@@ -266,6 +266,51 @@ def reset_demo():
     return {"status": "reset"}
 
 
+@app.post("/demo/seed")
+def seed_demo():
+    store.reset()
+    demo_requests = [
+        ChatRequest(
+            user_id="u-demo-1",
+            role="employee",
+            team="payments",
+            message="The checkout service is timing out. What should I check first?",
+            context={"incident_id": "INC-1042"},
+        ),
+        ChatRequest(
+            user_id="u-demo-2",
+            role="employee",
+            team="payments",
+            message="Here is the error log with token=demo-secret-value and customer@example.test. Why is this failing?",
+            context={"incident_id": "INC-1042"},
+        ),
+        ChatRequest(
+            user_id="u-demo-3",
+            role="employee",
+            team="cloudops",
+            message="Create a ticket for the VPN outage and assign it to CloudOps.",
+        ),
+        ChatRequest(
+            user_id="u-demo-4",
+            role="employee",
+            team="payments",
+            message="Give me admin access to the production database.",
+            context={"incident_id": "INC-1042"},
+        ),
+        ChatRequest(
+            user_id="u-demo-5",
+            role="manager",
+            team="payments",
+            message="Why did our AI and cloud costs spike this week?",
+        ),
+    ]
+
+    for demo_request in demo_requests:
+        chat(demo_request)
+
+    return {"status": "seeded", "requests": len(demo_requests), "metrics": store.metrics()}
+
+
 def build_answer(intent: str, redacted_text: str, decision: str) -> str:
     if decision == "deny":
         return "This request was denied by policy."
@@ -282,4 +327,3 @@ def build_answer(intent: str, redacted_text: str, decision: str) -> str:
         )
 
     return f"Request processed through the local demo gateway. Sanitized input: {redacted_text[:180]}"
-

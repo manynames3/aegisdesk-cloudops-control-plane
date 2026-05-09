@@ -82,3 +82,14 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert response.status_code == 200
     assert body["policy"]["reason"] == "incident_triage_allowed_for_employee"
     assert body["model_route"]["provider"] == "local"
+
+
+def test_seed_demo_populates_governance_state():
+    response = client.post("/demo/seed")
+    metrics = response.json()["metrics"]
+
+    assert response.status_code == 200
+    assert metrics["requests_total"] == 5
+    assert metrics["redactions_total"] >= 2
+    assert metrics["denied_actions"] == 1
+    assert metrics["tool_calls_total"] >= 2

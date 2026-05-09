@@ -22,6 +22,7 @@ Implemented endpoints:
 - `POST /approvals/{id}/deny`
 - `GET /metrics/summary`
 - `POST /demo/reset`
+- `POST /demo/seed`
 
 ## Local Run
 

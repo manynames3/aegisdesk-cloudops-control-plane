@@ -94,6 +94,7 @@ Completed:
 - FastAPI gateway with `/chat`, `/events`, `/approvals`, `/metrics/summary`, and `/health`
 - Redaction, policy decisions, model route metadata, approvals, mock tool calls, and audit events
 - SQLite-backed local audit/event state
+- Demo seed/reset actions for fast reviewer walkthroughs
 - API tests and web build in GitHub Actions
 - Deterministic control evals for redaction, routing, policy denial, approvals, and tool authorization
 - Rego policy files for model routing, tool authorization, and approvals

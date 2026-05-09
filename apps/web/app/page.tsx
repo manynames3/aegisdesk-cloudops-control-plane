@@ -224,6 +224,12 @@ export default function Home() {
     await refreshData();
   }
 
+  async function seedDemo() {
+    await fetch(`${API_BASE}/demo/seed`, { method: "POST" });
+    setMessages([]);
+    await refreshData();
+  }
+
   const latestResponse = useMemo(
     () => [...messages].reverse().find((item) => item.response)?.response,
     [messages]
@@ -278,6 +284,9 @@ export default function Home() {
           <div className="topActions">
             <button className="iconButton" onClick={refreshData} title="Refresh" type="button">
               <RefreshCw size={18} />
+            </button>
+            <button className="secondary" onClick={seedDemo} type="button">
+              Seed
             </button>
             <button className="secondary" onClick={resetDemo} type="button">
               Reset
