@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  docs-scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required documentation exists
+        run: |
+          test -f README.md
+          test -f docs/product/why-this-exists.md
+          test -f docs/product/target-users.md
+          test -f docs/product/use-cases.md
+          test -f docs/product/enterprise-value.md
+          test -f docs/product/frontend-demo-spec.md
+          test -f docs/architecture/system-architecture.md
+          test -f docs/architecture/api-contracts.md
+          test -f docs/architecture/audit-event-model.md
+          test -f docs/security/threat-model.md
+          test -f docs/delivery/two-week-mvp-plan.md
