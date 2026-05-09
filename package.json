@@ -1,0 +1,12 @@
+{
+  "name": "aegisdesk-cloudops-control-plane",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "dev:api": "cd services/api && .venv/bin/uvicorn app.main:app --reload --port 8000",
+    "test:api": "cd services/api && .venv/bin/pytest tests",
+    "check": "npm run build:web && npm run test:api"
+  }
+}

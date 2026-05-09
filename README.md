@@ -2,7 +2,7 @@
 
 AegisDesk is a portfolio project for a policy-aware AI gateway in cloud operations. The goal is to show how an enterprise can let employees use AI for incident triage, access requests, ticket workflows, and cost investigation while enforcing privacy controls, role-based policy, model routing, approvals, audit logs, and cost visibility.
 
-This repository currently contains the product definition, architecture, delivery plan, and implementation scaffolding. The first runnable milestone is a local Docker Compose demo with a Next.js frontend, FastAPI gateway, OPA policy checks, MCP-style tools, local model routing, redaction, and an admin governance dashboard.
+This repository now includes a local runnable MVP slice: a Next.js frontend, FastAPI gateway, deterministic policy/redaction/model-routing logic, mock MCP-style tools, approvals, audit events, Rego policy files, CI checks, and a Docker Compose deployment shape.
 
 ## About
 
@@ -30,26 +30,26 @@ The demo is designed around a simple recruiter-friendly story:
 
 ## Tech Stack
 
-This is the planned MVP stack reflected by the current scaffolding and documentation:
+This is the current MVP stack and near-term deployment path:
 
 | Area | Choice | Purpose |
 | --- | --- | --- |
 | Frontend | Next.js | Employee chat, manager approvals, admin dashboard |
 | API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
 | Policy | OPA, Rego | Authorization, model routing, approval, and budget rules |
-| AI routing | Ollama local model, optional cloud provider adapter | Local-first demo with optional cloud route |
-| Tooling | MCP-style Python tool layer | Ticket, access request, cost lookup, and knowledge search tools |
-| Observability | OpenTelemetry, Jaeger | Request traces and operational visibility |
-| Data | SQLite for MVP, Postgres path documented | Audit events and dashboard summaries |
-| Runtime | Docker Compose | Low-cost reproducible local demo |
+| AI routing | deterministic local route simulator, Ollama path documented | Shows routing decisions without paid model calls |
+| Tooling | MCP-style Python tool layer | Ticket, access request, and cost lookup tools |
+| Observability | trace IDs now, OpenTelemetry/Jaeger path documented | Request-level debugging and review |
+| Data | in-memory MVP state, Postgres path documented | Audit events and dashboard summaries |
+| Runtime | direct local run, Docker Compose path | Low-cost reproducible demo |
 | Cloud path | Terraform/OpenTofu, Helm | Production deployment path without requiring always-on cloud spend |
 | CI | GitHub Actions | Documentation checks now, implementation checks as code lands |
 
 ## Engineering Highlights
 
 - **Policy outside the model:** OPA/Rego is the authority for tool use, access requests, routing, and approvals.
-- **Local-first cost control:** the primary demo path is designed to run locally with Ollama and Docker Compose.
-- **Sensitive-data handling before model calls:** PII and secret detection are planned as pre-routing controls, not UI-only warnings.
+- **Local-first cost control:** the current demo does not call paid model providers or modify cloud resources.
+- **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
 - **Auditable AI workflow:** each request should produce events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
 - **Safe portfolio boundaries:** destructive cloud actions are mocked or approval-only in the MVP, with a production hardening path documented separately.
 - **Cloud role alignment:** the project emphasizes containers, policy-as-code, identity boundaries, observability, FinOps thinking, CI/CD, and deployable architecture.
@@ -65,7 +65,7 @@ flowchart LR
     API --> Redaction["PII and Secret Inspection"]
     API --> OPA["OPA / Rego Policy"]
     API --> Router["Model Router"]
-    Router --> Local["Ollama Local Model"]
+    Router --> Local["Local Route Simulator / Ollama Path"]
     Router --> Cloud["Optional Cloud Model"]
     API --> Tools["MCP-Style Tool Layer"]
     Tools --> Ticket["Ticket Tool"]
@@ -90,6 +90,12 @@ Architecture docs:
 
 Completed:
 
+- Local Next.js frontend with Chat, Approvals, Governance, and Evaluations views
+- FastAPI gateway with `/chat`, `/events`, `/approvals`, `/metrics/summary`, and `/health`
+- Redaction, policy decisions, model route metadata, approvals, mock tool calls, and audit events
+- API tests and web build in GitHub Actions
+- Rego policy files for model routing, tool authorization, and approvals
+- Docker Compose deployment shape
 - Product framing and target users
 - Recruiter and hiring manager positioning
 - Use cases and demo script
@@ -97,16 +103,15 @@ Completed:
 - Audit event model
 - Governance and threat model
 - Cost strategy and two-week MVP plan
-- GitHub Actions documentation scaffold check
+- GitHub Actions validation
 
 Next implementation milestone:
 
-- Next.js chat and governance dashboard
-- FastAPI `/chat` endpoint and event APIs
-- OPA policy integration
-- Mock MCP-style ticket, access, and cost tools
-- Local redaction and model-routing logic
-- Docker Compose runtime
+- Persist audit events in SQLite or Postgres
+- Wire OPA runtime evaluation into the API instead of mirrored Python policy logic
+- Add OpenTelemetry spans and Jaeger trace links
+- Add Promptfoo or deterministic red-team evaluation fixtures
+- Add screenshots and a short demo video
 
 ## Repository Structure
 
@@ -126,24 +131,44 @@ docs/security/            Governance model and threat model
 docs/delivery/            MVP plan, cost strategy, review checklist
 ```
 
-## Run Status
+## Local Run
 
-There is no live demo or runnable application yet. The repo is intentionally starting with clear documentation and implementation boundaries before code is added.
+The app runs locally and does not require cloud resources or paid model APIs.
+
+API:
+
+```bash
+cd services/api
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+Web:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+Docker Compose path when Docker is available:
+
+```bash
+docker compose up --build
+```
 
 ## Validation
 
-Current CI verifies that required documentation files exist. As implementation lands, CI should expand to include:
+Current CI verifies required docs, runs API tests, and builds the web app.
 
-- API tests
-- OPA policy tests
-- frontend checks
-- container build checks
-- Terraform/OpenTofu validation
-- Helm template validation
-
-Local checks used for this scaffold:
+Local checks:
 
 ```bash
+npm run build:web
+npm run test:api
 git diff --check
 ```
 
@@ -158,4 +183,3 @@ Sources:
 
 - https://www.cncf.io/announcements/2026/01/20/kubernetes-established-as-the-de-facto-operating-system-for-ai-as-production-use-hits-82-in-2025-cncf-annual-cloud-native-survey/
 - https://data.finops.org/
-

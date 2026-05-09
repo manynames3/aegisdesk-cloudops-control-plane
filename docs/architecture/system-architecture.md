@@ -32,7 +32,7 @@ Responsibilities:
 
 ### Gateway API
 
-Candidate stack: FastAPI + Pydantic.
+Stack: FastAPI + Pydantic.
 
 Responsibilities:
 
@@ -47,7 +47,7 @@ Responsibilities:
 
 ### Policy Engine
 
-Candidate stack: OPA/Rego.
+Stack: Rego policy files with mirrored Python enforcement in the current API.
 
 Policy decisions:
 
@@ -61,8 +61,8 @@ Policy decisions:
 
 MVP routing rules:
 
-- Public and low-risk requests can use cloud model if configured.
-- Sensitive requests route to local model.
+- Public and low-risk requests can use the simulated cloud route.
+- Sensitive requests route to the local route.
 - Requests with secrets can be blocked or redacted before routing.
 - Budget threshold can force lower-cost routes.
 
@@ -93,7 +93,7 @@ Tool safety pattern:
 
 ### Audit Store
 
-MVP storage: SQLite or Postgres.
+MVP storage: in-memory demo state. Production path: SQLite/Postgres and immutable audit sink.
 
 Events:
 
@@ -110,7 +110,7 @@ Events:
 
 ### Observability
 
-Candidate stack: OpenTelemetry + Jaeger.
+Current MVP: trace IDs in audit events. Production path: OpenTelemetry + Jaeger.
 
 Trace spans:
 
@@ -143,8 +143,8 @@ sequenceDiagram
     API->>OPA: Evaluate model/tool policy
     OPA-->>API: allow/deny/approval_required
     API->>MR: Select local or cloud model
-    MR->>M: Send approved prompt
-    M-->>MR: Response
+    MR->>M: Select local or simulated cloud route
+    M-->>MR: Route metadata
     MR-->>API: AI response
     API->>OPA: Evaluate tool action if needed
     OPA-->>API: tool decision
@@ -161,10 +161,8 @@ sequenceDiagram
 - Docker Compose
 - Next.js frontend
 - FastAPI gateway
-- OPA container
-- Ollama container or host service
-- Jaeger
-- SQLite/Postgres
+- optional OPA container
+- optional Jaeger
 
 ### Production Path
 
@@ -187,4 +185,3 @@ This is intentional:
 - Lower cost
 - Easier to run locally
 - Still demonstrates the enterprise control pattern
-

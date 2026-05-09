@@ -29,3 +29,36 @@ jobs:
           test -f docs/adrs/003-policy-outside-the-model.md
           test -f docs/security/threat-model.md
           test -f docs/delivery/two-week-mvp-plan.md
+          test -f compose.yaml
+          test -f policies/model_routing.rego
+          test -f policies/tool_authorization.rego
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API dependencies
+        working-directory: services/api
+        run: pip install -r requirements.txt
+      - name: Run API tests
+        working-directory: services/api
+        run: pytest tests
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Build web app
+        working-directory: apps/web
+        run: npm run build

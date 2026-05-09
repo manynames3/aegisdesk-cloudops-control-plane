@@ -1,0 +1,557 @@
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-subtle: #f0f3f6;
+  --text: #17202a;
+  --muted: #64707d;
+  --line: #dce2e8;
+  --accent: #126b68;
+  --accent-strong: #0e5653;
+  --good: #16794c;
+  --good-bg: #e7f6ee;
+  --warn: #9a5b00;
+  --warn-bg: #fff3d6;
+  --bad: #b42318;
+  --bad-bg: #ffe7e4;
+  --neutral-bg: #e8eef7;
+  --neutral: #315273;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  border-right: 1px solid var(--line);
+  background: #101820;
+  color: #f8fafc;
+  padding: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand strong {
+  font-size: 18px;
+}
+
+.brand span {
+  color: #a7b4c2;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.tabs {
+  display: grid;
+  gap: 8px;
+}
+
+.tabs button,
+.promptBar button,
+.composer button,
+.secondary,
+.iconButton {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.tabs button {
+  background: transparent;
+  color: #c9d3dd;
+  justify-content: flex-start;
+  padding: 12px;
+}
+
+.tabs button.active,
+.tabs button:hover {
+  background: #22303d;
+  color: #ffffff;
+}
+
+.rolePanel {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.rolePanel > span {
+  color: #a7b4c2;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.segmented {
+  background: #22303d;
+  border: 1px solid #304253;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+}
+
+.segmented button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #c9d3dd;
+  padding: 8px;
+  text-transform: capitalize;
+}
+
+.segmented button.selected {
+  background: #ffffff;
+  color: #101820;
+}
+
+.status {
+  align-items: center;
+  color: #c9d3dd;
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.status span {
+  background: #a7b4c2;
+  border-radius: 999px;
+  display: block;
+  height: 9px;
+  width: 9px;
+}
+
+.status.ok span {
+  background: #33c27f;
+}
+
+.status.offline span {
+  background: #ff6b5f;
+}
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 28px;
+}
+
+.topbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.topbar p,
+.topbar h1 {
+  margin: 0;
+}
+
+.topbar p {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.topbar h1 {
+  font-size: 30px;
+  line-height: 1.2;
+}
+
+.topActions {
+  display: flex;
+  gap: 10px;
+}
+
+.secondary,
+.iconButton {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--text);
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.iconButton {
+  aspect-ratio: 1;
+  padding: 0;
+  width: 40px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(16, 24, 32, 0.05);
+}
+
+.chatGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.chatPanel {
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr) auto;
+  min-height: calc(100vh - 112px);
+  overflow: hidden;
+}
+
+.promptBar {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px;
+}
+
+.promptBar button {
+  background: var(--panel-subtle);
+  border-color: var(--line);
+  color: var(--text);
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 18px;
+}
+
+.emptyState {
+  align-items: center;
+  color: var(--muted);
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin: auto;
+}
+
+.bubble {
+  border-radius: 8px;
+  max-width: 760px;
+  padding: 14px;
+}
+
+.bubble p {
+  margin: 0;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: #dff4f2;
+  border: 1px solid #b9dfdc;
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: #f4f6f8;
+  border: 1px solid var(--line);
+}
+
+.composer {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px;
+}
+
+.composer textarea {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  min-height: 72px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.composer button {
+  background: var(--accent);
+  border: 0;
+  color: #ffffff;
+  min-width: 104px;
+  padding: 0 18px;
+}
+
+.composer button:hover {
+  background: var(--accent-strong);
+}
+
+.decisionPanel {
+  align-self: start;
+  padding: 18px;
+}
+
+.decisionPanel h2,
+.sectionHeader h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.metaGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.badge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 7px 9px;
+  text-transform: uppercase;
+}
+
+.badge.good {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.badge.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.badge.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.badge.neutral {
+  background: var(--neutral-bg);
+  color: var(--neutral);
+}
+
+.decisionStack {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.decisionItem {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+}
+
+.decisionItem span,
+.metric span,
+.eventItem span,
+.approvalRow span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.decisionItem strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.governanceGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.metric {
+  display: grid;
+  gap: 8px;
+  min-height: 128px;
+  padding: 18px;
+}
+
+.metric svg {
+  color: var(--accent);
+}
+
+.metric strong {
+  font-size: 26px;
+}
+
+.eventPanel {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.sectionHeader {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.sectionHeader > span {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.eventList,
+.table,
+.evalPanel {
+  display: grid;
+}
+
+.eventItem,
+.approvalRow,
+.evalRow {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  padding: 14px 18px;
+}
+
+.eventItem {
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+
+.eventItem strong,
+.approvalRow strong {
+  display: block;
+}
+
+.eventItem:last-child,
+.approvalRow:last-child,
+.evalRow:last-child {
+  border-bottom: 0;
+}
+
+.approvalRow {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.rowActions {
+  display: flex;
+  gap: 8px;
+}
+
+.emptyRow {
+  color: var(--muted);
+  padding: 18px;
+}
+
+.evalPanel {
+  overflow: hidden;
+}
+
+.evalRow {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.evalRow svg {
+  color: var(--good);
+}
+
+@media (max-width: 1100px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .tabs button {
+    justify-content: center;
+  }
+
+  .chatGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .governanceGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace {
+    padding: 18px;
+  }
+
+  .topbar,
+  .composer {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    display: grid;
+    gap: 14px;
+  }
+
+  .tabs,
+  .governanceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .approvalRow,
+  .eventItem {
+    grid-template-columns: 1fr;
+  }
+}
+

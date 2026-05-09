@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AegisDesk is currently a documentation-first scaffold for a CloudOps AI control plane. The intended MVP is a local-first system where a frontend sends employee, manager, and admin workflows through a FastAPI gateway that performs redaction, policy evaluation, model routing, tool authorization, audit logging, and observability.
+AegisDesk is a local-first MVP for a CloudOps AI control plane. The current implementation sends employee, manager, and admin workflows through a FastAPI gateway that performs redaction, policy evaluation, model route selection, mock tool authorization, approval handling, and audit logging.
 
 ## Container Diagram
 
@@ -23,7 +23,7 @@ flowchart LR
     end
 
     subgraph External["External Systems"]
-        LocalModel["Local Model<br/>Ollama"]
+        LocalModel["Local Route<br/>Simulator now / Ollama path"]
         CloudModel["Optional Cloud Model<br/>Provider adapter"]
     end
 
@@ -56,18 +56,23 @@ flowchart LR
 
 ### Current Repository State
 
-The repository is a scaffold. It contains documentation, contracts, CI documentation checks, and workspaces for the planned application services.
+The repository contains a runnable local frontend and API, Rego policy files, CI checks, API tests, documentation, and a Docker Compose deployment shape.
 
 ### MVP Deployment
 
-The first runnable target is Docker Compose:
+The verified local development path is direct process execution:
+
+- `services/api`: FastAPI gateway on port 8000
+- `apps/web`: Next.js frontend on port 3000
+
+The Docker Compose path is available when Docker is installed:
 
 - `apps/web`: Next.js frontend
 - `services/api`: FastAPI gateway
 - `services/mcp-tools`: MCP-style tool service
 - `policies`: OPA/Rego policy bundle
-- local model route through Ollama
-- SQLite or Postgres for audit events
+- local model route simulator, with Ollama path documented
+- in-memory audit events for MVP
 - Jaeger for trace viewing
 
 ### Production Path
@@ -84,7 +89,7 @@ The production path is documented but not implemented yet:
 
 ## Key Constraints
 
-- The current repo must not claim a live app until the app exists.
+- The current demo must not claim paid model calls or real cloud writes.
 - Destructive cloud actions are mocked or approval-only in the portfolio MVP.
 - Policy must be enforced outside the model.
 - Sensitive data controls happen before model routing.

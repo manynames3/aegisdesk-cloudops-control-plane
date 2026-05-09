@@ -1,6 +1,6 @@
-# API Service Placeholder
+# API Service
 
-Planned backend: FastAPI + Pydantic.
+Backend: FastAPI + Pydantic.
 
 Responsibilities:
 
@@ -12,12 +12,31 @@ Responsibilities:
 - Create audit events
 - Emit OpenTelemetry traces
 
-Planned endpoints:
+Implemented endpoints:
 
+- `GET /health`
 - `POST /chat`
 - `GET /events`
 - `GET /approvals`
 - `POST /approvals/{id}/approve`
 - `POST /approvals/{id}/deny`
 - `GET /metrics/summary`
+- `POST /demo/reset`
 
+## Local Run
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+## Tests
+
+```bash
+.venv/bin/pytest tests
+```
+
+## Current Boundary
+
+The API uses in-memory demo state and deterministic mock tools. It does not call paid model providers or modify real cloud resources.

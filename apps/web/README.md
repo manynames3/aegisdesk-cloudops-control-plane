@@ -1,6 +1,6 @@
-# Web App Placeholder
+# Web App
 
-Planned frontend: Next.js.
+Frontend: Next.js.
 
 Views:
 
@@ -18,3 +18,11 @@ The frontend should make enterprise controls visible through simple UI elements:
 - Approval status
 - Audit timeline
 
+## Local Run
+
+```bash
+npm install
+npm run dev
+```
+
+By default the app expects the API at `http://localhost:8000`. Override with `NEXT_PUBLIC_API_BASE_URL`.
