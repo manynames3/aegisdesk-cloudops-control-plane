@@ -1,6 +1,33 @@
 # API Contracts
 
-These contracts are the intended MVP shape. They may change during implementation, but they define the first build target.
+These contracts describe the current MVP shape. Protected endpoints require `Authorization: Bearer <demo token>` locally.
+
+## POST /auth/demo-token
+
+Request:
+
+```json
+{
+  "role": "employee",
+  "team": "payments"
+}
+```
+
+Response:
+
+```json
+{
+  "access_token": "signed.demo.token",
+  "token_type": "bearer",
+  "actor": {
+    "user_id": "u-1001",
+    "role": "employee",
+    "team": "payments"
+  }
+}
+```
+
+This is a local demo issuer only. Hosted deployments should replace it with OIDC/JWKS verification.
 
 ## POST /chat
 
@@ -8,9 +35,6 @@ Request:
 
 ```json
 {
-  "user_id": "u-1001",
-  "role": "employee",
-  "team": "payments",
   "message": "The checkout service is timing out. What should I check first?",
   "context": {
     "incident_id": "INC-1042"
@@ -37,39 +61,31 @@ Response:
   },
   "policy": {
     "decision": "allow",
-    "reason": "support_guidance_allowed"
+    "reason": "incident_triage_allowed_for_employee",
+    "policy_name": "chat_policy",
+    "metadata": {}
   },
   "tool_calls": [],
   "trace_id": "trace-123"
 }
 ```
 
-## POST /tools/ticket
+## Tool Calls Through /chat
 
-Request:
+The MVP does not expose separate public tool endpoints. Tool actions are selected by intent inside `/chat`, authorized by OPA, and returned as structured `tool_calls`.
 
-```json
-{
-  "request_id": "req-abc123",
-  "user_id": "u-1001",
-  "role": "employee",
-  "action": "create_ticket",
-  "payload": {
-    "title": "Checkout service timeout",
-    "team": "cloudops",
-    "severity": "medium"
-  }
-}
-```
-
-Response:
+Example tool call response:
 
 ```json
 {
   "tool_call_id": "tool-001",
+  "name": "ticket.create",
+  "status": "allowed",
   "policy": {
     "decision": "allow",
-    "reason": "employees_can_create_support_tickets"
+    "reason": "employees_can_create_support_tickets",
+    "policy_name": "tool_authorization",
+    "metadata": {}
   },
   "result": {
     "ticket_id": "TCK-4821",
@@ -78,38 +94,9 @@ Response:
 }
 ```
 
-## POST /access-requests
-
-Request:
-
-```json
-{
-  "user_id": "u-1001",
-  "role": "employee",
-  "resource": "prod-payments-db",
-  "permission": "admin",
-  "reason": "debug incident INC-1042"
-}
-```
-
-Response:
-
-```json
-{
-  "request_id": "access-123",
-  "policy": {
-    "decision": "deny",
-    "reason": "employees_cannot_request_production_admin_access"
-  },
-  "suggested_alternative": {
-    "permission": "read_only",
-    "requires_approval": true,
-    "expires_in": "2h"
-  }
-}
-```
-
 ## GET /events
+
+Requires admin role.
 
 Response:
 
@@ -129,6 +116,8 @@ Response:
 
 ## GET /metrics/summary
 
+Requires admin role.
+
 Response:
 
 ```json
@@ -143,4 +132,3 @@ Response:
   "tool_calls_total": 42
 }
 ```
-

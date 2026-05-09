@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AegisDesk is a local-first MVP for a CloudOps AI control plane. The current implementation sends employee, manager, and admin workflows through a FastAPI gateway that performs redaction, policy evaluation, model route selection, mock tool authorization, approval handling, and audit logging.
+AegisDesk is a local-first MVP for a CloudOps AI control plane. The current implementation sends employee, manager, and admin workflows through a FastAPI gateway that verifies signed demo tokens, performs redaction, calls OPA/Rego policy, selects a model route, authorizes mock tools, handles approvals, emits OpenTelemetry spans, and writes audit events.
 
 ## Container Diagram
 
@@ -14,8 +14,9 @@ flowchart LR
 
     subgraph AegisDesk["AegisDesk System Boundary"]
         Web["Web App<br/>Next.js<br/>Chat, approvals, dashboard"]
+        Auth["Demo Auth<br/>Signed JWT-style tokens<br/>Local identity boundary"]
         API["Gateway API<br/>FastAPI / Pydantic<br/>Validation, orchestration, audit"]
-        Policy["Policy Engine<br/>OPA / Rego<br/>Routing, authorization, approval rules"]
+        Policy["Policy Engine<br/>OPA / Rego over HTTP<br/>Routing, authorization, approval rules"]
         Router["Model Router<br/>Python module<br/>Local/cloud route selection"]
         Tools["MCP-Style Tool Layer<br/>Python<br/>Ticket, access, cost, knowledge tools"]
         Audit[("Audit Store<br/>SQLite MVP / Postgres path")]
@@ -30,7 +31,8 @@ flowchart LR
     Employee --> Web
     Manager --> Web
     Admin --> Web
-    Web --> API
+    Web --> Auth
+    Auth --> API
     API --> Policy
     API --> Router
     Router --> LocalModel
@@ -44,7 +46,7 @@ flowchart LR
 ## Runtime Flow
 
 1. A user submits a CloudOps request through the web app.
-2. The FastAPI gateway validates the request and attaches user, role, team, and request context.
+2. The FastAPI gateway validates the bearer token and derives user, role, and team from signed claims.
 3. The gateway inspects input for PII, secrets, and privileged-action intent.
 4. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
 5. The model router chooses local Ollama or an optional cloud provider based on sensitivity, budget, and policy.
@@ -56,7 +58,7 @@ flowchart LR
 
 ### Current Repository State
 
-The repository contains a runnable local frontend and API, Rego policy files, CI checks, API tests, documentation, and a Docker Compose deployment shape.
+The repository contains a runnable local frontend and API, signed demo auth, Rego policy files and tests, CI checks, API tests, documentation, screenshots, Docker Compose, and plan-only AWS Terraform.
 
 ### MVP Deployment
 
@@ -69,21 +71,20 @@ The Docker Compose path is available when Docker is installed:
 
 - `apps/web`: Next.js frontend
 - `services/api`: FastAPI gateway
-- `services/mcp-tools`: MCP-style tool service
-- `policies`: OPA/Rego policy bundle
+- `opa`: OPA server loaded from the Rego policy bundle
 - local model route simulator, with Ollama path documented
 - SQLite audit events for MVP
-- Jaeger for trace viewing
+- Jaeger for trace viewing through OTLP HTTP export
 
 ### Production Path
 
-The production path is documented but not implemented yet:
+The production path is partially modeled as plan-only Terraform and not applied:
 
-- Kubernetes deployment with Helm
-- Terraform/OpenTofu for cloud resources
-- managed Postgres
-- cloud identity provider integration
-- managed secrets
+- S3 and CloudFront static frontend
+- Lambda container API behind HTTP API Gateway
+- ECR, IAM, CloudWatch logs, Secrets Manager reference, and AWS Budget
+- future managed Postgres
+- future OIDC/JWKS identity provider integration
 - immutable or append-only audit sink
 - scoped IAM roles for any real cloud tools
 

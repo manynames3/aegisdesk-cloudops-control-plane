@@ -8,7 +8,6 @@ requires_approval if {
 }
 
 requires_approval if {
-  input.action == "view_cost_summary"
+  input.action == "view_summary"
   input.role == "employee"
 }
-

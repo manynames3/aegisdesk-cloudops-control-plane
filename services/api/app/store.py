@@ -121,6 +121,8 @@ class DemoStore:
         approval = self.get_approval(approval_id)
         if role not in {Role.manager, Role.admin}:
             raise PermissionError("approval_decision_requires_manager_or_admin")
+        if approval.status != ApprovalStatus.pending:
+            raise ValueError("approval_already_decided")
 
         approval.status = ApprovalStatus.approved if approved else ApprovalStatus.denied
         approval.decided_by = actor_id
@@ -158,6 +160,13 @@ class DemoStore:
             self._conn.execute("DELETE FROM audit_events")
             self._conn.execute("DELETE FROM approvals")
             self._conn.execute("DELETE FROM model_routes")
+
+    def ready(self) -> bool:
+        try:
+            self._conn.execute("SELECT 1").fetchone()
+        except sqlite3.Error:
+            return False
+        return True
 
 
 def actor_from(user_id: str, role: Role, team: str) -> Actor:

@@ -84,6 +84,15 @@ type Approval = {
   created_at: string;
 };
 
+type DemoTokenResponse = {
+  access_token: string;
+  actor: {
+    user_id: string;
+    role: Role;
+    team: string;
+  };
+};
+
 type Message = {
   role: "user" | "assistant";
   text: string;
@@ -141,20 +150,43 @@ export default function Home() {
   const [apiStatus, setApiStatus] = useState<"checking" | "ok" | "offline">("checking");
 
   const canApprove = role === "manager" || role === "admin";
+  const canSeedDemo = role === "admin";
+
+  async function authHeaders(selectedRole = role): Promise<HeadersInit> {
+    const response = await fetch(`${API_BASE}/auth/demo-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: selectedRole,
+        team: selectedRole === "admin" ? "platform" : "payments"
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("demo_token_failed");
+    }
+
+    const token = (await response.json()) as DemoTokenResponse;
+    return {
+      Authorization: `Bearer ${token.access_token}`,
+      "Content-Type": "application/json"
+    };
+  }
 
   async function refreshData() {
     try {
+      const headers = await authHeaders();
       const [healthRes, metricsRes, eventsRes, approvalsRes] = await Promise.all([
         fetch(`${API_BASE}/health`),
-        fetch(`${API_BASE}/metrics/summary`),
-        fetch(`${API_BASE}/events`),
-        fetch(`${API_BASE}/approvals`)
+        fetch(`${API_BASE}/metrics/summary`, { headers }),
+        fetch(`${API_BASE}/events`, { headers }),
+        fetch(`${API_BASE}/approvals`, { headers })
       ]);
 
       setApiStatus(healthRes.ok ? "ok" : "offline");
-      if (metricsRes.ok) setMetrics(await metricsRes.json());
-      if (eventsRes.ok) setEvents((await eventsRes.json()).events);
-      if (approvalsRes.ok) setApprovals((await approvalsRes.json()).approvals);
+      setMetrics(metricsRes.ok ? await metricsRes.json() : initialMetrics);
+      setEvents(eventsRes.ok ? (await eventsRes.json()).events : []);
+      setApprovals(approvalsRes.ok ? (await approvalsRes.json()).approvals : []);
     } catch {
       setApiStatus("offline");
     }
@@ -162,7 +194,7 @@ export default function Home() {
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [role]);
 
   async function sendChat(event?: FormEvent) {
     event?.preventDefault();
@@ -173,13 +205,11 @@ export default function Home() {
     setMessages((current) => [...current, { role: "user", text: trimmed }]);
 
     try {
+      const headers = await authHeaders();
       const response = await fetch(`${API_BASE}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
-          user_id: role === "employee" ? "u-1001" : role === "manager" ? "u-2001" : "u-9001",
-          role,
-          team: role === "admin" ? "platform" : "payments",
           message: trimmed,
           context: { incident_id: "INC-1042" }
         })
@@ -207,25 +237,26 @@ export default function Home() {
   }
 
   async function decideApproval(approvalId: string, action: "approve" | "deny") {
+    const headers = await authHeaders();
     await fetch(`${API_BASE}/approvals/${approvalId}/${action}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        actor_id: role === "admin" ? "u-9001" : "u-2001",
-        role
-      })
+      headers
     });
     await refreshData();
   }
 
   async function resetDemo() {
-    await fetch(`${API_BASE}/demo/reset`, { method: "POST" });
+    if (!canSeedDemo) return;
+    const headers = await authHeaders("admin");
+    await fetch(`${API_BASE}/demo/reset`, { method: "POST", headers });
     setMessages([]);
     await refreshData();
   }
 
   async function seedDemo() {
-    await fetch(`${API_BASE}/demo/seed`, { method: "POST" });
+    if (!canSeedDemo) return;
+    const headers = await authHeaders("admin");
+    await fetch(`${API_BASE}/demo/seed`, { method: "POST", headers });
     setMessages([]);
     await refreshData();
   }
@@ -285,10 +316,10 @@ export default function Home() {
             <button className="iconButton" onClick={refreshData} title="Refresh" type="button">
               <RefreshCw size={18} />
             </button>
-            <button className="secondary" onClick={seedDemo} type="button">
+            <button className="secondary" disabled={!canSeedDemo} onClick={seedDemo} title="Admin demo role required" type="button">
               Seed
             </button>
-            <button className="secondary" onClick={resetDemo} type="button">
+            <button className="secondary" disabled={!canSeedDemo} onClick={resetDemo} title="Admin demo role required" type="button">
               Reset
             </button>
           </div>

@@ -20,6 +20,7 @@ decision := {
   "reason": "pii_redacted_before_local_model_route",
 } if {
   input.pii_detected == true
+  input.secrets_detected == false
 }
 
 decision := {
@@ -28,5 +29,6 @@ decision := {
   "reason": "internal_operational_context_uses_local_route",
 } if {
   input.intent in {"incident_triage", "production_admin_access", "temporary_read_only_access"}
+  input.pii_detected == false
+  input.secrets_detected == false
 }
-

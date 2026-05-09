@@ -54,7 +54,7 @@ Controls:
 - Policy enforced outside the model
 - Tool calls evaluated by gateway, not by model alone
 - System instructions separated from user/tool content
-- Evaluation tests for common prompt injection patterns
+- Deterministic control evals for policy denial, routing, redaction, and tool authorization
 
 ### 4. Cost Abuse
 
@@ -101,6 +101,7 @@ Controls:
 - Real destructive cloud operations
 - Full enterprise identity federation
 - Full compliance certification
+- Real prompt-injection corpus coverage
 
 ## Production Hardening Path
 
@@ -113,4 +114,3 @@ Controls:
 - Network policies
 - Rate limits and quotas
 - Formal incident response runbook
-

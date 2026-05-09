@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import ChatRequest, PolicyDecision, RedactionResult, Role
+from .models import Actor, PolicyDecision, RedactionResult, Role
 
 
 def classify_intent(message: str) -> str:
@@ -19,7 +19,7 @@ def classify_intent(message: str) -> str:
     return "support_guidance"
 
 
-def evaluate_chat_policy(request: ChatRequest, intent: str) -> PolicyDecision:
+def evaluate_chat_policy(actor: Actor, intent: str) -> PolicyDecision:
     if intent == "production_admin_access":
         return PolicyDecision(
             decision="deny",
@@ -27,7 +27,7 @@ def evaluate_chat_policy(request: ChatRequest, intent: str) -> PolicyDecision:
             policy_name="tool_authorization",
         )
 
-    if intent == "cost_investigation" and request.role == Role.employee:
+    if intent == "cost_investigation" and actor.role == Role.employee:
         return PolicyDecision(
             decision="approval_required",
             reason="cost_investigation_requires_manager_or_admin",
@@ -36,7 +36,7 @@ def evaluate_chat_policy(request: ChatRequest, intent: str) -> PolicyDecision:
 
     return PolicyDecision(
         decision="allow",
-        reason=f"{intent}_allowed_for_{request.role.value}",
+        reason=f"{intent}_allowed_for_{actor.role.value}",
         policy_name="chat_request",
     )
 

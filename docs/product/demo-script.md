@@ -10,6 +10,8 @@ Open three views:
 2. Manager approval queue
 3. Admin governance dashboard
 
+Before presenting, switch to `Admin` and click `Seed` so the governance dashboard has audit history.
+
 ## 30-Second Introduction
 
 Say:
@@ -25,9 +27,8 @@ Prompt:
 Show:
 
 - AI answer
-- Source/runbook reference
-- Suggested ticket creation
 - Model used
+- Route reason and trace ID
 
 Explain:
 
@@ -61,6 +62,7 @@ Show:
 - Denied result
 - OPA policy explanation
 - Safer alternative: temporary read-only access with approval
+- Backend-derived employee role from signed demo token
 
 Explain:
 

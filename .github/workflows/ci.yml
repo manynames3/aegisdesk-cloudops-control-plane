@@ -30,11 +30,17 @@ jobs:
           test -f docs/adrs/001-cloudops-control-plane.md
           test -f docs/adrs/002-local-first-mvp.md
           test -f docs/adrs/003-policy-outside-the-model.md
+          test -f docs/adrs/006-demo-token-auth-boundary.md
+          test -f docs/adrs/007-plan-only-aws-iac.md
+          test -f docs/demo/README.md
+          test -f docs/demo/screenshots/policy-aware-chat.png
           test -f docs/security/threat-model.md
           test -f docs/delivery/two-week-mvp-plan.md
           test -f compose.yaml
+          test -f policies/chat_policy.rego
           test -f policies/model_routing.rego
           test -f policies/tool_authorization.rego
+          test -f infra/terraform/main.tf
 
   api:
     runs-on: ubuntu-latest
@@ -46,11 +52,44 @@ jobs:
       - name: Install API dependencies
         working-directory: services/api
         run: pip install -r requirements.txt
+      - name: Check Python dependency compatibility
+        working-directory: services/api
+        run: python -m pip check
       - name: Run API tests
         working-directory: services/api
         run: pytest tests
       - name: Run control evals
         run: python evals/run_evals.py
+
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install OPA
+        run: |
+          curl -fsSL -o opa https://openpolicyagent.org/downloads/v1.16.1/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/opa
+          opa version
+      - name: Run Rego policy tests
+        run: opa test policies
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Terraform
+        run: |
+          curl -fsSLo terraform.zip https://releases.hashicorp.com/terraform/1.14.9/terraform_1.14.9_linux_amd64.zip
+          unzip -q terraform.zip
+          sudo mv terraform /usr/local/bin/terraform
+          terraform version
+      - name: Validate Terraform formatting
+        run: terraform -chdir=infra/terraform fmt -check
+      - name: Initialize Terraform without backend
+        run: terraform -chdir=infra/terraform init -backend=false
+      - name: Validate Terraform
+        run: terraform -chdir=infra/terraform validate
 
   web:
     runs-on: ubuntu-latest
@@ -64,6 +103,20 @@ jobs:
       - name: Install web dependencies
         working-directory: apps/web
         run: npm ci
+      - name: Audit web dependencies
+        working-directory: apps/web
+        run: npm audit --audit-level=critical
       - name: Build web app
         working-directory: apps/web
         run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate Compose file
+        run: docker compose config
+      - name: Build API image
+        run: docker build -t aegisdesk-api:ci services/api
+      - name: Build web image
+        run: docker build -t aegisdesk-web:ci apps/web

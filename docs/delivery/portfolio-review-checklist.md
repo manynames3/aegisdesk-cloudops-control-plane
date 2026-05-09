@@ -17,6 +17,7 @@ Use this before applying to jobs.
 - API has tests.
 - OPA policies have tests.
 - Security controls are not only UI labels.
+- API derives role from signed token claims, not request body fields.
 - Tool calls are actually policy checked.
 - Audit events are real records.
 - Cost routing is deterministic and explainable.
@@ -27,8 +28,8 @@ Use this before applying to jobs.
 
 - Containerized services
 - CI pipeline
-- IaC skeleton
-- Kubernetes/Helm path
+- Plan-only AWS Terraform that validates
+- Kubernetes/Helm path only if target roles require it
 - Observability
 - Secrets handling plan
 - Least-privilege design
@@ -45,4 +46,3 @@ Use this before applying to jobs.
 - No tests
 - No security model
 - No explanation of tradeoffs
-

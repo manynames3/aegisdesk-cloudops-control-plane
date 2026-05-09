@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -9,9 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 API_ROOT = ROOT / "services" / "api"
 sys.path.insert(0, str(API_ROOT))
 
+os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("AEGISDESK_AUTH_SECRET", "eval-auth-secret")
+os.environ.setdefault("AEGISDESK_POLICY_MODE", "python")
+
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.auth import create_demo_token  # noqa: E402
 from app.main import app, store  # noqa: E402
+from app.models import Actor, Role  # noqa: E402
 
 
 def load_cases() -> list[dict[str, Any]]:
@@ -21,11 +28,13 @@ def load_cases() -> list[dict[str, Any]]:
 def check_case(case: dict[str, Any], client: TestClient) -> list[str]:
     store.reset()
     payload = {
-        **case["user"],
         "message": case["message"],
         "context": {"eval_case": case["id"]},
     }
-    response = client.post("/chat", json=payload)
+    user = case["user"]
+    actor = Actor(user_id=user["user_id"], role=Role(user["role"]), team=user["team"])
+    headers = {"Authorization": f"Bearer {create_demo_token(actor)}"}
+    response = client.post("/chat", headers=headers, json=payload)
     failures: list[str] = []
 
     if response.status_code != 200:
@@ -46,7 +55,9 @@ def check_case(case: dict[str, Any], client: TestClient) -> list[str]:
         assertions["tool_status"] = body["tool_calls"][0]["status"]
 
     if "pending_approvals" in expected:
-        metrics = client.get("/metrics/summary").json()
+        admin = Actor(user_id="u-eval-admin", role=Role.admin, team="platform")
+        admin_headers = {"Authorization": f"Bearer {create_demo_token(admin)}"}
+        metrics = client.get("/metrics/summary", headers=admin_headers).json()
         assertions["pending_approvals"] = metrics["approvals_pending"]
 
     for key, expected_value in expected.items():
@@ -82,4 +93,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

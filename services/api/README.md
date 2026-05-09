@@ -14,7 +14,10 @@ Responsibilities:
 
 Implemented endpoints:
 
+- `POST /auth/demo-token`
 - `GET /health`
+- `GET /health/live`
+- `GET /health/ready`
 - `POST /chat`
 - `GET /events`
 - `GET /approvals`
@@ -31,6 +34,8 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
+
+Direct local runs default to `AEGISDESK_POLICY_MODE=auto`, which uses OPA when `OPA_URL` is set and falls back to the mirrored Python policy evaluator when OPA is not configured. Docker Compose sets `AEGISDESK_POLICY_MODE=opa`.
 
 ## Tests
 
@@ -49,3 +54,5 @@ AEGISDESK_DB_PATH=:memory:
 ## Current Boundary
 
 The API uses deterministic mock tools. It does not call paid model providers or modify real cloud resources.
+
+The `/auth/demo-token` endpoint is a local demo issuer only. Production identity should use OIDC/JWT verification from a real identity provider.

@@ -15,9 +15,6 @@ class Role(StrEnum):
 
 
 class ChatRequest(BaseModel):
-    user_id: str = Field(min_length=1)
-    role: Role
-    team: str = Field(min_length=1)
     message: str = Field(min_length=1)
     context: dict[str, Any] = Field(default_factory=dict)
 
@@ -45,6 +42,7 @@ class PolicyDecision(BaseModel):
     decision: Literal["allow", "deny", "approval_required"]
     reason: str
     policy_name: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelRoute(BaseModel):
@@ -105,9 +103,15 @@ class ApprovalRequest(BaseModel):
     decided_at: datetime | None = None
 
 
-class ApprovalDecisionRequest(BaseModel):
-    actor_id: str
+class DemoTokenRequest(BaseModel):
     role: Role
+    team: str | None = None
+
+
+class DemoTokenResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    actor: Actor
 
 
 class EventList(BaseModel):
@@ -133,4 +137,3 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
     service: str
     mode: str
-

@@ -2,7 +2,7 @@
 
 AegisDesk is a portfolio project for a policy-aware AI gateway in cloud operations. The goal is to show how an enterprise can let employees use AI for incident triage, access requests, ticket workflows, and cost investigation while enforcing privacy controls, role-based policy, model routing, approvals, audit logs, and cost visibility.
 
-This repository now includes a local runnable MVP slice: a Next.js frontend, FastAPI gateway, deterministic policy/redaction/model-routing logic, mock MCP-style tools, approvals, audit events, Rego policy files, CI checks, and a Docker Compose deployment shape.
+This repository now includes a local runnable MVP slice: a Next.js frontend, FastAPI gateway, signed demo auth tokens, OPA/Rego policy enforcement, redaction/model-routing logic, mock MCP-style tools, approvals, audit events, OpenTelemetry instrumentation, CI checks, Docker Compose, and plan-only AWS Terraform.
 
 ## About
 
@@ -11,6 +11,16 @@ Most AI demos stop at generating an answer. AegisDesk focuses on the enterprise 
 The demo is designed around a simple recruiter-friendly story:
 
 > Employees get AI help for cloud operations. The company keeps control over privacy, access, cost, and accountability.
+
+Live demo: not deployed yet. The project is intentionally local-first until cloud spend is explicitly approved.
+
+## Screenshots
+
+![Policy-aware chat](docs/demo/screenshots/policy-aware-chat.png)
+
+![Governance dashboard](docs/demo/screenshots/governance-dashboard.png)
+
+![Manager approvals](docs/demo/screenshots/manager-approvals.png)
 
 ## Target Users
 
@@ -36,21 +46,24 @@ This is the current MVP stack and near-term deployment path:
 | --- | --- | --- |
 | Frontend | Next.js | Employee chat, manager approvals, admin dashboard |
 | API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
-| Policy | OPA, Rego | Authorization, model routing, approval, and budget rules |
+| Auth | Signed local demo JWT-style tokens | Backend-derived identity and role claims for portfolio demo |
+| Policy | OPA/Rego via HTTP, explicit Python fallback | Authorization, model routing, approval, and budget rules |
 | AI routing | deterministic local route simulator, Ollama path documented | Shows routing decisions without paid model calls |
 | Tooling | MCP-style Python tool layer | Ticket, access request, and cost lookup tools |
-| Observability | trace IDs now, OpenTelemetry/Jaeger path documented | Request-level debugging and review |
+| Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and review |
 | Data | SQLite MVP state, Postgres path documented | Audit events and dashboard summaries |
 | Runtime | direct local run, Docker Compose path | Low-cost reproducible demo |
-| Cloud path | Terraform/OpenTofu, Helm | Production deployment path without requiring always-on cloud spend |
-| CI | GitHub Actions | Documentation checks now, implementation checks as code lands |
+| Cloud path | Plan-only AWS Terraform, Helm path documented | Production deployment path without requiring always-on cloud spend |
+| CI | GitHub Actions | API tests, evals, web build, OPA tests, Terraform validate, container builds |
 
 ## Engineering Highlights
 
-- **Policy outside the model:** OPA/Rego is the authority for tool use, access requests, routing, and approvals.
+- **Backend-enforced identity boundary:** protected API routes derive user, role, and team from signed demo tokens instead of trusting frontend role fields.
+- **Policy outside the model:** OPA/Rego is the runtime policy path for tool use, access requests, routing, and approvals, with Python fallback only for direct local/test mode.
 - **Local-first cost control:** the current demo does not call paid model providers or modify cloud resources.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
-- **Auditable AI workflow:** each request should produce events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
+- **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
+- **Plan-only AWS architecture:** Terraform models a low-idle-cost AWS path with S3, CloudFront, Lambda container runtime, API Gateway, ECR, IAM, Secrets Manager, CloudWatch logs, and a budget guardrail without applying resources.
 - **Safe portfolio boundaries:** destructive cloud actions are mocked or approval-only in the MVP, with a production hardening path documented separately.
 - **Cloud role alignment:** the project emphasizes containers, policy-as-code, identity boundaries, observability, FinOps thinking, CI/CD, and deployable architecture.
 
@@ -91,14 +104,17 @@ Architecture docs:
 Completed:
 
 - Local Next.js frontend with Chat, Approvals, Governance, and Evaluations views
-- FastAPI gateway with `/chat`, `/events`, `/approvals`, `/metrics/summary`, and `/health`
+- FastAPI gateway with signed demo auth, `/chat`, `/events`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
 - Redaction, policy decisions, model route metadata, approvals, mock tool calls, and audit events
 - SQLite-backed local audit/event state
-- Demo seed/reset actions for fast reviewer walkthroughs
-- API tests and web build in GitHub Actions
+- Admin-protected demo seed/reset actions for fast reviewer walkthroughs
+- API tests, web build, OPA tests, Terraform validation, and container builds in GitHub Actions
 - Deterministic control evals for redaction, routing, policy denial, approvals, and tool authorization
-- Rego policy files for model routing, tool authorization, and approvals
-- Docker Compose deployment shape
+- Rego policy files and policy tests for chat, model routing, tool authorization, and approvals
+- OpenTelemetry instrumentation and local Jaeger export path
+- Docker Compose deployment shape with API, web, OPA, Jaeger, and persistent local API data
+- Plan-only AWS Terraform for low-cost deployment review
+- Screenshots for recruiter review
 - Product framing and target users
 - Recruiter and hiring manager positioning
 - Use cases and demo script
@@ -110,11 +126,10 @@ Completed:
 
 Next implementation milestone:
 
-- Persist audit events in SQLite or Postgres
-- Wire OPA runtime evaluation into the API instead of mirrored Python policy logic
-- Add OpenTelemetry spans and Jaeger trace links
-- Add Promptfoo or deterministic red-team evaluation fixtures
-- Add screenshots and a short demo video
+- Add a short demo video
+- Add a minimal Helm chart or remove the Helm placeholder if Kubernetes is not needed for target roles
+- Add rate limiting and quota policy for cost-abuse scenarios
+- Replace local demo token issuer with OIDC/JWKS verification for a hosted deployment
 
 ## Repository Structure
 
@@ -128,6 +143,7 @@ infra/docker/             Local Docker runtime assets
 infra/terraform/          Optional cloud IaC path
 infra/helm/               Optional Kubernetes packaging path
 docs/product/             Product framing, users, use cases, demo spec
+docs/demo/                Screenshots and reviewer walkthrough evidence
 docs/architecture/        Detailed system docs, API contracts, audit model
 docs/adrs/                Architecture decision records
 docs/security/            Governance model and threat model
@@ -173,6 +189,9 @@ Local checks:
 npm run build:web
 npm run test:api
 npm run evals
+opa test policies
+terraform -chdir=infra/terraform fmt -check
+terraform -chdir=infra/terraform validate
 git diff --check
 ```
 

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from .models import ApprovalRequest, ToolCall
-from .policy import evaluate_tool_policy
+from .models import ApprovalRequest, PolicyDecision, ToolCall
 from .store import actor_from
 
 
-def create_ticket(role, title: str, team: str, severity: str) -> ToolCall:
-    policy = evaluate_tool_policy(role, "ticket", "create_ticket")
+def create_ticket(policy: PolicyDecision, title: str, team: str, severity: str) -> ToolCall:
     status = "allowed" if policy.decision == "allow" else "blocked"
 
     result = {}
@@ -22,8 +20,7 @@ def create_ticket(role, title: str, team: str, severity: str) -> ToolCall:
     return ToolCall(name="ticket.create", status=status, policy=policy, result=result)
 
 
-def lookup_cost_summary(role) -> ToolCall:
-    policy = evaluate_tool_policy(role, "cost", "view_summary")
+def lookup_cost_summary(policy: PolicyDecision) -> ToolCall:
     status = "allowed" if policy.decision == "allow" else "approval_required"
 
     result = {}
@@ -39,8 +36,14 @@ def lookup_cost_summary(role) -> ToolCall:
     return ToolCall(name="cost.summary", status=status, policy=policy, result=result)
 
 
-def request_read_only_access(request_id: str, user_id: str, role, team: str, reason: str) -> tuple[ToolCall, ApprovalRequest]:
-    policy = evaluate_tool_policy(role, "access", "request_temporary_read_only")
+def request_read_only_access(
+    request_id: str,
+    user_id: str,
+    role,
+    team: str,
+    reason: str,
+    policy: PolicyDecision,
+) -> tuple[ToolCall, ApprovalRequest]:
     approval = ApprovalRequest(
         request_id=request_id,
         requester=actor_from(user_id, role, team),
@@ -62,4 +65,3 @@ def request_read_only_access(request_id: str, user_id: str, role, team: str, rea
         },
     )
     return tool_call, approval
-

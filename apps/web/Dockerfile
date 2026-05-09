@@ -18,6 +18,7 @@ ENV PORT=3000
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+RUN chown -R node:node /app
 EXPOSE 3000
+USER node
 CMD ["node", "server.js"]
-

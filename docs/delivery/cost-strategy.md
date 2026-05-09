@@ -58,6 +58,17 @@ Why:
 - Makes FinOps thinking visible
 - Shows enterprise value beyond the chat UI
 
+### Plan-Only AWS IaC
+
+Terraform models a low-idle-cost AWS path but CI only runs `fmt`, `init -backend=false`, and `validate`.
+
+Why:
+
+- Proves AWS architecture choices without creating resources
+- Avoids NAT gateways, EKS, RDS, and always-on compute before there is a real need
+- Keeps the deployment decision separate from the implementation review
+- Adds an AWS Budget guardrail if the plan is ever applied
+
 ## Production Cost Considerations
 
 Production costs would come from:
@@ -84,5 +95,4 @@ Optimization options:
 
 Say:
 
-> I built the MVP local-first so the system can be reviewed without ongoing cloud spend. The production path is documented separately with Terraform and Helm because I wanted to separate proof of architecture from unnecessary portfolio cost.
-
+> I built the MVP local-first so the system can be reviewed without ongoing cloud spend. The AWS path is modeled in Terraform and validated in CI, but I intentionally stop before apply so architecture review is separate from spending money.

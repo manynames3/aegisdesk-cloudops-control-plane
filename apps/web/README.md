@@ -26,3 +26,5 @@ npm run dev
 ```
 
 By default the app expects the API at `http://localhost:8000`. Override with `NEXT_PUBLIC_API_BASE_URL`.
+
+The role switcher is a demo persona selector. The frontend requests a signed local demo token for the selected role; protected API routes still derive identity from the token instead of trusting role fields in request bodies.

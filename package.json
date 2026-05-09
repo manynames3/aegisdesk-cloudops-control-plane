@@ -7,6 +7,8 @@
     "build:web": "npm --prefix apps/web run build",
     "dev:api": "cd services/api && .venv/bin/uvicorn app.main:app --reload --port 8000",
     "test:api": "cd services/api && .venv/bin/pytest tests",
+    "test:policy": "opa test policies",
+    "validate:infra": "terraform -chdir=infra/terraform fmt -check && terraform -chdir=infra/terraform validate",
     "evals": "services/api/.venv/bin/python evals/run_evals.py",
     "check": "npm run build:web && npm run test:api && npm run evals"
   }
