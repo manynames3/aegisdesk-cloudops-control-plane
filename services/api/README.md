@@ -37,6 +37,14 @@ python3 -m venv .venv
 .venv/bin/pytest tests
 ```
 
+## Local Persistence
+
+By default, the API writes demo audit events, approvals, and model routes to SQLite at `data/aegisdesk.db` relative to the process working directory. Override with:
+
+```bash
+AEGISDESK_DB_PATH=:memory:
+```
+
 ## Current Boundary
 
-The API uses in-memory demo state and deterministic mock tools. It does not call paid model providers or modify real cloud resources.
+The API uses deterministic mock tools. It does not call paid model providers or modify real cloud resources.

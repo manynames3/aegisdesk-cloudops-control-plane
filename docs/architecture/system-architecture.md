@@ -93,7 +93,7 @@ Tool safety pattern:
 
 ### Audit Store
 
-MVP storage: in-memory demo state. Production path: SQLite/Postgres and immutable audit sink.
+MVP storage: SQLite demo state. Production path: managed Postgres and immutable audit sink.
 
 Events:
 

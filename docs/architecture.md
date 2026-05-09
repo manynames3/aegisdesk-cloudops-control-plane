@@ -72,7 +72,7 @@ The Docker Compose path is available when Docker is installed:
 - `services/mcp-tools`: MCP-style tool service
 - `policies`: OPA/Rego policy bundle
 - local model route simulator, with Ollama path documented
-- in-memory audit events for MVP
+- SQLite audit events for MVP
 - Jaeger for trace viewing
 
 ### Production Path

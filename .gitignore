@@ -33,4 +33,7 @@ logs/
 tmp/
 coverage/
 .next/
-
+data/
+*.db
+*.db-shm
+*.db-wal

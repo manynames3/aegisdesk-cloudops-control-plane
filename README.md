@@ -40,7 +40,7 @@ This is the current MVP stack and near-term deployment path:
 | AI routing | deterministic local route simulator, Ollama path documented | Shows routing decisions without paid model calls |
 | Tooling | MCP-style Python tool layer | Ticket, access request, and cost lookup tools |
 | Observability | trace IDs now, OpenTelemetry/Jaeger path documented | Request-level debugging and review |
-| Data | in-memory MVP state, Postgres path documented | Audit events and dashboard summaries |
+| Data | SQLite MVP state, Postgres path documented | Audit events and dashboard summaries |
 | Runtime | direct local run, Docker Compose path | Low-cost reproducible demo |
 | Cloud path | Terraform/OpenTofu, Helm | Production deployment path without requiring always-on cloud spend |
 | CI | GitHub Actions | Documentation checks now, implementation checks as code lands |
@@ -93,6 +93,7 @@ Completed:
 - Local Next.js frontend with Chat, Approvals, Governance, and Evaluations views
 - FastAPI gateway with `/chat`, `/events`, `/approvals`, `/metrics/summary`, and `/health`
 - Redaction, policy decisions, model route metadata, approvals, mock tool calls, and audit events
+- SQLite-backed local audit/event state
 - API tests and web build in GitHub Actions
 - Deterministic control evals for redaction, routing, policy denial, approvals, and tool authorization
 - Rego policy files for model routing, tool authorization, and approvals
