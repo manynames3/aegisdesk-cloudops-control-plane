@@ -7,6 +7,7 @@
     "build:web": "npm --prefix apps/web run build",
     "dev:api": "cd services/api && .venv/bin/uvicorn app.main:app --reload --port 8000",
     "test:api": "cd services/api && .venv/bin/pytest tests",
-    "check": "npm run build:web && npm run test:api"
+    "evals": "services/api/.venv/bin/python evals/run_evals.py",
+    "check": "npm run build:web && npm run test:api && npm run evals"
   }
 }

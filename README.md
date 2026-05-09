@@ -94,6 +94,7 @@ Completed:
 - FastAPI gateway with `/chat`, `/events`, `/approvals`, `/metrics/summary`, and `/health`
 - Redaction, policy decisions, model route metadata, approvals, mock tool calls, and audit events
 - API tests and web build in GitHub Actions
+- Deterministic control evals for redaction, routing, policy denial, approvals, and tool authorization
 - Rego policy files for model routing, tool authorization, and approvals
 - Docker Compose deployment shape
 - Product framing and target users
@@ -169,6 +170,7 @@ Local checks:
 ```bash
 npm run build:web
 npm run test:api
+npm run evals
 git diff --check
 ```
 

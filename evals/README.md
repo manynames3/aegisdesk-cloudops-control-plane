@@ -1,14 +1,23 @@
-# Evaluations Placeholder
+# Evaluations
 
-Planned evaluation categories:
+Deterministic MVP evaluations live in:
 
-- Secret leakage
-- PII redaction
-- Prompt injection
-- Unauthorized tool use
-- Privileged access requests
-- Budget override attempts
-- Incorrect model routing
+- `control_cases.json`
+- `run_evals.py`
 
-The MVP should include deterministic tests first. Promptfoo or similar red-team evaluations can be added after the core flow works.
+Current coverage:
 
+- Secret and PII redaction
+- Local routing for sensitive requests
+- Production admin access denial
+- Temporary read-only approval creation
+- Ticket tool authorization
+- Cost summary role gating
+
+Run from the repository root after installing API dependencies:
+
+```bash
+services/api/.venv/bin/python evals/run_evals.py
+```
+
+Promptfoo or similar red-team evaluations can be added after the deterministic control suite stays stable.
