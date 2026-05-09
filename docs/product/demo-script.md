@@ -37,7 +37,7 @@ Explain:
 
 Prompt:
 
-> Here is the error: database password=prod-secret-123 and customer email jane@example.com. Why is this failing?
+> Here is the error log with an example database secret and customer email customer@example.test. Why is this failing?
 
 Show:
 
@@ -104,4 +104,3 @@ Explain:
 Say:
 
 > The main point of this project is not the chatbot. The point is the control plane: policy, cost, privacy, observability, and safe tool execution around AI workflows.
-

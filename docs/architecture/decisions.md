@@ -2,6 +2,8 @@
 
 This file records early decisions and tradeoffs. The goal is to show practical architecture thinking, not to overbuild.
 
+Formal ADRs now live in [../adrs/README.md](../adrs/README.md). This file is retained as the original decision summary.
+
 ## ADR-001: Build AegisDesk As A CloudOps Control Plane, Not A Generic Chatbot
 
 Decision:
@@ -71,4 +73,3 @@ AI cost management is now part of cloud governance. Showing route and cost decis
 Tradeoff:
 
 MVP cost numbers may be estimates. They should be labeled as estimates and calculated consistently.
-

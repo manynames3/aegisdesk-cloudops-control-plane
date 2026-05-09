@@ -1,166 +1,157 @@
 # AegisDesk CloudOps Control Plane
 
-AegisDesk is a local-first, policy-aware AI gateway for cloud operations teams. It lets employees use AI for support, incident triage, access requests, and cloud cost investigation while the organization controls privacy, model routing, tool permissions, approvals, audit logs, and spend.
+AegisDesk is a portfolio project for a policy-aware AI gateway in cloud operations. The goal is to show how an enterprise can let employees use AI for incident triage, access requests, ticket workflows, and cost investigation while enforcing privacy controls, role-based policy, model routing, approvals, audit logs, and cost visibility.
 
-This is intentionally not just a chatbot. The project demonstrates the enterprise layer that companies need before they can safely let AI interact with cloud systems.
+This repository currently contains the product definition, architecture, delivery plan, and implementation scaffolding. The first runnable milestone is a local Docker Compose demo with a Next.js frontend, FastAPI gateway, OPA policy checks, MCP-style tools, local model routing, redaction, and an admin governance dashboard.
 
-## One-Liner
+## About
 
-A secure AI gateway for CloudOps workflows with OPA authorization, MCP tool interoperability, PII and secret protection, cost-aware model routing, approval workflows, audit logs, and cloud-native deployment artifacts.
+Most AI demos stop at generating an answer. AegisDesk focuses on the enterprise layer around the answer: who is allowed to ask, what data can leave the environment, which model should handle the request, which tools can be called, what needs approval, what it costs, and how the decision is audited.
 
-## Why I Am Building This
+The demo is designed around a simple recruiter-friendly story:
 
-Enterprise teams are adopting AI quickly, but they cannot simply tell employees to paste production logs, customer data, access requests, and incident details into public chat tools. They need a controlled front door for AI:
+> Employees get AI help for cloud operations. The company keeps control over privacy, access, cost, and accountability.
 
-- Sensitive data must be detected before it leaves the environment.
-- Users and agents must be restricted by role and policy.
-- AI tool calls must be approved, denied, scoped, and audited.
-- Model choice must account for sensitivity, latency, quality, and cost.
-- Cloud and AI spend must be visible before it becomes waste.
-- Leaders need evidence that controls are working, not just promises.
+## Target Users
 
-AegisDesk is built to show that I understand the cloud engineering problem behind enterprise AI adoption: useful AI has to be governed, observable, cost-aware, and deployable.
-
-## Target End Users
-
-Primary users:
-
-- Cloud operations engineers
-- Platform engineers
-- IT support teams
-- Security and compliance reviewers
-- Engineering managers responsible for AI enablement
+- Cloud operations engineers triaging incidents and support requests
+- Platform engineers building safe internal AI workflows
+- Security and compliance reviewers auditing AI usage
+- Engineering managers approving scoped operational actions
 - FinOps teams tracking cloud and AI spend
 
-Demo users:
+## Core Use Cases
 
-- Employee requesting help
-- Manager approving scoped actions
-- Admin reviewing governance, cost, and audit events
+- **Cloud incident triage:** summarize logs, detect secrets, search runbooks, and recommend next steps.
+- **Access request governance:** deny unsafe production admin requests and route safer alternatives for approval.
+- **Cost-aware model routing:** choose local or cloud models based on sensitivity, budget, and route policy.
+- **Ticket automation:** create or check tickets through policy-gated MCP-style tools.
+- **Governance dashboard:** show model usage, cost estimates, redactions, denied actions, approvals, and tool calls.
 
-## Recruiter-Friendly Demo Story
+## Tech Stack
 
-An employee asks AegisDesk for help with a cloud incident. The AI answers from approved internal knowledge, detects secrets in pasted logs, routes sensitive requests to a local model, blocks unsafe production access requests, requires manager approval for risky actions, and records every decision in an admin dashboard.
+This is the planned MVP stack reflected by the current scaffolding and documentation:
 
-The visible story is simple:
+| Area | Choice | Purpose |
+| --- | --- | --- |
+| Frontend | Next.js | Employee chat, manager approvals, admin dashboard |
+| API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
+| Policy | OPA, Rego | Authorization, model routing, approval, and budget rules |
+| AI routing | Ollama local model, optional cloud provider adapter | Local-first demo with optional cloud route |
+| Tooling | MCP-style Python tool layer | Ticket, access request, cost lookup, and knowledge search tools |
+| Observability | OpenTelemetry, Jaeger | Request traces and operational visibility |
+| Data | SQLite for MVP, Postgres path documented | Audit events and dashboard summaries |
+| Runtime | Docker Compose | Low-cost reproducible local demo |
+| Cloud path | Terraform/OpenTofu, Helm | Production deployment path without requiring always-on cloud spend |
+| CI | GitHub Actions | Documentation checks now, implementation checks as code lands |
 
-> Employees get AI help. The company keeps control.
+## Engineering Highlights
 
-## Core Demo Use Cases
+- **Policy outside the model:** OPA/Rego is the authority for tool use, access requests, routing, and approvals.
+- **Local-first cost control:** the primary demo path is designed to run locally with Ollama and Docker Compose.
+- **Sensitive-data handling before model calls:** PII and secret detection are planned as pre-routing controls, not UI-only warnings.
+- **Auditable AI workflow:** each request should produce events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
+- **Safe portfolio boundaries:** destructive cloud actions are mocked or approval-only in the MVP, with a production hardening path documented separately.
+- **Cloud role alignment:** the project emphasizes containers, policy-as-code, identity boundaries, observability, FinOps thinking, CI/CD, and deployable architecture.
 
-1. Cloud incident triage
-   - User pastes an application error or log sample.
-   - AegisDesk summarizes likely causes and suggests next steps.
-   - Secrets are detected and redacted before model processing.
+## Architecture
 
-2. Access request governance
-   - User asks for production database admin access.
-   - OPA blocks the request and recommends read-only temporary access with manager approval.
-
-3. AI cost-aware routing
-   - Public, low-risk requests can use a cloud model.
-   - Sensitive requests use local Ollama or are blocked.
-   - Dashboard shows estimated cost, route reason, and budget impact.
-
-4. Ticket and workflow automation
-   - User asks AegisDesk to create or check a support ticket.
-   - MCP-compatible tool calls are allowed or denied by policy.
-
-5. Admin governance dashboard
-   - Admin sees model usage, cost, redactions, policy decisions, tool calls, approvals, and evaluation results.
-
-## Enterprise Value
-
-AegisDesk demonstrates practical value in five areas:
-
-- Risk reduction: prevent accidental sharing of secrets, PII, and privileged actions.
-- Productivity: help CloudOps and support teams resolve common issues faster.
-- Cost control: route requests based on sensitivity, budget, and model economics.
-- Compliance readiness: provide audit trails, policy decisions, and evaluation reports.
-- Platform maturity: package AI workflows as cloud-native services instead of ad hoc scripts.
-
-## Planned MVP Architecture
+The system is organized as a gateway between users, models, policies, tools, and audit storage.
 
 ```mermaid
 flowchart LR
-    Employee["Employee Chat UI"] --> Web["Next.js Frontend"]
-    Manager["Manager Approval UI"] --> Web
-    Admin["Admin Dashboard"] --> Web
-
+    User["Employee / Manager / Admin"] --> Web["Next.js UI"]
     Web --> API["FastAPI Gateway"]
-    API --> Redaction["PII and Secret Redaction"]
-    API --> Policy["OPA/Rego Policy Engine"]
+    API --> Redaction["PII and Secret Inspection"]
+    API --> OPA["OPA / Rego Policy"]
     API --> Router["Model Router"]
-    API --> Audit["Audit/Event Store"]
-
-    Router --> LocalModel["Ollama Local Model"]
-    Router --> CloudModel["Optional Cloud Model"]
-
-    API --> MCP["MCP Tool Layer"]
-    MCP --> Tickets["Ticket Tool"]
-    MCP --> Cost["Cloud Cost Tool"]
-    MCP --> Access["Access Request Tool"]
-
-    API --> Traces["OpenTelemetry/Jaeger"]
+    Router --> Local["Ollama Local Model"]
+    Router --> Cloud["Optional Cloud Model"]
+    API --> Tools["MCP-Style Tool Layer"]
+    Tools --> Ticket["Ticket Tool"]
+    Tools --> Access["Access Request Tool"]
+    Tools --> Cost["Cost Lookup Tool"]
+    API --> Audit["Audit Event Store"]
+    API --> Trace["OpenTelemetry / Jaeger"]
     Audit --> Dashboard["Governance Dashboard"]
 ```
 
-## Initial Technology Choices
+Architecture docs:
 
-| Layer | MVP Choice | Why |
-| --- | --- | --- |
-| Frontend | Next.js | Recruiter-friendly demo UI and admin dashboard |
-| API | FastAPI + Pydantic | Strong OpenAPI support and clear service boundaries |
-| Local model | Ollama | Low-cost local-first demo |
-| Optional cloud model | OpenAI-compatible provider via LiteLLM or adapter | Shows model routing without locking into one vendor |
-| Policy | OPA/Rego | Real policy-as-code enforcement |
-| Tools | MCP-compatible Python tools | Demonstrates agent/tool interoperability |
-| Observability | OpenTelemetry + Jaeger | Shows request traces and operational maturity |
-| Data | SQLite for MVP, Postgres path documented | Keeps local demo simple and production path clear |
-| Runtime | Docker Compose | Reproducible demo at low cost |
-| Cloud path | Terraform/OpenTofu + Helm | Shows infrastructure thinking without forcing paid cloud uptime |
+- [Architecture Overview](docs/architecture.md)
+- [System Architecture](docs/architecture/system-architecture.md)
+- [API Contracts](docs/architecture/api-contracts.md)
+- [Audit Event Model](docs/architecture/audit-event-model.md)
+- [ADRs](docs/adrs/README.md)
+- [Threat Model](docs/security/threat-model.md)
+- [Governance Model](docs/security/governance-model.md)
 
-## What This Project Is Designed To Prove
+## Current Status
 
-- I can turn an enterprise problem into a working cloud-native product.
-- I can reason about security, cost, policy, and operations, not only UI or prompts.
-- I understand that AI systems need controls before they touch production workflows.
-- I can communicate tradeoffs clearly to technical and non-technical stakeholders.
-- I can build a practical MVP while documenting the path to production.
+Completed:
+
+- Product framing and target users
+- Recruiter and hiring manager positioning
+- Use cases and demo script
+- Architecture and API contracts
+- Audit event model
+- Governance and threat model
+- Cost strategy and two-week MVP plan
+- GitHub Actions documentation scaffold check
+
+Next implementation milestone:
+
+- Next.js chat and governance dashboard
+- FastAPI `/chat` endpoint and event APIs
+- OPA policy integration
+- Mock MCP-style ticket, access, and cost tools
+- Local redaction and model-routing logic
+- Docker Compose runtime
 
 ## Repository Structure
 
 ```text
-apps/web/                 Next.js frontend placeholder
-services/api/             FastAPI gateway placeholder
-services/mcp-tools/       MCP tool server placeholder
-policies/                 OPA/Rego policy placeholder
-evals/                    Evaluation and red-team test placeholder
-infra/docker/             Docker Compose assets
-infra/terraform/          Cloud IaC placeholder
-infra/helm/               Kubernetes Helm placeholder
-docs/product/             Product framing and use cases
-docs/architecture/        Architecture and design decisions
-docs/security/            Governance, threat model, security controls
-docs/delivery/            MVP plan, demo checklist, cost strategy
+apps/web/                 Frontend app workspace
+services/api/             Gateway API workspace
+services/mcp-tools/       MCP-style tool service workspace
+policies/                 OPA/Rego policy workspace
+evals/                    Safety and policy evaluation workspace
+infra/docker/             Local Docker runtime assets
+infra/terraform/          Optional cloud IaC path
+infra/helm/               Optional Kubernetes packaging path
+docs/product/             Product framing, users, use cases, demo spec
+docs/architecture/        Detailed system docs, API contracts, audit model
+docs/adrs/                Architecture decision records
+docs/security/            Governance model and threat model
+docs/delivery/            MVP plan, cost strategy, review checklist
 ```
 
-## Current Status
+## Run Status
 
-Documentation scaffold is in place. Next implementation milestone is a local Docker Compose demo with:
+There is no live demo or runnable application yet. The repo is intentionally starting with clear documentation and implementation boundaries before code is added.
 
-- Working chat UI
-- FastAPI gateway
-- Mock MCP ticket/access/cost tools
-- OPA policy decisions
-- PII/secret redaction
-- Audit event dashboard
+## Validation
+
+Current CI verifies that required documentation files exist. As implementation lands, CI should expand to include:
+
+- API tests
+- OPA policy tests
+- frontend checks
+- container build checks
+- Terraform/OpenTofu validation
+- Helm template validation
+
+Local checks used for this scaffold:
+
+```bash
+git diff --check
+```
 
 ## Market Signal
 
 This project is aligned with current cloud and AI infrastructure demand:
 
-- CNCF's 2026 cloud native survey reports that Kubernetes is now a foundation for production AI workloads, with 82% of container users running Kubernetes in production and 66% of organizations hosting generative AI models using Kubernetes for inference workloads.
+- CNCF's 2026 cloud native survey reports Kubernetes as a foundation for production AI workloads, with 82% of container users running Kubernetes in production and 66% of organizations hosting generative AI models using Kubernetes for inference workloads.
 - The FinOps Foundation's 2026 report identifies AI cost management as the top forward-looking FinOps skill and says 98% of respondents now manage AI spend.
 
 Sources:

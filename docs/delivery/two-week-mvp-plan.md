@@ -44,7 +44,7 @@ The project is successful if a reviewer can:
 - secret/PII detection
 - local/cloud route decision
 - model route metadata
-- cost estimate placeholder
+- initial cost estimate logic
 
 ### Day 5: MCP Tool Layer
 
@@ -121,4 +121,3 @@ Not in MVP:
 - Multi-tenant SaaS billing
 - Fine-tuning
 - Complex multi-agent framework
-

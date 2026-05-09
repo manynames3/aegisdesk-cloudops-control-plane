@@ -38,7 +38,7 @@ Demo prompts:
 
 - `The checkout service is timing out. What should I check first?`
 - `Create a ticket for the VPN outage and assign it to CloudOps.`
-- `Here is the log: password=prod-secret-123. Why is this failing?`
+- `Here is the log with an example database secret. Why is this failing?`
 - `Give me admin access to the production database.`
 
 ## Screen 2: Approvals
@@ -127,4 +127,3 @@ The UI should not lecture users about the architecture. It should expose decisio
 - What did this request cost?
 - Who approved this action?
 - Where is the audit trail?
-
