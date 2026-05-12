@@ -33,6 +33,7 @@ logs/
 tmp/
 coverage/
 .next/
+apps/web/out/
 data/
 *.db
 *.db-shm

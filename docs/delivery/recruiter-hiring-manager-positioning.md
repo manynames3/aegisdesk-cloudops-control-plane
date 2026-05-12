@@ -16,7 +16,7 @@ I built a local-first CloudOps AI control plane that separates natural language 
 
 - Built a local-first CloudOps AI gateway with OPA/Rego policy enforcement, MCP-style tool adapters, PII/secret redaction, model routing, approval workflows, and audit logging.
 - Implemented enterprise AI governance controls including pre-model redaction, role-based tool authorization, cost-aware local/cloud routing, and admin-visible policy decision traces.
-- Packaged a reproducible cloud-native demo with Docker Compose, API/policy tests, OpenTelemetry instrumentation, and plan-only AWS Terraform for review without cloud spend.
+- Packaged a reproducible cloud-native demo with Docker Compose, API/policy tests, OpenTelemetry instrumentation, and a low-cost AWS deployment using S3, CloudFront, Lambda, HTTP API Gateway, IAM, CloudWatch, and AWS Budget.
 
 ## Interview Talking Points
 
@@ -24,9 +24,9 @@ I built a local-first CloudOps AI control plane that separates natural language 
 - Policy is enforced outside the model.
 - Sensitive data routing happens before model calls.
 - Destructive actions are mocked in the portfolio demo by design.
-- Docker Compose proves the local workflow; plan-only Terraform shows the AWS production path without applying resources.
+- Docker Compose proves the local workflow; Terraform deploys a low-cost AWS portfolio environment without always-on compute.
 - The admin dashboard exists because enterprise AI needs evidence, not just answers.
 
 ## Honest Limitation Statement
 
-This is a portfolio MVP, not a production SaaS. It demonstrates the architecture and control pattern using local services and mocked cloud tools. In production, I would add enterprise SSO, managed secrets, immutable audit storage, rate limiting, tenant isolation, signed images, and scoped cloud IAM roles.
+This is a portfolio MVP, not a production SaaS. It demonstrates the architecture and control pattern using local services, a low-cost AWS hosted demo, and mocked cloud tools. In production, I would add enterprise SSO, managed secrets, immutable audit storage, rate limiting, tenant isolation, signed artifacts, and scoped cloud IAM roles for real tools.

@@ -37,6 +37,18 @@ python3 -m venv .venv
 
 Direct local runs default to `AEGISDESK_POLICY_MODE=auto`, which uses OPA when `OPA_URL` is set and falls back to the mirrored Python policy evaluator when OPA is not configured. Docker Compose sets `AEGISDESK_POLICY_MODE=opa`.
 
+## Lambda Package
+
+The hosted portfolio API uses `app/lambda_handler.py` with Mangum to adapt FastAPI to AWS Lambda.
+
+From the repository root:
+
+```bash
+scripts/build-lambda-package.sh
+```
+
+Terraform reads the generated `build/aegisdesk-api-lambda.zip`.
+
 ## Tests
 
 ```bash
@@ -53,6 +65,6 @@ AEGISDESK_DB_PATH=:memory:
 
 ## Current Boundary
 
-The API uses deterministic mock tools. It does not call paid model providers or modify real cloud resources.
+The API uses deterministic mock tools. It does not call paid model providers or modify real cloud resources through chat actions.
 
 The `/auth/demo-token` endpoint is a local demo issuer only. Production identity should use OIDC/JWT verification from a real identity provider.

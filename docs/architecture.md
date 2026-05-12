@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AegisDesk is a local-first MVP for a CloudOps AI control plane. The current implementation sends employee, manager, and admin workflows through a FastAPI gateway that verifies signed demo tokens, performs redaction, calls OPA/Rego policy, selects a model route, authorizes mock tools, handles approvals, emits OpenTelemetry spans, and writes audit events.
+AegisDesk is a local-first and hosted MVP for a CloudOps AI control plane. The current implementation sends employee, manager, and admin workflows through a FastAPI gateway that verifies signed demo tokens, performs redaction, calls OPA/Rego policy, selects a model route, authorizes mock tools, handles approvals, emits OpenTelemetry spans, and writes audit events.
 
 ## Container Diagram
 
@@ -13,14 +13,19 @@ flowchart LR
     end
 
     subgraph AegisDesk["AegisDesk System Boundary"]
-        Web["Web App<br/>Next.js<br/>Chat, approvals, dashboard"]
+        CDN["CloudFront<br/>HTTPS static delivery"]
+        Static["Private S3 Bucket<br/>Next.js static export"]
+        Web["Web App<br/>Next.js browser UI<br/>Chat, approvals, dashboard"]
+        APIGW["HTTP API Gateway<br/>Public API ingress"]
+        Lambda["AWS Lambda<br/>Mangum adapter"]
         Auth["Demo Auth<br/>Signed JWT-style tokens<br/>Local identity boundary"]
         API["Gateway API<br/>FastAPI / Pydantic<br/>Validation, orchestration, audit"]
         Policy["Policy Engine<br/>OPA / Rego over HTTP<br/>Routing, authorization, approval rules"]
         Router["Model Router<br/>Python module<br/>Local/cloud route selection"]
         Tools["MCP-Style Tool Layer<br/>Python<br/>Ticket, access, cost, knowledge tools"]
         Audit[("Audit Store<br/>SQLite MVP / Postgres path")]
-        Trace["Trace Backend<br/>OpenTelemetry / Jaeger"]
+        Trace["Trace Backend<br/>CloudWatch logs now / Jaeger local path"]
+        Budget["AWS Budget<br/>Portfolio spend guardrail"]
     end
 
     subgraph External["External Systems"]
@@ -28,11 +33,15 @@ flowchart LR
         CloudModel["Optional Cloud Model<br/>Provider adapter"]
     end
 
-    Employee --> Web
-    Manager --> Web
-    Admin --> Web
-    Web --> Auth
-    Auth --> API
+    Employee --> CDN
+    Manager --> CDN
+    Admin --> CDN
+    CDN --> Static
+    CDN --> Web
+    Web --> APIGW
+    APIGW --> Lambda
+    Lambda --> API
+    API --> Auth
     API --> Policy
     API --> Router
     Router --> LocalModel
@@ -40,7 +49,9 @@ flowchart LR
     API --> Tools
     API --> Audit
     API --> Trace
-    Web --> Audit
+    Budget -.->|monitors AWS spend| CDN
+    Budget -.->|monitors AWS spend| APIGW
+    Budget -.->|monitors AWS spend| Lambda
 ```
 
 ## Runtime Flow
@@ -58,7 +69,7 @@ flowchart LR
 
 ### Current Repository State
 
-The repository contains a runnable local frontend and API, signed demo auth, Rego policy files and tests, CI checks, API tests, documentation, screenshots, Docker Compose, and plan-only AWS Terraform.
+The repository contains a runnable local frontend and API, signed demo auth, Rego policy files and tests, CI checks, API tests, documentation, screenshots, Docker Compose, and applied AWS Terraform for the hosted portfolio demo.
 
 ### MVP Deployment
 
@@ -76,13 +87,21 @@ The Docker Compose path is available when Docker is installed:
 - SQLite audit events for MVP
 - Jaeger for trace viewing through OTLP HTTP export
 
-### Production Path
+### Hosted Portfolio Deployment
 
-The production path is partially modeled as plan-only Terraform and not applied:
+The current hosted deployment uses a low-idle-cost AWS shape:
 
-- S3 and CloudFront static frontend
-- Lambda container API behind HTTP API Gateway
-- ECR, IAM, CloudWatch logs, Secrets Manager reference, and AWS Budget
+- private S3 bucket and CloudFront distribution for the static frontend
+- FastAPI Lambda zip package behind HTTP API Gateway
+- IAM execution role scoped to CloudWatch log writes
+- CloudWatch log group with seven-day retention
+- AWS Budget guardrail set to the portfolio threshold
+- S3 server-side encryption, public access block, and noncurrent version cleanup
+
+### Production Hardening Path
+
+The hosted demo intentionally stays below production complexity. A production version would add:
+
 - future managed Postgres
 - future OIDC/JWKS identity provider integration
 - immutable or append-only audit sink

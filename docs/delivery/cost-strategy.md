@@ -8,7 +8,7 @@ Target:
 
 - Local development: $0
 - Demo operation: $0 to low single digits
-- Optional hosted demo: free tier or shut down after recording
+- Hosted demo: low single digits for light traffic, guarded by a $1 AWS Budget
 
 ## Cost-Conscious Choices
 
@@ -58,16 +58,18 @@ Why:
 - Makes FinOps thinking visible
 - Shows enterprise value beyond the chat UI
 
-### Plan-Only AWS IaC
+### Low-Cost AWS Deployment
 
-Terraform models a low-idle-cost AWS path but CI only runs `fmt`, `init -backend=false`, and `validate`.
+Terraform deploys a low-idle-cost AWS path for the portfolio demo.
 
 Why:
 
-- Proves AWS architecture choices without creating resources
+- Proves AWS architecture choices with real deployed resources
 - Avoids NAT gateways, EKS, RDS, and always-on compute before there is a real need
-- Keeps the deployment decision separate from the implementation review
-- Adds an AWS Budget guardrail if the plan is ever applied
+- Uses a private S3 static site behind CloudFront
+- Runs the API only on request through Lambda and HTTP API Gateway
+- Adds an AWS Budget guardrail at the portfolio threshold
+- Keeps paid model providers disabled
 
 ## Production Cost Considerations
 
@@ -95,4 +97,4 @@ Optimization options:
 
 Say:
 
-> I built the MVP local-first so the system can be reviewed without ongoing cloud spend. The AWS path is modeled in Terraform and validated in CI, but I intentionally stop before apply so architecture review is separate from spending money.
+> After validating the architecture locally, I deployed the portfolio version on a static/serverless AWS footprint: S3, CloudFront, Lambda, HTTP API Gateway, CloudWatch, IAM, and an AWS Budget guardrail. I avoided EKS, NAT gateways, RDS, and paid model calls because they would add cost without improving the demo signal.

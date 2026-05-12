@@ -10,4 +10,4 @@ This directory records the major architecture decisions for AegisDesk.
 | [ADR-004](004-mock-destructive-cloud-actions.md) | Accepted | Mock destructive cloud actions in the portfolio demo |
 | [ADR-005](005-audit-event-model-first.md) | Accepted | Design around audit events from the start |
 | [ADR-006](006-demo-token-auth-boundary.md) | Accepted | Use signed demo tokens before hosted OIDC |
-| [ADR-007](007-plan-only-aws-iac.md) | Accepted | Model AWS deployment with plan-only Terraform before spending |
+| [ADR-007](007-low-cost-aws-deployment.md) | Accepted | Deploy a low-cost AWS portfolio environment after approval |

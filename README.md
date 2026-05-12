@@ -2,7 +2,7 @@
 
 AegisDesk is a portfolio project for a policy-aware AI gateway in cloud operations. The goal is to show how an enterprise can let employees use AI for incident triage, access requests, ticket workflows, and cost investigation while enforcing privacy controls, role-based policy, model routing, approvals, audit logs, and cost visibility.
 
-This repository now includes a local runnable MVP slice: a Next.js frontend, FastAPI gateway, signed demo auth tokens, OPA/Rego policy enforcement, redaction/model-routing logic, mock MCP-style tools, approvals, audit events, OpenTelemetry instrumentation, CI checks, Docker Compose, and plan-only AWS Terraform.
+This repository includes a runnable and deployed MVP slice: a Next.js frontend, FastAPI gateway, signed demo auth tokens, OPA/Rego policy enforcement, redaction/model-routing logic, mock MCP-style tools, approvals, audit events, OpenTelemetry instrumentation, CI checks, Docker Compose, and low-cost AWS Terraform.
 
 ## About
 
@@ -12,7 +12,9 @@ The demo is designed around a simple recruiter-friendly story:
 
 > Employees get AI help for cloud operations. The company keeps control over privacy, access, cost, and accountability.
 
-Live demo: not deployed yet. The project is intentionally local-first until cloud spend is explicitly approved.
+Live demo: [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
+
+Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health)
 
 ## Screenshots
 
@@ -40,7 +42,7 @@ Live demo: not deployed yet. The project is intentionally local-first until clou
 
 ## Tech Stack
 
-This is the current MVP stack and near-term deployment path:
+This is the current MVP stack and deployment shape:
 
 | Area | Choice | Purpose |
 | --- | --- | --- |
@@ -52,18 +54,18 @@ This is the current MVP stack and near-term deployment path:
 | Tooling | MCP-style Python tool layer | Ticket, access request, and cost lookup tools |
 | Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and review |
 | Data | SQLite MVP state, Postgres path documented | Audit events and dashboard summaries |
-| Runtime | direct local run, Docker Compose path | Low-cost reproducible demo |
-| Cloud path | Plan-only AWS Terraform, Helm path documented | Production deployment path without requiring always-on cloud spend |
+| Runtime | direct local run, Docker Compose path, Lambda zip handler | Low-cost reproducible demo |
+| Cloud path | AWS Terraform with S3, CloudFront, Lambda, API Gateway, IAM, CloudWatch, Budget | Hosted portfolio demo without always-on compute |
 | CI | GitHub Actions | API tests, evals, web build, OPA tests, Terraform validate, container builds |
 
 ## Engineering Highlights
 
 - **Backend-enforced identity boundary:** protected API routes derive user, role, and team from signed demo tokens instead of trusting frontend role fields.
 - **Policy outside the model:** OPA/Rego is the runtime policy path for tool use, access requests, routing, and approvals, with Python fallback only for direct local/test mode.
-- **Local-first cost control:** the current demo does not call paid model providers or modify cloud resources.
+- **Local-first cost control:** the demo does not call paid model providers; the hosted path uses static/serverless AWS services and a $1 monthly budget guardrail.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
 - **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
-- **Plan-only AWS architecture:** Terraform models a low-idle-cost AWS path with S3, CloudFront, Lambda container runtime, API Gateway, ECR, IAM, Secrets Manager, CloudWatch logs, and a budget guardrail without applying resources.
+- **Deployed AWS architecture:** Terraform provisions a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
 - **Safe portfolio boundaries:** destructive cloud actions are mocked or approval-only in the MVP, with a production hardening path documented separately.
 - **Cloud role alignment:** the project emphasizes containers, policy-as-code, identity boundaries, observability, FinOps thinking, CI/CD, and deployable architecture.
 
@@ -113,7 +115,7 @@ Completed:
 - Rego policy files and policy tests for chat, model routing, tool authorization, and approvals
 - OpenTelemetry instrumentation and local Jaeger export path
 - Docker Compose deployment shape with API, web, OPA, Jaeger, and persistent local API data
-- Plan-only AWS Terraform for low-cost deployment review
+- Hosted AWS demo using private S3, CloudFront, API Gateway, Lambda, CloudWatch, IAM, and AWS Budget
 - Screenshots for recruiter review
 - Product framing and target users
 - Recruiter and hiring manager positioning
@@ -127,9 +129,8 @@ Completed:
 Next implementation milestone:
 
 - Add a short demo video
-- Add a minimal Helm chart or remove the Helm placeholder if Kubernetes is not needed for target roles
 - Add rate limiting and quota policy for cost-abuse scenarios
-- Replace local demo token issuer with OIDC/JWKS verification for a hosted deployment
+- Replace local demo token issuer with OIDC/JWKS verification for a production-grade hosted deployment
 
 ## Repository Structure
 
@@ -140,7 +141,7 @@ services/mcp-tools/       MCP-style tool service workspace
 policies/                 OPA/Rego policy workspace
 evals/                    Safety and policy evaluation workspace
 infra/docker/             Local Docker runtime assets
-infra/terraform/          Optional cloud IaC path
+infra/terraform/          AWS Terraform deployment path
 infra/helm/               Optional Kubernetes packaging path
 docs/product/             Product framing, users, use cases, demo spec
 docs/demo/                Screenshots and reviewer walkthrough evidence

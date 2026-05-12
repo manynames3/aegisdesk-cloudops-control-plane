@@ -1,5 +1,10 @@
+data "aws_caller_identity" "current" {}
+
 locals {
-  name = "${var.project_name}-${var.environment}"
+  name           = "${var.project_name}-${var.environment}"
+  account_id     = data.aws_caller_identity.current.account_id
+  web_bucket     = "${local.name}-${local.account_id}-web"
+  lambda_package = abspath("${path.module}/${var.lambda_package_path}")
 
   tags = {
     Project     = "AegisDesk"
@@ -9,24 +14,14 @@ locals {
   }
 }
 
-resource "aws_ecr_repository" "api" {
-  name                 = "${local.name}-api"
-  image_tag_mutability = "IMMUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
+resource "random_password" "demo_auth_secret" {
+  length  = 32
+  special = false
 }
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/lambda/${local.name}-api"
   retention_in_days = 7
-}
-
-resource "aws_secretsmanager_secret" "app_config" {
-  name                    = "${local.name}/app-config"
-  description             = "Runtime secret reference for AegisDesk API providers and auth signing."
-  recovery_window_in_days = 0
 }
 
 resource "aws_iam_role" "api_lambda" {
@@ -61,32 +56,29 @@ resource "aws_iam_role_policy" "api_lambda" {
           "logs:PutLogEvents"
         ]
         Resource = "${aws_cloudwatch_log_group.api.arn}:*"
-      },
-      {
-        Sid      = "ReadRuntimeSecretReference"
-        Effect   = "Allow"
-        Action   = "secretsmanager:GetSecretValue"
-        Resource = aws_secretsmanager_secret.app_config.arn
       }
     ]
   })
 }
 
 resource "aws_lambda_function" "api" {
-  function_name = "${local.name}-api"
-  package_type  = "Image"
-  image_uri     = var.api_image_uri
-  role          = aws_iam_role.api_lambda.arn
-  memory_size   = 512
-  timeout       = 30
+  function_name    = "${local.name}-api"
+  filename         = local.lambda_package
+  source_code_hash = fileexists(local.lambda_package) ? filebase64sha256(local.lambda_package) : null
+  handler          = "app.lambda_handler.handler"
+  runtime          = "python3.12"
+  architectures    = ["x86_64"]
+  role             = aws_iam_role.api_lambda.arn
+  memory_size      = 512
+  timeout          = 30
 
   environment {
     variables = {
-      DEMO_MODE               = "false"
-      AEGISDESK_POLICY_MODE   = "opa"
-      AEGISDESK_SECRET_ARN    = aws_secretsmanager_secret.app_config.arn
-      OTEL_SERVICE_NAME       = "aegisdesk-api"
-      POWERTOOLS_SERVICE_NAME = "aegisdesk-api"
+      DEMO_MODE             = "true"
+      AEGISDESK_AUTH_SECRET = random_password.demo_auth_secret.result
+      AEGISDESK_DB_PATH     = "/tmp/aegisdesk.db"
+      AEGISDESK_POLICY_MODE = "python"
+      OTEL_SERVICE_NAME     = "aegisdesk-api"
     }
   }
 
@@ -100,7 +92,7 @@ resource "aws_apigatewayv2_api" "http" {
   cors_configuration {
     allow_headers = ["authorization", "content-type"]
     allow_methods = ["GET", "POST", "OPTIONS"]
-    allow_origins = var.allowed_cors_origins
+    allow_origins = concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"])
     max_age       = 300
   }
 }
@@ -139,7 +131,8 @@ resource "aws_lambda_permission" "api_gateway" {
 }
 
 resource "aws_s3_bucket" "web" {
-  bucket = "${local.name}-web"
+  bucket        = local.web_bucket
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "web" {
@@ -157,6 +150,35 @@ resource "aws_s3_bucket_versioning" "web" {
   versioning_configuration {
     status = "Enabled"
   }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "web" {
+  bucket = aws_s3_bucket.web.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "web" {
+  bucket = aws_s3_bucket.web.id
+
+  rule {
+    id     = "expire-old-static-asset-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.web]
 }
 
 resource "aws_cloudfront_origin_access_control" "web" {
@@ -186,6 +208,18 @@ resource "aws_cloudfront_distribution" "web" {
     cached_methods         = ["GET", "HEAD"]
     compress               = true
     cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
   }
 
   restrictions {

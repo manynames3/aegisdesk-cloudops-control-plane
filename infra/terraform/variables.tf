@@ -16,10 +16,10 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "api_image_uri" {
-  description = "Container image URI for the FastAPI Lambda package. Placeholder value keeps validate plan-only."
+variable "lambda_package_path" {
+  description = "Path to the Lambda zip package built by scripts/build-lambda-package.sh."
   type        = string
-  default     = "123456789012.dkr.ecr.us-east-1.amazonaws.com/aegisdesk-api:placeholder"
+  default     = "../../build/aegisdesk-api-lambda.zip"
 }
 
 variable "monthly_budget_usd" {
@@ -31,5 +31,5 @@ variable "monthly_budget_usd" {
 variable "allowed_cors_origins" {
   description = "Allowed browser origins for the API Gateway CORS policy."
   type        = list(string)
-  default     = ["http://localhost:3000"]
+  default     = ["http://localhost:3000", "http://127.0.0.1:3000"]
 }

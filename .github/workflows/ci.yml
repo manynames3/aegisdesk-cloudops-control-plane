@@ -31,7 +31,7 @@ jobs:
           test -f docs/adrs/002-local-first-mvp.md
           test -f docs/adrs/003-policy-outside-the-model.md
           test -f docs/adrs/006-demo-token-auth-boundary.md
-          test -f docs/adrs/007-plan-only-aws-iac.md
+          test -f docs/adrs/007-low-cost-aws-deployment.md
           test -f docs/demo/README.md
           test -f docs/demo/screenshots/policy-aware-chat.png
           test -f docs/security/threat-model.md

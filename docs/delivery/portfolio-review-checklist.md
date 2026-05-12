@@ -28,7 +28,7 @@ Use this before applying to jobs.
 
 - Containerized services
 - CI pipeline
-- Plan-only AWS Terraform that validates
+- AWS Terraform that validates and deploys the low-cost hosted demo
 - Kubernetes/Helm path only if target roles require it
 - Observability
 - Secrets handling plan

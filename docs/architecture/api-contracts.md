@@ -27,7 +27,7 @@ Response:
 }
 ```
 
-This is a local demo issuer only. Hosted deployments should replace it with OIDC/JWKS verification.
+This is a portfolio demo issuer only. Production hosted deployments should replace it with OIDC/JWKS verification.
 
 ## POST /chat
 

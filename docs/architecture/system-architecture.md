@@ -176,9 +176,17 @@ sequenceDiagram
 - Jaeger
 - persistent local SQLite volume
 
-### Production Path
+### Hosted AWS Demo
 
-- Plan-only AWS Terraform for S3, CloudFront, Lambda container runtime, API Gateway, ECR, IAM, CloudWatch, Secrets Manager reference, and budget guardrail
+- Terraform-provisioned private S3 bucket behind CloudFront for the static frontend
+- FastAPI packaged as a Lambda zip with Mangum behind HTTP API Gateway
+- IAM role scoped to Lambda log writes
+- CloudWatch log group with seven-day retention
+- S3 server-side encryption, public access block, and noncurrent version cleanup
+- AWS Budget guardrail for the portfolio cost threshold
+
+### Production Hardening Path
+
 - Optional Helm chart if target roles require Kubernetes
 - Managed Postgres or immutable audit storage
 - Managed secrets and real identity provider
