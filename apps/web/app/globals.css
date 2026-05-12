@@ -55,10 +55,15 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  height: 100dvh;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
   border-right: 1px solid var(--line);
   background: #101820;
   color: #f8fafc;
   padding: 24px;
+  z-index: 20;
 }
 
 .brand {
@@ -508,7 +513,13 @@ button:disabled {
   }
 
   .sidebar {
-    position: static;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr) auto auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 16px 18px;
   }
 
   .tabs {
@@ -517,6 +528,17 @@ button:disabled {
 
   .tabs button {
     justify-content: center;
+  }
+
+  .rolePanel {
+    align-content: center;
+    margin-top: 0;
+  }
+
+  .status {
+    align-self: end;
+    min-height: 38px;
+    white-space: nowrap;
   }
 
   .chatGrid {
@@ -529,6 +551,10 @@ button:disabled {
 }
 
 @media (max-width: 720px) {
+  .sidebar {
+    grid-template-columns: 1fr;
+  }
+
   .workspace {
     padding: 18px;
   }
@@ -554,4 +580,3 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
-
