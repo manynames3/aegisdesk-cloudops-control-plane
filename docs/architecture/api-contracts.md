@@ -37,6 +37,8 @@ Returns the Cognito Hosted UI OAuth endpoints and public app client ID used by t
 
 Creates or updates a controlled reviewer persona in Cognito, returns reviewer credentials, and returns Hosted UI config. The frontend uses this to send a reviewer to Cognito Hosted UI instead of silently switching roles in the browser.
 
+The returned credentials are disposable portfolio personas. The frontend shows them in the sidebar so a reviewer can sign into Cognito without a separate secret handoff.
+
 ## POST /auth/oauth/exchange
 
 Exchanges a Cognito Hosted UI authorization code and PKCE verifier for tokens. The API verifies the returned ID token through Cognito JWKS before returning the actor context to the frontend.

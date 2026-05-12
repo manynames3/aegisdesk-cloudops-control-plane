@@ -16,6 +16,15 @@ Live deployment: [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.
 
 Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health)
 
+## Reviewer Access
+
+The hosted app supports two reviewer-friendly identity paths:
+
+1. **Cognito Hosted UI sign-in:** In the left sidebar, choose `employee`, `manager`, or `admin` under `Identity`. The app prepares a disposable Cognito reviewer persona and shows the generated username and password in the `Cognito credentials` box. Copy those credentials, click `Open Hosted UI`, and sign in through AWS Cognito. After the callback, the sidebar should show `Cognito Hosted UI`, the signed-in user, role, and team.
+2. **Reviewer shortcut:** Expand `Reviewer shortcut` for a faster walkthrough when you do not need to show the Hosted UI redirect. This still asks the backend for a controlled reviewer token; protected API routes derive identity, role, and team from token claims rather than trusting frontend fields.
+
+The visible Cognito credentials are demo-only portfolio accounts (`aegisdesk-employee`, `aegisdesk-manager`, and `aegisdesk-admin`). They are generated from the hosted environment's persona seed, can be rotated by redeploying that seed, and are not personal credentials.
+
 ## Screenshots
 
 ![Guided walkthrough](docs/evidence/screenshots/guided-walkthrough.png)
@@ -154,7 +163,7 @@ Completed:
 Next implementation milestone:
 
 - Add a short walkthrough video
-- Add an optional hosted login flow using Cognito Hosted UI instead of the current recruiter-friendly persona selector
+- Add a captured Cognito login screenshot to the reviewer evidence docs
 
 ## Repository Structure
 

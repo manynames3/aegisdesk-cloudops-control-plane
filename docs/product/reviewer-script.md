@@ -13,6 +13,10 @@ Open three views:
 
 Before presenting, use the sidebar identity panel to prepare an `Admin` Hosted UI login, copy the generated reviewer credentials, open Cognito Hosted UI, and sign in. Then click `Seed` so the governance dashboard has audit history. For a shorter path, click `Walkthrough` in the top bar and run the four guided steps.
 
+Reviewer credentials are available directly in the app. Select `employee`, `manager`, or `admin` in the sidebar `Identity` panel; the app displays the generated Cognito username and password before opening Hosted UI. These are disposable portfolio personas, not personal credentials.
+
+The `Reviewer shortcut` panel is for fast demos when the reviewer does not need to watch the Cognito redirect. It requests a controlled persona token from the backend, while protected API routes still derive identity, role, and team from token claims.
+
 ## 30-Second Introduction
 
 Say:
@@ -25,12 +29,17 @@ Show:
 
 - Sidebar `Identity` panel
 - `Cognito credentials` reviewer account
+- Generated username and password visible in the app
 - AWS Cognito Hosted UI page
 - Return to the app showing `Cognito Hosted UI`, user, group-derived role, and team
 
 Explain:
 
 > The role is not coming from a frontend dropdown. The app redirects through Cognito Hosted UI, exchanges an OAuth code with PKCE, and the API verifies the resulting Cognito ID token through JWKS.
+
+Optional shortcut:
+
+> If a recruiter only wants the surface-level walkthrough, the `Reviewer shortcut` skips the Hosted UI screen but still uses backend-issued reviewer tokens. I keep it labeled so it is clear which path demonstrates managed Cognito sign-in.
 
 ## Flow 1: Helpful AI Support
 

@@ -29,6 +29,8 @@ By default the app expects the API at `http://localhost:8000`. Override with `NE
 
 The role switcher is a portfolio persona selector. The frontend requests a short-lived bearer token for the selected role; protected API routes still derive identity from token claims instead of trusting role fields in request bodies. In the hosted AWS deployment, those tokens are Cognito ID tokens verified through Cognito JWKS.
 
+For the hosted reviewer flow, the sidebar `Identity` panel can prepare a Cognito Hosted UI login for `employee`, `manager`, or `admin`. The API creates or updates a disposable Cognito reviewer persona and returns the generated username and password, which the UI displays before redirecting to Hosted UI. The `Reviewer shortcut` panel is intentionally labeled for fast demos that do not need to show the Cognito redirect.
+
 ## Static Export
 
 The hosted AWS deployment builds the web app as a static export and serves it from private S3 through CloudFront.
