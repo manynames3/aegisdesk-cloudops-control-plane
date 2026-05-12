@@ -6,17 +6,31 @@ Goal: show the project in under six minutes.
 
 Open three views:
 
-1. Employee chat
-2. Manager approval queue
-3. Admin governance dashboard
+1. Cognito Hosted UI sign-in
+2. Employee chat
+3. Manager approval queue
+4. Admin governance dashboard
 
-Before presenting, switch to `Admin` and click `Seed` so the governance dashboard has audit history. For a shorter path, click `Walkthrough` in the top bar and run the four guided steps.
+Before presenting, use the sidebar identity panel to prepare an `Admin` Hosted UI login, copy the generated reviewer credentials, open Cognito Hosted UI, and sign in. Then click `Seed` so the governance dashboard has audit history. For a shorter path, click `Walkthrough` in the top bar and run the four guided steps.
 
 ## 30-Second Introduction
 
 Say:
 
 > AegisDesk is a secure AI gateway for cloud operations teams. It lets employees use AI for incident triage, access requests, and support workflows while the company controls privacy, cost, permissions, approvals, and audit logs.
+
+## Flow 0: Cognito Sign-In
+
+Show:
+
+- Sidebar `Identity` panel
+- `Cognito credentials` reviewer account
+- AWS Cognito Hosted UI page
+- Return to the app showing `Cognito Hosted UI`, user, group-derived role, and team
+
+Explain:
+
+> The role is not coming from a frontend dropdown. The app redirects through Cognito Hosted UI, exchanges an OAuth code with PKCE, and the API verifies the resulting Cognito ID token through JWKS.
 
 ## Flow 1: Helpful AI Support
 

@@ -5,6 +5,7 @@ import hashlib
 import hmac
 
 import boto3
+import httpx
 from botocore.exceptions import ClientError
 
 from .models import Actor, Role
@@ -21,6 +22,18 @@ def create_persona_session(role: Role, team: str | None, settings: Settings) -> 
     if not settings.cognito_user_pool_id or not settings.cognito_client_id:
         raise CognitoSessionError("missing_cognito_configuration")
 
+    username, password, actor = ensure_persona_user(role, team, settings)
+    client = boto3.client("cognito-idp", region_name=settings.cognito_region)
+    id_token = _initiate_auth(client, settings.cognito_user_pool_id, settings.cognito_client_id, username, password)
+    return id_token, actor
+
+
+def ensure_persona_user(role: Role, team: str | None, settings: Settings) -> tuple[str, str, Actor]:
+    if not settings.persona_auth_enabled:
+        raise CognitoSessionError("persona_auth_disabled")
+    if not settings.cognito_user_pool_id:
+        raise CognitoSessionError("missing_cognito_configuration")
+
     resolved_team = team or ("platform" if role == Role.admin else "payments")
     username = f"aegisdesk-{role.value}"
     password = _persona_password(settings.persona_password_seed, role)
@@ -28,8 +41,32 @@ def create_persona_session(role: Role, team: str | None, settings: Settings) -> 
     client = boto3.client("cognito-idp", region_name=settings.cognito_region)
 
     _ensure_user(client, settings.cognito_user_pool_id, username, password, role, resolved_team)
-    id_token = _initiate_auth(client, settings.cognito_user_pool_id, settings.cognito_client_id, username, password)
-    return id_token, actor
+    return username, password, actor
+
+
+def exchange_oauth_code(code: str, code_verifier: str, redirect_uri: str, settings: Settings) -> dict:
+    if not settings.cognito_client_id or not settings.cognito_hosted_ui_domain:
+        raise CognitoSessionError("missing_cognito_configuration")
+
+    token_url = f"{settings.cognito_hosted_ui_domain.rstrip('/')}/oauth2/token"
+    try:
+        response = httpx.post(
+            token_url,
+            data={
+                "grant_type": "authorization_code",
+                "client_id": settings.cognito_client_id,
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "code_verifier": code_verifier,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=settings.opa_timeout_seconds,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise CognitoSessionError("oauth_exchange_failed") from exc
+
+    return response.json()
 
 
 def _ensure_user(client, user_pool_id: str, username: str, password: str, role: Role, team: str) -> None:

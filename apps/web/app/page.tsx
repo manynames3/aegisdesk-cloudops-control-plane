@@ -7,10 +7,13 @@ import {
   ChevronRight,
   Clock,
   ClipboardList,
+  Copy,
   Database,
   DollarSign,
   KeyRound,
   ListFilter,
+  LogIn,
+  LogOut,
   Lock,
   MessageSquare,
   Play,
@@ -24,6 +27,11 @@ import type { LucideIcon } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const AUTH_TOKEN_KEY = "aegisdesk.cognito.idToken";
+const AUTH_ACTOR_KEY = "aegisdesk.cognito.actor";
+const PKCE_VERIFIER_KEY = "aegisdesk.pkce.verifier";
+const PKCE_STATE_KEY = "aegisdesk.pkce.state";
+const PKCE_REDIRECT_KEY = "aegisdesk.pkce.redirectUri";
 
 type Role = "employee" | "manager" | "admin";
 type Tab = "chat" | "approvals" | "governance" | "evaluations";
@@ -132,6 +140,28 @@ type PersonaTokenResponse = {
   };
 };
 
+type AuthActor = PersonaTokenResponse["actor"];
+
+type HostedAuthConfig = {
+  client_id: string;
+  authorization_endpoint: string;
+  logout_endpoint: string;
+  scopes: string[];
+};
+
+type HostedLogin = {
+  actor: AuthActor;
+  username: string;
+  password: string;
+  config: HostedAuthConfig;
+  authorizationUrl: string;
+};
+
+type OAuthExchangeResponse = {
+  id_token: string;
+  actor: AuthActor;
+};
+
 type Message = {
   role: "user" | "assistant";
   text: string;
@@ -214,6 +244,11 @@ export default function Home() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [apiStatus, setApiStatus] = useState<"checking" | "ok" | "offline">("checking");
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authActor, setAuthActor] = useState<AuthActor | null>(null);
+  const [hostedLogin, setHostedLogin] = useState<HostedLogin | null>(null);
+  const [authNotice, setAuthNotice] = useState("");
+  const [isPreparingLogin, setIsPreparingLogin] = useState(false);
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const [walkthroughStep, setWalkthroughStep] = useState(0);
   const [eventFilters, setEventFilters] = useState({
@@ -224,10 +259,18 @@ export default function Home() {
     tool: ""
   });
 
-  const canApprove = role === "manager" || role === "admin";
-  const canManageState = role === "admin";
+  const activeRole = authActor?.role ?? role;
+  const canApprove = activeRole === "manager" || activeRole === "admin";
+  const canManageState = activeRole === "admin";
 
-  async function authHeaders(selectedRole = role): Promise<HeadersInit> {
+  async function authHeaders(selectedRole = activeRole): Promise<HeadersInit> {
+    if (authToken && authActor?.role === selectedRole) {
+      return {
+        Authorization: `Bearer ${authToken}`,
+        "Content-Type": "application/json"
+      };
+    }
+
     const response = await fetch(`${API_BASE}/auth/persona-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -248,7 +291,7 @@ export default function Home() {
     };
   }
 
-  async function refreshData(selectedRole = role) {
+  async function refreshData(selectedRole = activeRole) {
     try {
       const headers = await authHeaders(selectedRole);
       const [healthRes, metricsRes, eventsRes, approvalsRes] = await Promise.all([
@@ -268,10 +311,156 @@ export default function Home() {
   }
 
   useEffect(() => {
-    refreshData();
-  }, [role]);
+    initializeHostedAuth();
+  }, []);
 
-  async function submitMessage(text: string, selectedRole = role) {
+  useEffect(() => {
+    refreshData();
+  }, [role, authToken]);
+
+  async function initializeHostedAuth() {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    const code = params.get("code");
+    const state = params.get("state");
+
+    if (error) {
+      setAuthNotice(`Cognito sign-in failed: ${error}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (code) {
+      const expectedState = sessionStorage.getItem(PKCE_STATE_KEY);
+      const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+      const redirectUri = sessionStorage.getItem(PKCE_REDIRECT_KEY) ?? window.location.origin;
+
+      if (!verifier || !expectedState || state !== expectedState) {
+        setAuthNotice("Cognito callback could not be verified. Start sign-in again.");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/auth/oauth/exchange`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, code_verifier: verifier, redirect_uri: redirectUri })
+        });
+
+        if (!response.ok) throw new Error("oauth_exchange_failed");
+
+        const body = (await response.json()) as OAuthExchangeResponse;
+        localStorage.setItem(AUTH_TOKEN_KEY, body.id_token);
+        localStorage.setItem(AUTH_ACTOR_KEY, JSON.stringify(body.actor));
+        sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+        sessionStorage.removeItem(PKCE_STATE_KEY);
+        sessionStorage.removeItem(PKCE_REDIRECT_KEY);
+        setAuthToken(body.id_token);
+        setAuthActor(body.actor);
+        setRole(body.actor.role);
+        setAuthNotice("Signed in through Cognito Hosted UI. Backend API calls now use the Cognito ID token.");
+      } catch {
+        setAuthNotice("Cognito code exchange failed. Start sign-in again.");
+      } finally {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      return;
+    }
+
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const storedActor = localStorage.getItem(AUTH_ACTOR_KEY);
+    if (storedToken && storedActor) {
+      try {
+        const actor = JSON.parse(storedActor) as AuthActor;
+        setAuthToken(storedToken);
+        setAuthActor(actor);
+        setRole(actor.role);
+      } catch {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(AUTH_ACTOR_KEY);
+      }
+    }
+  }
+
+  async function prepareHostedLogin(selectedRole: Role) {
+    setIsPreparingLogin(true);
+    setAuthNotice("");
+    try {
+      const verifier = randomBase64Url(64);
+      const state = randomBase64Url(32);
+      const challenge = await pkceChallenge(verifier);
+      const redirectUri = window.location.origin;
+      const response = await fetch(`${API_BASE}/auth/hosted-ui-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: selectedRole,
+          team: selectedRole === "admin" ? "platform" : "payments"
+        })
+      });
+
+      if (!response.ok) throw new Error("hosted_login_failed");
+
+      const body = (await response.json()) as Omit<HostedLogin, "authorizationUrl">;
+      const params = new URLSearchParams({
+        client_id: body.config.client_id,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        login_hint: body.username,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: body.config.scopes.join(" "),
+        state
+      });
+
+      sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+      sessionStorage.setItem(PKCE_STATE_KEY, state);
+      sessionStorage.setItem(PKCE_REDIRECT_KEY, redirectUri);
+      setHostedLogin({ ...body, authorizationUrl: `${body.config.authorization_endpoint}?${params.toString()}` });
+      setRole(selectedRole);
+      setAuthNotice("Reviewer credentials are ready. Open Cognito Hosted UI and sign in there.");
+    } catch {
+      setAuthNotice("Could not prepare Cognito Hosted UI sign-in.");
+    } finally {
+      setIsPreparingLogin(false);
+    }
+  }
+
+  async function signOut() {
+    const logoutEndpoint = await getHostedLogoutEndpoint();
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_ACTOR_KEY);
+    setAuthToken(null);
+    setAuthActor(null);
+    setAuthNotice("Signed out locally.");
+
+    if (logoutEndpoint) {
+      const params = new URLSearchParams({
+        client_id: logoutEndpoint.clientId,
+        logout_uri: window.location.origin
+      });
+      window.location.assign(`${logoutEndpoint.url}?${params.toString()}`);
+    }
+  }
+
+  async function getHostedLogoutEndpoint(): Promise<{ url: string; clientId: string } | null> {
+    try {
+      const response = await fetch(`${API_BASE}/auth/hosted-ui-config`);
+      if (!response.ok) return null;
+      const config = (await response.json()) as HostedAuthConfig;
+      return { url: config.logout_endpoint, clientId: config.client_id };
+    } catch {
+      return null;
+    }
+  }
+
+  function openHostedLogin() {
+    if (hostedLogin) {
+      window.location.assign(hostedLogin.authorizationUrl);
+    }
+  }
+
+  async function submitMessage(text: string, selectedRole = activeRole) {
     const headers = await authHeaders(selectedRole);
     const response = await fetch(`${API_BASE}/chat`, {
       method: "POST",
@@ -315,7 +504,7 @@ export default function Home() {
     }
   }
 
-  async function decideApproval(approvalId: string, action: "approve" | "deny", selectedRole = role) {
+  async function decideApproval(approvalId: string, action: "approve" | "deny", selectedRole = activeRole) {
     const headers = await authHeaders(selectedRole);
     await fetch(`${API_BASE}/approvals/${approvalId}/${action}`, {
       method: "POST",
@@ -433,20 +622,61 @@ export default function Home() {
           <TabButton icon={ShieldCheck} label="Evaluations" active={tab === "evaluations"} onClick={() => setTab("evaluations")} />
         </nav>
 
-        <div className="rolePanel">
-          <span>Role</span>
-          <div className="segmented">
-            {(["employee", "manager", "admin"] as Role[]).map((option) => (
-              <button
-                key={option}
-                className={role === option ? "selected" : ""}
-                onClick={() => setRole(option)}
-                type="button"
-              >
-                {option}
+        <div className="identityPanel">
+          <span>Identity</span>
+          {authActor ? (
+            <div className="signedIdentity">
+              <strong>Cognito Hosted UI</strong>
+              <small>{authActor.user_id}</small>
+              <small>{authActor.role} - {authActor.team}</small>
+              <button onClick={signOut} type="button">
+                <LogOut size={15} />
+                Sign out
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className="hostedButtons">
+                {(["employee", "manager", "admin"] as Role[]).map((option) => (
+                  <button disabled={isPreparingLogin} key={option} onClick={() => prepareHostedLogin(option)} type="button">
+                    <LogIn size={15} />
+                    {option}
+                  </button>
+                ))}
+              </div>
+              {hostedLogin && (
+                <div className="credentialBox">
+                  <strong>Cognito credentials</strong>
+                  <span>{hostedLogin.username}</span>
+                  <code>{hostedLogin.password}</code>
+                  <button onClick={() => navigator.clipboard.writeText(`${hostedLogin.username}\n${hostedLogin.password}`)} type="button">
+                    <Copy size={15} />
+                    Copy
+                  </button>
+                  <button className="primaryMini" onClick={openHostedLogin} type="button">
+                    <LogIn size={15} />
+                    Open Hosted UI
+                  </button>
+                </div>
+              )}
+              <details className="shortcutPanel">
+                <summary>Reviewer shortcut</summary>
+                <div className="segmented">
+                  {(["employee", "manager", "admin"] as Role[]).map((option) => (
+                    <button
+                      key={option}
+                      className={role === option ? "selected" : ""}
+                      onClick={() => setRole(option)}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            </>
+          )}
+          {authNotice && <small className="authNotice">{authNotice}</small>}
         </div>
 
         <div className={`status ${apiStatus}`}>
@@ -883,6 +1113,25 @@ function formatTime(value?: string | null) {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function randomBase64Url(byteLength: number) {
+  const bytes = new Uint8Array(byteLength);
+  window.crypto.getRandomValues(bytes);
+  return base64Url(bytes);
+}
+
+async function pkceChallenge(verifier: string) {
+  const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return base64Url(new Uint8Array(digest));
+}
+
+function base64Url(bytes: Uint8Array) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function Metric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string | number }) {

@@ -51,7 +51,7 @@ This is the current MVP stack and deployment shape:
 | --- | --- | --- |
 | Frontend | Next.js | Employee chat, manager approvals, admin dashboard |
 | API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
-| Auth | Amazon Cognito ID tokens with JWKS verification | Backend-derived identity, role, and team claims |
+| Auth | Amazon Cognito Hosted UI, ID tokens, and JWKS verification | Visible login path plus backend-derived identity, role, and team claims |
 | Policy | OPA/Rego in Lambda or HTTP, explicit Python fallback | Authorization, model routing, approval, and budget rules |
 | AI routing | Amazon Bedrock Nova Lite, deterministic fallback, Ollama path documented | Shows real provider routing while preserving low-cost local review |
 | Tooling | MCP Python SDK server plus Lambda in-process adapter | Ticket, access request, cost lookup, and runbook tools |
@@ -65,6 +65,7 @@ This is the current MVP stack and deployment shape:
 ## Engineering Highlights
 
 - **Backend-enforced identity boundary:** protected API routes derive user, role, and team from Cognito ID token claims instead of trusting frontend role fields.
+- **Visible Cognito login:** the hosted app supports Cognito Hosted UI sign-in with PKCE; reviewer persona shortcuts remain labeled as shortcuts for fast walkthroughs.
 - **Policy outside the model:** OPA/Rego is the runtime policy path for tool use, access requests, routing, quotas, and approvals, with Python fallback only for direct local/test mode.
 - **Real LLM path with cost control:** approved low-sensitivity prompts call Amazon Bedrock Nova Lite; sensitive, denied, or failed routes use deterministic/local fallback.
 - **Real cost governance path:** manager/admin cost investigations call AWS Cost Explorer and cache results in DynamoDB to reduce repeated API calls.
@@ -119,6 +120,7 @@ Completed:
 
 - Local Next.js frontend with Chat, Approvals, Governance, and Evaluations views
 - FastAPI gateway with Cognito/JWKS auth, `/chat`, `/events`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
+- Cognito Hosted UI sign-in with backend OAuth code exchange and JWKS-verified ID tokens
 - Redaction, policy decisions, model route metadata, approvals, governed tool calls, and audit events
 - Cognito-backed persona tokens for the hosted portfolio environment
 - Amazon Bedrock Nova Lite route for approved low-sensitivity prompts

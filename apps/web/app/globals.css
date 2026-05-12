@@ -120,16 +120,80 @@ button:disabled {
   color: #ffffff;
 }
 
-.rolePanel {
+.identityPanel {
   display: grid;
   gap: 10px;
   margin-top: auto;
 }
 
-.rolePanel > span {
+.identityPanel > span {
   color: #a7b4c2;
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.signedIdentity,
+.credentialBox,
+.shortcutPanel {
+  background: #17232e;
+  border: 1px solid #304253;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.signedIdentity strong,
+.credentialBox strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.signedIdentity small,
+.credentialBox span,
+.credentialBox code,
+.authNotice,
+.shortcutPanel summary {
+  color: #a7b4c2;
+  font-size: 12px;
+}
+
+.credentialBox code {
+  background: #101820;
+  border-radius: 6px;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+  padding: 7px;
+}
+
+.hostedButtons {
+  display: grid;
+  gap: 6px;
+}
+
+.hostedButtons button,
+.signedIdentity button,
+.credentialBox button {
+  align-items: center;
+  background: #22303d;
+  border: 1px solid #304253;
+  border-radius: 8px;
+  color: #f8fafc;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 10px;
+  text-transform: capitalize;
+}
+
+.credentialBox .primaryMini {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.shortcutPanel summary {
+  cursor: pointer;
 }
 
 .segmented {
@@ -743,7 +807,7 @@ button:disabled {
     justify-content: center;
   }
 
-  .rolePanel {
+  .identityPanel {
     align-content: center;
     margin-top: 0;
   }

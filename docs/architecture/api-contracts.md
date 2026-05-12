@@ -29,6 +29,18 @@ Response:
 
 This endpoint creates reviewer personas for the hosted portfolio environment. In AWS it uses Cognito Admin APIs to issue Cognito ID tokens; direct local runs can use a local token issuer for fast testing.
 
+## GET /auth/hosted-ui-config
+
+Returns the Cognito Hosted UI OAuth endpoints and public app client ID used by the static frontend.
+
+## POST /auth/hosted-ui-login
+
+Creates or updates a controlled reviewer persona in Cognito, returns reviewer credentials, and returns Hosted UI config. The frontend uses this to send a reviewer to Cognito Hosted UI instead of silently switching roles in the browser.
+
+## POST /auth/oauth/exchange
+
+Exchanges a Cognito Hosted UI authorization code and PKCE verifier for tokens. The API verifies the returned ID token through Cognito JWKS before returning the actor context to the frontend.
+
 ## GET /.well-known/jwks.json
 
 Returns the public JSON Web Key Set used to verify hosted Cognito tokens.

@@ -137,6 +137,35 @@ DemoTokenRequest = PersonaTokenRequest
 DemoTokenResponse = PersonaTokenResponse
 
 
+class HostedAuthConfig(BaseModel):
+    client_id: str
+    authorization_endpoint: str
+    logout_endpoint: str
+    scopes: list[str]
+
+
+class HostedLoginResponse(BaseModel):
+    actor: Actor
+    username: str
+    password: str
+    config: HostedAuthConfig
+
+
+class OAuthExchangeRequest(BaseModel):
+    code: str
+    code_verifier: str
+    redirect_uri: str
+
+
+class OAuthExchangeResponse(BaseModel):
+    id_token: str
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str
+    expires_in: int | None = None
+    actor: Actor
+
+
 class EventList(BaseModel):
     events: list[AuditEvent]
 

@@ -43,6 +43,11 @@ output "cognito_user_pool_client_id" {
   value       = aws_cognito_user_pool_client.web.id
 }
 
+output "cognito_hosted_ui_domain" {
+  description = "Cognito Hosted UI domain."
+  value       = "https://${aws_cognito_user_pool_domain.main.domain}.auth.${var.aws_region}.amazoncognito.com"
+}
+
 output "monthly_budget_name" {
   description = "AWS Budget guardrail resource name."
   value       = aws_budgets_budget.portfolio_guardrail.name

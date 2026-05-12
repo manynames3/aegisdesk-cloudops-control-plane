@@ -35,7 +35,9 @@ Responsibilities:
 
 ### Identity Boundary
 
-The direct local path can use HMAC-signed bearer tokens for fast tests. The hosted AWS deployment issues Cognito ID tokens through `/auth/persona-token` for reviewer personas and verifies those tokens with Cognito JWKS. The API derives `user_id`, `role`, and `team` from token claims and ignores role fields sent in chat request bodies.
+The direct local path can use HMAC-signed bearer tokens for fast tests. The hosted AWS deployment supports Cognito Hosted UI sign-in with OAuth authorization code + PKCE. The API exchanges the code, verifies the resulting Cognito ID token with Cognito JWKS, derives `user_id`, `role`, and `team` from token claims, and ignores role fields sent in request bodies.
+
+The UI also keeps a labeled reviewer shortcut that issues controlled Cognito persona tokens through `/auth/persona-token` for fast walkthroughs. That shortcut is intentionally separate from the visible Hosted UI path.
 
 Production extension:
 
@@ -43,6 +45,7 @@ Production extension:
 - short token TTLs
 - tenant and group claims
 - separate admin-only operations
+- remove public reviewer credentials and use enterprise SSO users only
 
 ### Gateway API
 
@@ -209,6 +212,7 @@ sequenceDiagram
 - Terraform-provisioned private S3 bucket behind CloudFront for the static frontend
 - FastAPI packaged as a Lambda zip with Mangum behind HTTP API Gateway
 - Cognito user pool, app client, and role groups for hosted identity
+- Cognito Hosted UI domain and PKCE code flow for visible sign-in
 - DynamoDB table for audit events, approvals, route history, metrics, quotas, and cached cost summaries
 - Bedrock Nova Lite invocation for approved low-sensitivity prompts
 - AWS Cost Explorer read path for manager/admin cost investigations

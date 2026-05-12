@@ -24,6 +24,7 @@ class Settings:
     jwt_audience: str | None
     cognito_user_pool_id: str | None
     cognito_client_id: str | None
+    cognito_hosted_ui_domain: str | None
     cognito_region: str
     persona_auth_enabled: bool
     persona_password_seed: str
@@ -65,6 +66,7 @@ def get_settings() -> Settings:
         jwt_audience=os.getenv("AEGISDESK_JWT_AUDIENCE"),
         cognito_user_pool_id=os.getenv("AEGISDESK_COGNITO_USER_POOL_ID"),
         cognito_client_id=os.getenv("AEGISDESK_COGNITO_CLIENT_ID"),
+        cognito_hosted_ui_domain=os.getenv("AEGISDESK_COGNITO_HOSTED_UI_DOMAIN"),
         cognito_region=os.getenv("AEGISDESK_COGNITO_REGION", os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))),
         persona_auth_enabled=_env_bool("AEGISDESK_PERSONA_AUTH_ENABLED", True),
         persona_password_seed=os.getenv("AEGISDESK_PERSONA_PASSWORD_SEED", "local-persona-seed-change-me"),

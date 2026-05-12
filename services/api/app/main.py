@@ -6,8 +6,8 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from .auth import create_demo_token, jwks_document, require_actor, require_admin, require_manager_or_admin
-from .cognito_auth import CognitoSessionError, create_persona_session
+from .auth import AuthError, create_demo_token, decode_token, jwks_document, require_actor, require_admin, require_manager_or_admin
+from .cognito_auth import CognitoSessionError, create_persona_session, ensure_persona_user, exchange_oauth_code
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
 from .incident_context import lookup_incident_context
 from .llm import LLMUnavailable, maybe_generate_with_bedrock
@@ -20,6 +20,10 @@ from .models import (
     ChatResponse,
     EventList,
     HealthResponse,
+    HostedAuthConfig,
+    HostedLoginResponse,
+    OAuthExchangeRequest,
+    OAuthExchangeResponse,
     PersonaTokenRequest,
     PersonaTokenResponse,
     Role,
@@ -69,6 +73,49 @@ def persona_token(request: PersonaTokenRequest) -> PersonaTokenResponse:
     return PersonaTokenResponse(access_token=create_demo_token(actor), actor=actor)
 
 
+@app.get("/auth/hosted-ui-config", response_model=HostedAuthConfig)
+def hosted_ui_config() -> HostedAuthConfig:
+    return _hosted_auth_config()
+
+
+@app.post("/auth/hosted-ui-login", response_model=HostedLoginResponse)
+def hosted_ui_login(request: PersonaTokenRequest) -> HostedLoginResponse:
+    if settings.auth_mode != "cognito":
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="hosted_ui_requires_cognito")
+    try:
+        username, password, actor = ensure_persona_user(request.role, request.team, settings)
+    except CognitoSessionError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    return HostedLoginResponse(
+        actor=actor,
+        username=username,
+        password=password,
+        config=_hosted_auth_config(),
+    )
+
+
+@app.post("/auth/oauth/exchange", response_model=OAuthExchangeResponse)
+def oauth_exchange(request: OAuthExchangeRequest) -> OAuthExchangeResponse:
+    if settings.auth_mode != "cognito":
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="oauth_exchange_requires_cognito")
+    try:
+        token_response = exchange_oauth_code(request.code, request.code_verifier, request.redirect_uri, settings)
+        id_token = token_response["id_token"]
+        actor = decode_token(id_token)
+    except (AuthError, CognitoSessionError, KeyError) as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+    return OAuthExchangeResponse(
+        id_token=id_token,
+        access_token=token_response.get("access_token"),
+        refresh_token=token_response.get("refresh_token"),
+        token_type=token_response.get("token_type", "Bearer"),
+        expires_in=token_response.get("expires_in"),
+        actor=actor,
+    )
+
+
 @app.post("/auth/demo-token", response_model=PersonaTokenResponse)
 def demo_token(request: PersonaTokenRequest) -> PersonaTokenResponse:
     return persona_token(request)
@@ -82,6 +129,19 @@ def auth_jwks():
 @app.get("/.well-known/jwks.json")
 def well_known_jwks():
     return jwks_document()
+
+
+def _hosted_auth_config() -> HostedAuthConfig:
+    if not settings.cognito_client_id or not settings.cognito_hosted_ui_domain:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="missing_cognito_hosted_ui_configuration")
+
+    domain = settings.cognito_hosted_ui_domain.rstrip("/")
+    return HostedAuthConfig(
+        client_id=settings.cognito_client_id,
+        authorization_endpoint=f"{domain}/oauth2/authorize",
+        logout_endpoint=f"{domain}/logout",
+        scopes=["openid", "profile", "email"],
+    )
 
 
 @app.get("/health", response_model=HealthResponse)
