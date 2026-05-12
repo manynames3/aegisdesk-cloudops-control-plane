@@ -777,7 +777,7 @@ export default function Home() {
                   <div className="approvalMain">
                     <div>
                       <strong>{approval.resource}</strong>
-                      <span>{approval.permission} - {approval.policy_reason}</span>
+                      <span>{formatPermission(approval.permission)} access - {explainApprovalReason(approval.policy_reason)}</span>
                     </div>
                     <div className="approvalFacts">
                       <span><User size={14} /> Requester {approval.requester.user_id}</span>
@@ -785,7 +785,11 @@ export default function Home() {
                       <span><Database size={14} /> Request {approval.request_id}</span>
                       {approval.decided_by && <span><Check size={14} /> {approval.decided_by} at {formatTime(approval.decided_at)}</span>}
                     </div>
-                    <ApprovalTimeline approval={approval} events={events.filter((event) => event.request_id === approval.request_id)} />
+                    <ApprovalTimeline
+                      approval={approval}
+                      events={events.filter((event) => event.request_id === approval.request_id)}
+                      showTechnical={activeRole === "admin"}
+                    />
                   </div>
                   <Badge tone={approval.status === "approved" ? "good" : approval.status === "denied" ? "bad" : "warn"}>
                     {approval.status}
@@ -1003,14 +1007,48 @@ function DecisionItem({ label, value, emphasis = false }: { label: string; value
   );
 }
 
-function ApprovalTimeline({ approval, events }: { approval: Approval; events: AuditEvent[] }) {
+function ApprovalTimeline({
+  approval,
+  events,
+  showTechnical
+}: {
+  approval: Approval;
+  events: AuditEvent[];
+  showTechnical: boolean;
+}) {
   const requested = events.find((event) => event.event_type === "approval.requested");
   const decided = events.find((event) => event.event_type === "approval.granted" || event.event_type === "approval.denied");
+  const decisionLabel =
+    approval.status === "pending"
+      ? "Waiting for manager decision."
+      : `${capitalize(approval.status)} by ${approval.decided_by ?? "manager"} at ${formatTime(approval.decided_at)}.`;
+  const requestLabel = `Temporary ${formatPermission(approval.permission)} access requested for ${approval.resource}. Manager approval is required before access is granted.`;
 
   return (
     <div className="approvalTimeline">
-      <span>Before: {requested ? requested.summary : "Approval request recorded."}</span>
-      <span>After: {decided ? decided.summary : approval.status === "pending" ? "Waiting for manager decision." : "Decision recorded."}</span>
+      <strong>Approval timeline</strong>
+      <div className="timelineItem">
+        <Clock size={15} />
+        <div>
+          <span>Request opened</span>
+          <p>{requestLabel}</p>
+        </div>
+      </div>
+      <div className="timelineItem">
+        {approval.status === "approved" ? <Check size={15} /> : approval.status === "denied" ? <X size={15} /> : <Clock size={15} />}
+        <div>
+          <span>{approval.status === "pending" ? "Current status" : "Decision"}</span>
+          <p>{decisionLabel}</p>
+        </div>
+      </div>
+      {showTechnical && (
+        <details className="technicalTrail">
+          <summary>Technical audit details</summary>
+          <code>{requested?.event_type ?? "approval.requested"}</code>
+          <code>{decided?.event_type ?? "decision.pending"}</code>
+          <code>{approval.request_id}</code>
+        </details>
+      )}
     </div>
   );
 }
@@ -1113,6 +1151,21 @@ function formatTime(value?: string | null) {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatPermission(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function explainApprovalReason(reason: string) {
+  if (reason === "temporary_production_access_requires_manager_approval") {
+    return "Manager approval required for temporary production access.";
+  }
+  return reason.replaceAll("_", " ");
 }
 
 function randomBase64Url(byteLength: number) {

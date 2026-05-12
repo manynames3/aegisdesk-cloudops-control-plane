@@ -45,7 +45,7 @@ An employee says:
 - Suggests temporary read-only access tied to an incident ticket.
 - Sends approval request to a manager.
 - Records the policy decision and reason.
-- Shows requester, approver, decision timestamp, and correlated before/after audit events.
+- Shows requester, current status, approver, decision timestamp, and admin-only technical audit details.
 
 ### Enterprise Value
 

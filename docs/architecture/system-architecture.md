@@ -130,7 +130,7 @@ Events:
 - tool.called
 - eval.failed
 
-The governance view reads these persisted records directly and supports filters for request ID, actor, policy decision, model route, and tool name. Approval cards show the requester, approver, decision timestamp, and the correlated before/after audit events for the approval workflow.
+The governance view reads these persisted records directly and supports filters for request ID, actor, policy decision, model route, and tool name. Approval cards show the requester, current status, approver, decision timestamp, and a plain-English approval timeline. Admin users can expand technical audit details when they need event names and request IDs.
 
 ### Incident Context
 

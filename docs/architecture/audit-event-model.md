@@ -76,4 +76,5 @@ Approval records link back to audit events through request IDs and approval meta
 
 - `approval.requested` records requester, resource, permission, and approval ID.
 - `approval.granted` or `approval.denied` records approver, status, decision timestamp, and approval ID.
-- The frontend shows the before/after trail on the approval card so the workflow is understandable without inspecting DynamoDB directly.
+- The frontend shows a plain-English approval timeline on the approval card so the workflow is understandable without inspecting DynamoDB directly.
+- Admin users can expand technical audit details when they need event names and request IDs.

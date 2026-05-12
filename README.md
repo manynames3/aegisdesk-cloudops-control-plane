@@ -73,7 +73,7 @@ This is the current MVP stack and deployment shape:
 - **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
 - **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, incident context, tool call, approval, cost estimate, and trace ID.
 - **Audit event explorer:** governance reviewers can filter persisted events by request ID, user, policy decision, model route, and tool.
-- **Approval workflow evidence:** approval cards show requester, approver identity, decision timestamp, and before/after audit events.
+- **Approval workflow evidence:** approval cards show requester, current status, approver identity, decision timestamp, and admin-only technical audit details.
 - **Durable cloud state:** hosted audit events, approvals, model routes, metrics, and quota counters persist in DynamoDB.
 - **Deployed AWS architecture:** Terraform provisions Cognito, a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, DynamoDB, Bedrock IAM, Cost Explorer access, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
 - **Deployment automation:** a manual GitHub Actions deploy workflow builds the Lambda package, runs Terraform, publishes the static frontend, and invalidates CloudFront.

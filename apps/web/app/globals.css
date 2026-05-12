@@ -758,8 +758,59 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.approvalTimeline > strong {
+  font-size: 13px;
+}
+
+.timelineItem {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.timelineItem svg {
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.timelineItem span {
+  display: block;
+  font-weight: 700;
+}
+
+.timelineItem p {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 2px 0 0;
+}
+
+.technicalTrail {
+  border-top: 1px solid var(--line);
+  display: grid;
   gap: 6px;
-  padding: 10px;
+  padding-top: 8px;
+}
+
+.technicalTrail summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.technicalTrail code {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--neutral);
+  display: block;
+  font-size: 12px;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
 }
 
 .rowActions {
