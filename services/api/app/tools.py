@@ -20,15 +20,15 @@ def create_ticket(policy: PolicyDecision, title: str, team: str, severity: str) 
     return ToolCall(name="ticket.create", status=status, policy=policy, result=result)
 
 
-def lookup_cost_summary(policy: PolicyDecision) -> ToolCall:
+def lookup_cost_summary(policy: PolicyDecision, summary: dict | None = None) -> ToolCall:
     status = "allowed" if policy.decision == "allow" else "approval_required"
 
     result = {}
     if status == "allowed":
-        result = {
+        result = summary or {
             "period": "last_7_days",
             "total_usd": 184.72,
-            "largest_driver": "simulated cloud model experimentation",
+            "largest_driver": "cloud model experimentation",
             "recommendation": "route low-value repeated prompts to local model or cache approved answers",
             "estimated_savings_usd": 37.4,
         }

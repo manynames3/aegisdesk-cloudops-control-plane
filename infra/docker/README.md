@@ -9,7 +9,7 @@ Planned local services in the root `compose.yaml`:
 
 Goal:
 
-Run the full demo locally without required cloud spend.
+Run the full app locally without required cloud spend.
 
 Current note:
 
@@ -19,4 +19,4 @@ Docker is not required for the direct local development path. Use Docker Compose
 docker compose up --build
 ```
 
-The current FastAPI implementation uses deterministic local demo behavior and does not require a paid model provider.
+The current FastAPI implementation uses deterministic local behavior and does not require a paid model provider.

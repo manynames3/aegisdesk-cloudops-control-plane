@@ -14,8 +14,7 @@ Make Docker Compose and local model routing the first runnable target. Use Ollam
 
 ## Consequences
 
-- The demo can run at low or zero cost.
+- The app can run at low or zero cost.
 - The project is easier to reproduce from a clean checkout.
-- Cloud deployment artifacts remain a production path rather than a blocker for the first demo.
+- Cloud deployment artifacts remain a production path rather than a blocker for the first reviewer path.
 - Local runtime does not replace the need to document cloud deployment, IAM, secrets, and observability hardening.
-

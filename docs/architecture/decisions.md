@@ -16,17 +16,17 @@ Generic chatbots are easy to dismiss. A CloudOps control plane demonstrates high
 
 Tradeoff:
 
-The project becomes more complex than a basic chat UI. Scope must stay narrow and demo-driven.
+The project becomes more complex than a basic chat UI. Scope must stay narrow and reviewer-driven.
 
 ## ADR-002: Local-First MVP
 
 Decision:
 
-The first complete demo should run locally with Docker Compose and Ollama.
+The first complete reviewer path should run locally with Docker Compose and Ollama.
 
 Reason:
 
-This keeps initial cost near zero, makes the demo reproducible, and highlights cost-conscious engineering.
+This keeps initial cost near zero, makes the app reproducible, and highlights cost-conscious engineering.
 
 Tradeoff:
 
@@ -50,7 +50,7 @@ OPA adds complexity. The MVP should use a small number of readable policies and 
 
 Decision:
 
-Do not grant real production access or modify real cloud resources in the portfolio demo.
+Do not grant real production access or modify real cloud resources in the portfolio environment.
 
 Reason:
 
@@ -58,7 +58,7 @@ The goal is to prove safe architecture, not create unnecessary risk or cost.
 
 Tradeoff:
 
-Some cloud actions are simulated. The documentation must clearly distinguish mocked demo actions from production implementation.
+Some cloud actions are simulated. The documentation must clearly distinguish mocked actions from production implementation.
 
 ## ADR-005: Show Cost Decisions In The Product UI
 

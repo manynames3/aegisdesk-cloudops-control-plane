@@ -10,7 +10,7 @@ mcp = FastMCP("aegisdesk-cloudops-tools")
 
 @mcp.tool()
 def create_ticket(title: str, team: str, severity: Literal["low", "medium", "high"] = "medium") -> dict:
-    """Create a deterministic support ticket for the governed CloudOps demo."""
+    """Create a deterministic support ticket for the governed CloudOps workflow."""
     return {
         "ticket_id": f"TCK-{uuid4().hex[:6].upper()}",
         "title": title,
@@ -37,7 +37,7 @@ def request_temporary_read_only_access(user_id: str, team: str, resource: str, r
 
 @mcp.tool()
 def lookup_cost_summary(period: str = "last_7_days") -> dict:
-    """Return a deterministic cost summary for the governed CloudOps demo."""
+    """Return a deterministic cost summary for the governed CloudOps workflow."""
     return {
         "period": period,
         "total_usd": 184.72,

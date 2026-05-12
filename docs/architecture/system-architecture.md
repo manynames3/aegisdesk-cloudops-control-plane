@@ -30,13 +30,13 @@ Responsibilities:
 - Show clear policy, redaction, and route indicators
 - Provide non-technical visibility into enterprise controls
 
-### Demo Auth Boundary
+### Identity Boundary
 
-The local demo can use HMAC-signed bearer tokens for fast tests. The hosted portfolio environment issues RS256 demo tokens from `/auth/demo-token` and verifies them with the public key exposed at `/.well-known/jwks.json`. The API derives `user_id`, `role`, and `team` from token claims and ignores role fields sent in chat request bodies.
+The direct local path can use HMAC-signed bearer tokens for fast tests. The hosted AWS deployment issues Cognito ID tokens through `/auth/persona-token` for reviewer personas and verifies those tokens with Cognito JWKS. The API derives `user_id`, `role`, and `team` from token claims and ignores role fields sent in chat request bodies.
 
 Production extension:
 
-- OIDC/JWKS verification from Cognito, Entra ID, Okta, or another identity provider
+- federation from Entra ID, Okta, or another corporate identity provider into Cognito or directly into the gateway
 - short token TTLs
 - tenant and group claims
 - separate admin-only operations
@@ -58,7 +58,7 @@ Responsibilities:
 
 ### Policy Engine
 
-Stack: OPA/Rego over HTTP in Docker Compose, with an explicit Python fallback for direct local runs and tests.
+Stack: OPA/Rego. Docker Compose can run OPA over HTTP; the hosted Lambda bundle executes the OPA binary directly against the Rego policy directory. An explicit Python fallback remains for direct local runs and tests.
 
 Policy decisions:
 
@@ -76,7 +76,7 @@ MVP routing rules:
 - Sensitive requests route to the local route.
 - Requests with secrets can be blocked or redacted before routing.
 - Budget threshold can force lower-cost routes.
-- If Bedrock is disabled or unavailable, deterministic fallback keeps the demo usable.
+- If Bedrock is disabled or unavailable, deterministic fallback keeps the app usable.
 
 Production extension:
 
@@ -95,7 +95,7 @@ MVP tools:
 - Cloud cost lookup tool
 - Knowledge search tool
 
-The repository includes a real MCP server in `services/mcp-tools` using the Python MCP SDK. The hosted Lambda API uses an in-process adapter for the same deterministic demo actions to avoid spawning subprocesses in Lambda.
+The repository includes a real MCP server in `services/mcp-tools` using the Python MCP SDK. The hosted Lambda API uses an in-process adapter for the same controlled actions to avoid spawning subprocesses in Lambda.
 
 Tool safety pattern:
 
@@ -107,7 +107,7 @@ Tool safety pattern:
 
 ### Audit Store
 
-Hosted storage: DynamoDB single-table demo state. Local fallback: SQLite. Production path: managed Postgres or a stricter immutable audit sink, depending on retention and reporting requirements.
+Hosted storage: DynamoDB single-table state for audit events, approvals, route history, quota counters, metrics, and Cost Explorer cache entries. Local fallback: SQLite. Production path: managed Postgres or a stricter immutable audit sink, depending on retention and reporting requirements.
 
 Events:
 
@@ -183,13 +183,15 @@ sequenceDiagram
 - Jaeger
 - persistent local SQLite volume
 
-### Hosted AWS Demo
+### Hosted AWS Deployment
 
 - Terraform-provisioned private S3 bucket behind CloudFront for the static frontend
 - FastAPI packaged as a Lambda zip with Mangum behind HTTP API Gateway
-- DynamoDB table for audit events, approvals, route history, metrics, and quotas
+- Cognito user pool, app client, and role groups for hosted identity
+- DynamoDB table for audit events, approvals, route history, metrics, quotas, and cached cost summaries
 - Bedrock Nova Lite invocation for approved low-sensitivity prompts
-- IAM role scoped to Lambda log writes
+- AWS Cost Explorer read path for manager/admin cost investigations
+- IAM role scoped to Lambda log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention
 - S3 server-side encryption, public access block, and noncurrent version cleanup
 - AWS Budget guardrail for the portfolio cost threshold
@@ -209,7 +211,7 @@ The MVP should not pretend to modify real cloud resources. Destructive actions a
 
 This is intentional:
 
-- Safer for a portfolio demo
+- Safer for a portfolio project
 - Lower cost
 - Easier to run locally
 - Still demonstrates the enterprise control pattern

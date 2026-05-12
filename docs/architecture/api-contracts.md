@@ -1,8 +1,8 @@
 # API Contracts
 
-These contracts describe the current MVP shape. Protected endpoints require `Authorization: Bearer <demo token>`. The hosted demo token is RS256-signed and verified through JWKS.
+These contracts describe the current portfolio shape. Protected endpoints require `Authorization: Bearer <token>`. The hosted deployment uses Cognito ID tokens verified through Cognito JWKS.
 
-## POST /auth/demo-token
+## POST /auth/persona-token
 
 Request:
 
@@ -17,21 +17,21 @@ Response:
 
 ```json
 {
-  "access_token": "signed.demo.token",
+  "access_token": "cognito.id.token",
   "token_type": "bearer",
   "actor": {
-    "user_id": "u-1001",
+    "user_id": "aegisdesk-employee",
     "role": "employee",
     "team": "payments"
   }
 }
 ```
 
-This is a portfolio demo issuer only. The hosted demo verifies RS256 tokens through JWKS; production deployments should replace the demo issuer with Cognito, Entra ID, Okta, or another OIDC provider.
+This endpoint creates reviewer personas for the hosted portfolio environment. In AWS it uses Cognito Admin APIs to issue Cognito ID tokens; direct local runs can use a local token issuer for fast testing.
 
 ## GET /.well-known/jwks.json
 
-Returns the public JSON Web Key Set used to verify hosted demo tokens.
+Returns the public JSON Web Key Set used to verify hosted Cognito tokens.
 
 ## POST /chat
 
@@ -100,6 +100,8 @@ Example tool call response:
   }
 }
 ```
+
+Manager/admin cost investigations call AWS Cost Explorer when enabled and cache the summary in DynamoDB. Employee cost investigations return `approval_required`.
 
 ## GET /events
 

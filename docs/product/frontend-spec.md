@@ -1,4 +1,4 @@
-# Frontend Demo Spec
+# Frontend Spec
 
 The frontend should make the enterprise value obvious within one minute.
 
@@ -34,7 +34,7 @@ Key UI elements:
 - Policy decision badge
 - Tool call result
 
-Demo prompts:
+Suggested prompts:
 
 - `The checkout service is timing out. What should I check first?`
 - `Create a ticket for the VPN outage and assign it to CloudOps.`

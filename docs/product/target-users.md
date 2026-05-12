@@ -80,7 +80,7 @@ Value:
 - Budget-aware routing
 - Clear link between AI consumption and business workflow
 
-## Demo Personas
+## Reviewer Personas
 
 ### Employee
 
@@ -93,4 +93,3 @@ Approves or rejects scoped actions such as temporary read-only access.
 ### Admin
 
 Reviews model usage, cost, redactions, policy decisions, tool calls, and evaluation results.
-

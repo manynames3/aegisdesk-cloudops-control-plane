@@ -9,12 +9,13 @@ Responsibilities:
 - Evaluate OPA policies
 - Route to local fallback or Amazon Bedrock
 - Gate MCP tool calls
+- Query AWS Cost Explorer for authorized cost investigations
 - Create audit events
 - Emit OpenTelemetry traces
 
 Implemented endpoints:
 
-- `POST /auth/demo-token`
+- `POST /auth/persona-token`
 - `GET /health`
 - `GET /health/live`
 - `GET /health/ready`
@@ -24,8 +25,8 @@ Implemented endpoints:
 - `POST /approvals/{id}/approve`
 - `POST /approvals/{id}/deny`
 - `GET /metrics/summary`
-- `POST /demo/reset`
-- `POST /demo/seed`
+- `POST /admin/reset`
+- `POST /admin/seed`
 
 ## Local Run
 
@@ -37,7 +38,7 @@ python3 -m venv .venv
 
 Direct local runs default to `AEGISDESK_POLICY_MODE=auto`, which uses OPA when `OPA_URL` is set and falls back to the mirrored Python policy evaluator when OPA is not configured. Docker Compose sets `AEGISDESK_POLICY_MODE=opa`.
 
-Local runs default to SQLite storage, HMAC demo tokens, and deterministic model fallback. The hosted Terraform path sets DynamoDB storage, JWKS token verification, and Bedrock Nova Lite routing.
+Local runs default to SQLite storage, local persona tokens, and deterministic model fallback. The hosted Terraform path sets DynamoDB storage, Cognito/JWKS token verification, OPA subprocess policy evaluation, Bedrock Nova Lite routing, and Cost Explorer summaries with DynamoDB caching.
 
 ## Lambda Package
 
@@ -59,7 +60,7 @@ Terraform reads the generated `build/aegisdesk-api-lambda.zip`.
 
 ## Local Persistence
 
-By default, the API writes demo audit events, approvals, and model routes to SQLite at `data/aegisdesk.db` relative to the process working directory. Override with:
+By default, the API writes audit events, approvals, and model routes to SQLite at `data/aegisdesk.db` relative to the process working directory. Override with:
 
 ```bash
 AEGISDESK_DB_PATH=:memory:
@@ -67,6 +68,6 @@ AEGISDESK_DB_PATH=:memory:
 
 ## Current Boundary
 
-The API uses deterministic mock tools. It does not call paid model providers or modify real cloud resources through chat actions.
+The API uses deterministic ticket/access tools and does not modify real cloud resources through chat actions. The hosted path can call Amazon Bedrock for approved low-sensitivity prompts and AWS Cost Explorer for manager/admin cost summaries.
 
-The `/auth/demo-token` endpoint is a portfolio demo issuer. In hosted mode it issues RS256 tokens verified through `/.well-known/jwks.json`. Production identity should use OIDC/JWT verification from a real identity provider such as Cognito, Entra ID, or Okta.
+The `/auth/persona-token` endpoint is a portfolio persona issuer. In hosted mode it uses Cognito Admin APIs to issue Cognito ID tokens verified through Cognito JWKS. Production identity should federate a corporate identity provider such as Entra ID or Okta instead of using reviewer personas.

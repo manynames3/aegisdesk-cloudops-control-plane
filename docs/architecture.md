@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AegisDesk is a local-first and hosted MVP for a CloudOps AI control plane. The current implementation sends employee, manager, and admin workflows through a FastAPI gateway that verifies JWKS-backed demo tokens, performs redaction, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, emits OpenTelemetry spans, and writes audit events to DynamoDB in the hosted environment.
+AegisDesk is a local-first and hosted portfolio implementation of a CloudOps AI control plane. The current system sends employee, manager, and admin workflows through a FastAPI gateway that verifies Cognito ID tokens through JWKS, performs redaction, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, queries AWS Cost Explorer for manager/admin cost investigations, emits OpenTelemetry spans, and writes audit/cache state to DynamoDB in the hosted environment.
 
 ## Container Diagram
 
@@ -18,13 +18,14 @@ flowchart LR
         Web["Web App<br/>Next.js browser UI<br/>Chat, approvals, dashboard"]
         APIGW["HTTP API Gateway<br/>Public API ingress"]
         Lambda["AWS Lambda<br/>Mangum adapter"]
-        Auth["Demo Auth<br/>RS256 tokens + JWKS<br/>Hosted identity boundary"]
+        Auth["Amazon Cognito<br/>ID tokens + JWKS<br/>Hosted identity boundary"]
         API["Gateway API<br/>FastAPI / Pydantic<br/>Validation, orchestration, audit"]
-        Policy["Policy Engine<br/>OPA / Rego over HTTP<br/>Routing, authorization, approval rules"]
+        Policy["Policy Engine<br/>OPA / Rego in Lambda or HTTP<br/>Routing, authorization, approval rules"]
         Router["Model Router<br/>Python module<br/>Local/Bedrock route selection"]
         Bedrock["Amazon Bedrock<br/>Nova Lite"]
         Tools["MCP Tool Server<br/>Python MCP SDK<br/>Ticket, access, cost, knowledge tools"]
-        Audit[("Audit Store<br/>DynamoDB hosted / SQLite local")]
+        Cost["AWS Cost Explorer<br/>Cached cloud cost summaries"]
+        Audit[("Audit + Cache Store<br/>DynamoDB hosted / SQLite local")]
         Quota["Quota Policy<br/>Role/team counters"]
         Trace["Trace Backend<br/>CloudWatch logs now / Jaeger local path"]
         Budget["AWS Budget<br/>Portfolio spend guardrail"]
@@ -49,6 +50,7 @@ flowchart LR
     Router --> LocalModel
     Router --> Bedrock
     API --> Tools
+    Tools --> Cost
     API --> Audit
     API --> Trace
     Budget -.->|monitors AWS spend| CDN
@@ -59,10 +61,10 @@ flowchart LR
 ## Runtime Flow
 
 1. A user submits a CloudOps request through the web app.
-2. The FastAPI gateway validates the bearer token and derives user, role, and team from signed claims.
+2. The FastAPI gateway validates the bearer token and derives user, role, and team from Cognito/JWKS claims.
 3. The gateway inspects input for PII, secrets, and privileged-action intent.
 4. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
-5. The model router chooses local Ollama or an optional cloud provider based on sensitivity, budget, and policy.
+5. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, and policy.
 6. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
 7. The gateway writes audit events for redaction, policy, model route, tool calls, approvals, estimated cost, and trace IDs.
 8. The frontend shows the answer and decision metadata to the user, manager, or admin.
@@ -71,7 +73,7 @@ flowchart LR
 
 ### Current Repository State
 
-The repository contains a runnable local frontend and API, JWKS demo auth, Rego policy files and tests, CI checks, API tests, MCP server, documentation, screenshots, Docker Compose, applied AWS Terraform for the hosted portfolio demo, and a manual GitHub Actions deploy workflow.
+The repository contains a runnable local frontend and API, Cognito/JWKS auth in AWS, Rego policy files and tests, CI checks, API tests, MCP server, documentation, screenshots, Docker Compose, applied AWS Terraform for the hosted portfolio deployment, and a manual GitHub Actions deploy workflow.
 
 ### MVP Deployment
 
@@ -95,9 +97,11 @@ The current hosted deployment uses a low-idle-cost AWS shape:
 
 - private S3 bucket and CloudFront distribution for the static frontend
 - FastAPI Lambda zip package behind HTTP API Gateway
-- DynamoDB table for durable audit events, approvals, model routes, metrics, and quotas
+- Amazon Cognito user pool, app client, role groups, and JWKS verification
+- DynamoDB table for durable audit events, approvals, model routes, metrics, quotas, and Cost Explorer cache entries
 - Amazon Bedrock Nova Lite for approved low-sensitivity prompts
-- IAM execution role scoped to CloudWatch log writes
+- AWS Cost Explorer for manager/admin cost investigations
+- IAM execution role scoped to CloudWatch log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention
 - AWS Budget guardrail set to the portfolio threshold
 - S3 server-side encryption, public access block, and noncurrent version cleanup
@@ -105,20 +109,20 @@ The current hosted deployment uses a low-idle-cost AWS shape:
 
 ### Production Hardening Path
 
-The hosted demo intentionally stays below production complexity. A production version would add:
+The hosted deployment intentionally stays below production complexity. A production version would add:
 
 - future managed Postgres
-- future production identity provider integration with Cognito, Entra ID, or Okta
+- enterprise identity federation with Entra ID, Okta, or an existing corporate IdP
 - immutable or append-only audit sink
 - scoped IAM roles for any real cloud tools
 
 ## Key Constraints
 
-- The current demo must not claim paid model calls or real cloud writes.
+- The current system must distinguish real provider calls from deterministic fallback behavior.
 - Destructive cloud actions are mocked or approval-only in the portfolio MVP.
 - Policy must be enforced outside the model.
 - Sensitive data controls happen before model routing.
-- Cloud model use must be optional so the demo can run at low cost.
+- Cloud model use must be optional so the app can run at low cost.
 - Audit events must be based on backend decisions, not invented dashboard values.
 
 ## Related Docs

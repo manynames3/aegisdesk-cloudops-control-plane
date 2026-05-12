@@ -84,7 +84,7 @@ type Approval = {
   created_at: string;
 };
 
-type DemoTokenResponse = {
+type PersonaTokenResponse = {
   access_token: string;
   actor: {
     user_id: string;
@@ -108,7 +108,7 @@ const prompts = [
   {
     label: "Secret",
     icon: Lock,
-    text: "Here is the error log with token=demo-secret-value and customer@example.test. Why is this failing?"
+    text: "Here is the error log with token=sample-secret-value and customer@example.test. Why is this failing?"
   },
   {
     label: "Ticket",
@@ -150,10 +150,10 @@ export default function Home() {
   const [apiStatus, setApiStatus] = useState<"checking" | "ok" | "offline">("checking");
 
   const canApprove = role === "manager" || role === "admin";
-  const canSeedDemo = role === "admin";
+  const canManageState = role === "admin";
 
   async function authHeaders(selectedRole = role): Promise<HeadersInit> {
-    const response = await fetch(`${API_BASE}/auth/demo-token`, {
+    const response = await fetch(`${API_BASE}/auth/persona-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -163,10 +163,10 @@ export default function Home() {
     });
 
     if (!response.ok) {
-      throw new Error("demo_token_failed");
+      throw new Error("persona_token_failed");
     }
 
-    const token = (await response.json()) as DemoTokenResponse;
+    const token = (await response.json()) as PersonaTokenResponse;
     return {
       Authorization: `Bearer ${token.access_token}`,
       "Content-Type": "application/json"
@@ -245,18 +245,18 @@ export default function Home() {
     await refreshData();
   }
 
-  async function resetDemo() {
-    if (!canSeedDemo) return;
+  async function resetState() {
+    if (!canManageState) return;
     const headers = await authHeaders("admin");
-    await fetch(`${API_BASE}/demo/reset`, { method: "POST", headers });
+    await fetch(`${API_BASE}/admin/reset`, { method: "POST", headers });
     setMessages([]);
     await refreshData();
   }
 
-  async function seedDemo() {
-    if (!canSeedDemo) return;
+  async function seedState() {
+    if (!canManageState) return;
     const headers = await authHeaders("admin");
-    await fetch(`${API_BASE}/demo/seed`, { method: "POST", headers });
+    await fetch(`${API_BASE}/admin/seed`, { method: "POST", headers });
     setMessages([]);
     await refreshData();
   }
@@ -309,17 +309,17 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p>Live AWS demo</p>
+            <p>Live AWS deployment</p>
             <h1>{tabTitle(tab)}</h1>
           </div>
           <div className="topActions">
             <button className="iconButton" onClick={refreshData} title="Refresh" type="button">
               <RefreshCw size={18} />
             </button>
-            <button className="secondary" disabled={!canSeedDemo} onClick={seedDemo} title="Admin demo role required" type="button">
+            <button className="secondary" disabled={!canManageState} onClick={seedState} title="Admin identity required" type="button">
               Seed
             </button>
-            <button className="secondary" disabled={!canSeedDemo} onClick={resetDemo} title="Admin demo role required" type="button">
+            <button className="secondary" disabled={!canManageState} onClick={resetState} title="Admin identity required" type="button">
               Reset
             </button>
           </div>

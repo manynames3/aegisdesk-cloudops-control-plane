@@ -7,14 +7,14 @@ AegisDesk is designed to demonstrate cost-conscious enterprise architecture.
 Target:
 
 - Local development: $0
-- Demo operation: $0 to low single digits
-- Hosted demo: low single digits for light traffic, guarded by a $1 AWS Budget
+- Local operation: $0 to low single digits
+- Hosted portfolio deployment: low single digits for light traffic, guarded by a $1 AWS Budget
 
 ## Cost-Conscious Choices
 
 ### Local-First Runtime
 
-Use Docker Compose and Ollama for the primary demo path.
+Use Docker Compose and Ollama for the primary local path.
 
 Why:
 
@@ -30,19 +30,30 @@ Use mock tools for access grants and infrastructure changes.
 Why:
 
 - Avoids real cloud risk
-- Keeps demo safe
+- Keeps the portfolio environment safe
 - Shows control pattern without requiring paid cloud resources
 
 ### Governed Bedrock Route
 
-Amazon Bedrock Nova Lite is enabled in the hosted demo only for approved low-sensitivity prompts. Local development and tests use deterministic fallback unless Bedrock is explicitly enabled.
+Amazon Bedrock Nova Lite is enabled in the hosted deployment only for approved low-sensitivity prompts. Local development and tests use deterministic fallback unless Bedrock is explicitly enabled.
 
 Why:
 
 - Project works without paid API keys
-- Demo shows a real AWS model invocation path
+- Shows a real AWS model invocation path
 - Cost exposure is explicit
 - Sensitive, denied, or quota-blocked requests do not call Bedrock
+
+### Governed Cost Explorer Path
+
+Manager/admin cost investigations call AWS Cost Explorer when enabled. Results are cached in DynamoDB for six hours so repeated walkthroughs do not repeatedly call the Cost Explorer API.
+
+Why:
+
+- Proves a real AWS cost-governance integration
+- Keeps cost visibility behind role and policy checks
+- Avoids repeated billing API calls during reviewer walkthroughs
+- Shows honest behavior when tagged spend is zero or tags are not yet active
 
 ### Estimated Cost Display
 
@@ -61,7 +72,7 @@ Why:
 
 ### Low-Cost AWS Deployment
 
-Terraform deploys a low-idle-cost AWS path for the portfolio demo.
+Terraform deploys a low-idle-cost AWS path for the portfolio deployment.
 
 Why:
 
@@ -99,4 +110,4 @@ Optimization options:
 
 Say:
 
-> After validating the architecture locally, I deployed the portfolio version on a static/serverless AWS footprint: S3, CloudFront, Lambda, HTTP API Gateway, DynamoDB, Bedrock Nova Lite, CloudWatch, IAM, and an AWS Budget guardrail. I avoided EKS, NAT gateways, RDS, and always-on compute because they would add cost without improving the demo signal.
+> After validating the architecture locally, I deployed the portfolio version on a static/serverless AWS footprint: Cognito, S3, CloudFront, Lambda, HTTP API Gateway, DynamoDB, Bedrock Nova Lite, Cost Explorer, CloudWatch, IAM, and an AWS Budget guardrail. I avoided EKS, NAT gateways, RDS, and always-on compute because they would add cost without improving the architecture signal.

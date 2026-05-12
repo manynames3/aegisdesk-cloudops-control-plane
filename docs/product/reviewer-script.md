@@ -1,8 +1,8 @@
-# Recruiter and Hiring Manager Demo Script
+# Recruiter and Hiring Manager Reviewer Script
 
 Goal: show the project in under six minutes.
 
-## Demo Setup
+## Setup
 
 Open three views:
 

@@ -18,7 +18,7 @@ AegisDesk exists to answer one practical question:
 
 ## Problem
 
-Most AI demos stop at the answer. Real enterprises need the control plane around the answer.
+Most AI chat projects stop at the answer. Real enterprises need the control plane around the answer.
 
 For CloudOps and platform teams, the risk is not only inaccurate output. The bigger risks are:
 
@@ -52,4 +52,3 @@ For senior cloud hiring managers, the project has deeper proof:
 - Real audit events and traces
 - Clear deployment and production hardening path
 - Documented security and architecture tradeoffs
-

@@ -84,6 +84,15 @@ class DemoStore:
                 )
                 """
             )
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cache_entries (
+                    cache_key TEXT PRIMARY KEY,
+                    expires_at INTEGER NOT NULL,
+                    payload TEXT NOT NULL
+                )
+                """
+            )
 
     @property
     def events(self) -> list[AuditEvent]:
@@ -185,6 +194,7 @@ class DemoStore:
             self._conn.execute("DELETE FROM approvals")
             self._conn.execute("DELETE FROM model_routes")
             self._conn.execute("DELETE FROM quota_counters")
+            self._conn.execute("DELETE FROM cache_entries")
 
     def ready(self) -> bool:
         try:
@@ -211,6 +221,27 @@ class DemoStore:
             )
             row = self._conn.execute("SELECT count FROM quota_counters WHERE quota_key = ?", (key,)).fetchone()
         return int(row["count"])
+
+    def get_cache(self, key: str) -> str | None:
+        now = int(datetime.now(UTC).timestamp())
+        row = self._conn.execute(
+            "SELECT payload, expires_at FROM cache_entries WHERE cache_key = ?",
+            (key,),
+        ).fetchone()
+        if not row or int(row["expires_at"]) < now:
+            return None
+        return str(row["payload"])
+
+    def set_cache(self, key: str, payload: str, ttl_seconds: int) -> None:
+        expires_at = int(datetime.now(UTC).timestamp()) + ttl_seconds
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO cache_entries (cache_key, expires_at, payload)
+                VALUES (?, ?, ?)
+                """,
+                (key, expires_at, payload),
+            )
 
 
 class DynamoStore:
@@ -314,7 +345,7 @@ class DynamoStore:
         )
 
     def reset(self) -> None:
-        for pk in ("AUDIT", "APPROVAL", "ROUTE", "QUOTA"):
+        for pk in ("AUDIT", "APPROVAL", "ROUTE", "QUOTA", "CACHE"):
             items = self._table.query(KeyConditionExpression=Key("pk").eq(pk), ProjectionExpression="pk, sk").get("Items", [])
             with self._table.batch_writer() as batch:
                 for item in items:
@@ -353,6 +384,26 @@ class DynamoStore:
             ReturnValues="UPDATED_NEW",
         )
         return int(response["Attributes"]["count"])
+
+    def get_cache(self, key: str) -> str | None:
+        response = self._table.get_item(Key={"pk": "CACHE", "sk": key})
+        item = response.get("Item")
+        now = int(datetime.now(UTC).timestamp())
+        if not item or int(item.get("expires_at", 0)) < now:
+            return None
+        return str(item["payload"])
+
+    def set_cache(self, key: str, payload: str, ttl_seconds: int) -> None:
+        expires_at = int(datetime.now(UTC).timestamp()) + ttl_seconds
+        self._table.put_item(
+            Item={
+                "pk": "CACHE",
+                "sk": key,
+                "entity": "cache_entry",
+                "expires_at": Decimal(expires_at),
+                "payload": payload,
+            }
+        )
 
 
 def create_store():

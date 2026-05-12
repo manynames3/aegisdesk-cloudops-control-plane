@@ -1,6 +1,6 @@
 # MCP Tool Server
 
-This service exposes the AegisDesk demo tools through a real Model Context Protocol server using the Python MCP SDK.
+This service exposes the AegisDesk governed tools through a real Model Context Protocol server using the Python MCP SDK.
 
 Implemented tools:
 
@@ -9,7 +9,7 @@ Implemented tools:
 - `lookup_cost_summary`
 - `search_runbook`
 
-The hosted Lambda API uses an in-process adapter for these deterministic demo actions so it does not need to spawn a subprocess. This MCP server proves protocol interoperability for local reviewers and future agent clients.
+The hosted Lambda API uses an in-process adapter for these controlled actions so it does not need to spawn a subprocess. This MCP server proves protocol interoperability for local reviewers and future agent clients.
 
 ## Run
 

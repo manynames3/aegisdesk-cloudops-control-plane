@@ -7,10 +7,12 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
+import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import jwt
+from jwt import PyJWKClient
 from jwt.algorithms import RSAAlgorithm
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
@@ -72,6 +74,9 @@ def create_demo_token(actor: Actor, expires_in_seconds: int = 3600) -> str:
 
 def decode_token(token: str) -> Actor:
     settings = get_settings()
+    if settings.auth_mode == "cognito":
+        return _decode_cognito_token(token)
+
     if settings.auth_mode == "jwks":
         return _decode_jwks_token(token)
 
@@ -132,8 +137,73 @@ def _decode_jwks_token(token: str) -> Actor:
         raise AuthError("invalid_actor_claims") from exc
 
 
+def _decode_cognito_token(token: str) -> Actor:
+    settings = get_settings()
+    if not settings.cognito_user_pool_id or not settings.cognito_client_id:
+        raise AuthError("missing_cognito_configuration")
+
+    jwks_url = _cognito_jwks_url()
+    try:
+        signing_key = PyJWKClient(jwks_url).get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=settings.cognito_client_id,
+            issuer=settings.jwt_issuer,
+            options={"require": ["exp", "iat", "iss", "sub", "token_use"]},
+        )
+    except InvalidTokenError as exc:
+        raise AuthError("invalid_cognito_token") from exc
+
+    if payload.get("token_use") != "id":
+        raise AuthError("invalid_cognito_token_use")
+
+    groups = payload.get("cognito:groups", [])
+    if isinstance(groups, str):
+        groups = [groups]
+
+    role = _role_from_groups(groups)
+    team = payload.get("custom:team") or payload.get("team") or ("platform" if role == Role.admin else "payments")
+    user_id = payload.get("cognito:username") or payload["sub"]
+
+    try:
+        return Actor(user_id=user_id, role=role, team=team)
+    except (ValidationError, ValueError) as exc:
+        raise AuthError("invalid_actor_claims") from exc
+
+
+def _role_from_groups(groups: list[str]) -> Role:
+    group_set = set(groups)
+    if "admin" in group_set:
+        return Role.admin
+    if "manager" in group_set:
+        return Role.manager
+    if "employee" in group_set:
+        return Role.employee
+    raise AuthError("missing_cognito_role_group")
+
+
+def _cognito_jwks_url() -> str:
+    settings = get_settings()
+    return (
+        f"https://cognito-idp.{settings.cognito_region}.amazonaws.com/"
+        f"{settings.cognito_user_pool_id}/.well-known/jwks.json"
+    )
+
+
 def jwks_document() -> dict:
     settings = get_settings()
+    if settings.auth_mode == "cognito":
+        if not settings.cognito_user_pool_id:
+            return {"keys": []}
+        try:
+            response = httpx.get(_cognito_jwks_url(), timeout=settings.opa_timeout_seconds)
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return {"keys": []}
+        return response.json()
+
     if not settings.jwks_public_key_pem:
         return {"keys": []}
 

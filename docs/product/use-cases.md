@@ -50,7 +50,7 @@ An employee says:
 - Least-privilege access
 - Reduced production risk
 - Clear approval trail
-- Strong demo of policy-as-code
+- Strong evidence of policy-as-code
 
 ## Use Case 3: Cost Spike Investigation
 
@@ -73,7 +73,7 @@ An engineering manager says:
 - FinOps visibility
 - Executive-friendly cost explanation
 - Practical cloud governance
-- Demonstrates AI cost management
+- Shows AI cost management
 
 ## Use Case 4: Model Routing Decision
 
@@ -86,7 +86,7 @@ Two users ask similar questions:
 
 ### System Behavior
 
-- Routes public/low-risk request to Amazon Bedrock Nova Lite in the hosted demo.
+- Routes public/low-risk request to Amazon Bedrock Nova Lite in the hosted deployment.
 - Routes sensitive request to local Ollama or blocks it.
 - Shows route reason in admin dashboard.
 - Tracks estimated cost and budget impact.
@@ -118,7 +118,7 @@ An employee says:
 ### Enterprise Value
 
 - Practical workflow automation
-- Demonstrates controlled tool use
+- Shows controlled tool use
 - Shows MCP interoperability in a business workflow
 
 ## Use Case 6: Governance Report

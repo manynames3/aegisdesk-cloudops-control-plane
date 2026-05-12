@@ -7,6 +7,8 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import create_demo_token, jwks_document, require_actor, require_admin, require_manager_or_admin
+from .cognito_auth import CognitoSessionError, create_persona_session
+from .cost_explorer import CostExplorerUnavailable, get_cost_summary
 from .llm import LLMUnavailable, maybe_generate_with_bedrock
 from .model_router import select_model_route
 from .models import (
@@ -15,10 +17,10 @@ from .models import (
     AuditEvent,
     ChatRequest,
     ChatResponse,
-    DemoTokenRequest,
-    DemoTokenResponse,
     EventList,
     HealthResponse,
+    PersonaTokenRequest,
+    PersonaTokenResponse,
     Role,
 )
 from .observability import configure_observability, current_trace_id, tracer
@@ -34,7 +36,7 @@ settings = get_settings()
 app = FastAPI(
     title="AegisDesk CloudOps Control Plane API",
     version="0.1.0",
-    description="Local-first demo gateway for policy-aware CloudOps AI workflows.",
+    description="CloudOps AI control plane for policy-aware AI workflows.",
 )
 
 app.add_middleware(
@@ -50,13 +52,25 @@ store = create_store()
 policy_engine = PolicyEngine()
 
 
-@app.post("/auth/demo-token", response_model=DemoTokenResponse)
-def demo_token(request: DemoTokenRequest) -> DemoTokenResponse:
-    if not settings.demo_mode:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="demo_token_issuer_disabled")
+@app.post("/auth/persona-token", response_model=PersonaTokenResponse)
+def persona_token(request: PersonaTokenRequest) -> PersonaTokenResponse:
+    if not settings.persona_issuer_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="persona_token_issuer_disabled")
 
-    actor = demo_actor_for_role(request.role, request.team)
-    return DemoTokenResponse(access_token=create_demo_token(actor), actor=actor)
+    actor = reviewer_actor_for_role(request.role, request.team)
+    if settings.auth_mode == "cognito":
+        try:
+            access_token, actor = create_persona_session(request.role, request.team, settings)
+        except CognitoSessionError as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        return PersonaTokenResponse(access_token=access_token, actor=actor)
+
+    return PersonaTokenResponse(access_token=create_demo_token(actor), actor=actor)
+
+
+@app.post("/auth/demo-token", response_model=PersonaTokenResponse)
+def demo_token(request: PersonaTokenRequest) -> PersonaTokenResponse:
+    return persona_token(request)
 
 
 @app.get("/auth/jwks.json")
@@ -71,12 +85,12 @@ def well_known_jwks():
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    if not settings.demo_mode:
+    if not settings.persona_issuer_enabled:
         mode = "production"
     elif settings.store_backend == "dynamodb":
-        mode = "portfolio-demo"
+        mode = "portfolio"
     else:
-        mode = "local-demo"
+        mode = "local"
     return HealthResponse(status="ok", service="aegisdesk-api", mode=mode)
 
 
@@ -165,45 +179,55 @@ def deny(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or_ad
     return approval
 
 
-@app.post("/demo/reset")
-def reset_demo(_actor: Annotated[Actor, Depends(require_admin)]):
+@app.post("/admin/reset")
+def reset_state(_actor: Annotated[Actor, Depends(require_admin)]):
     store.reset()
     return {"status": "reset"}
 
 
-@app.post("/demo/seed")
-def seed_demo(_actor: Annotated[Actor, Depends(require_admin)]):
+@app.post("/admin/seed")
+def seed_state(_actor: Annotated[Actor, Depends(require_admin)]):
     store.reset()
-    demo_requests = [
+    seed_requests = [
         (
-            demo_actor_for_role(Role.employee, "payments"),
+            reviewer_actor_for_role(Role.employee, "payments"),
             ChatRequest(message="The checkout service is timing out. What should I check first?", context={"incident_id": "INC-1042"}),
         ),
         (
-            demo_actor_for_role(Role.employee, "payments"),
+            reviewer_actor_for_role(Role.employee, "payments"),
             ChatRequest(
-                message="Here is the error log with token=demo-secret-value and customer@example.test. Why is this failing?",
+                message="Here is the error log with token=sample-secret-value and customer@example.test. Why is this failing?",
                 context={"incident_id": "INC-1042"},
             ),
         ),
         (
-            demo_actor_for_role(Role.employee, "cloudops"),
+            reviewer_actor_for_role(Role.employee, "cloudops"),
             ChatRequest(message="Create a ticket for the VPN outage and assign it to CloudOps."),
         ),
         (
-            demo_actor_for_role(Role.employee, "payments"),
+            reviewer_actor_for_role(Role.employee, "payments"),
             ChatRequest(message="Give me admin access to the production database.", context={"incident_id": "INC-1042"}),
         ),
         (
-            demo_actor_for_role(Role.manager, "payments"),
+            reviewer_actor_for_role(Role.manager, "payments"),
             ChatRequest(message="Why did our AI and cloud costs spike this week?"),
         ),
     ]
 
-    for actor, demo_request in demo_requests:
-        process_chat(demo_request, actor)
+    for actor, seed_request in seed_requests:
+        process_chat(seed_request, actor)
 
-    return {"status": "seeded", "requests": len(demo_requests), "metrics": store.metrics()}
+    return {"status": "seeded", "requests": len(seed_requests), "metrics": store.metrics()}
+
+
+@app.post("/demo/reset")
+def reset_demo(_actor: Annotated[Actor, Depends(require_admin)]):
+    return reset_state(_actor)
+
+
+@app.post("/demo/seed")
+def seed_demo(_actor: Annotated[Actor, Depends(require_admin)]):
+    return seed_state(_actor)
 
 
 def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
@@ -423,7 +447,13 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
 
             if intent == "cost_investigation":
                 tool_policy = policy_engine.evaluate_tool(actor.role, "cost", "view_summary")
-                tool_call = lookup_cost_summary(tool_policy)
+                cost_summary = None
+                if tool_policy.decision == "allow":
+                    try:
+                        cost_summary = get_cost_summary(settings, store)
+                    except CostExplorerUnavailable:
+                        cost_summary = None
+                tool_call = lookup_cost_summary(tool_policy, cost_summary)
                 tool_calls.append(tool_call)
                 event_type = "tool.called" if tool_call.status == "allowed" else "approval.requested"
                 store.add_event(
@@ -432,14 +462,23 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         actor=actor,
                         event_type=event_type,
                         summary=f"{tool_call.name} {tool_call.status}.",
-                        metadata={"tool": tool_call.name, "policy_reason": tool_call.policy.reason},
+                        metadata={
+                            "tool": tool_call.name,
+                            "policy_reason": tool_call.policy.reason,
+                            "source": tool_call.result.get("source"),
+                            "cache_hit": tool_call.result.get("cache_hit"),
+                        },
                         trace_id=trace_id,
                     )
                 )
                 if tool_call.status == "allowed":
+                    source = tool_call.result.get("source", "cost_summary")
+                    total = tool_call.result.get("total_usd", 0)
+                    driver = tool_call.result.get("largest_driver", "unknown service")
+                    recommendation = str(tool_call.result.get("recommendation", "review cost drivers")).rstrip(".")
                     answer = (
-                        "The simulated weekly cost spike is driven by cloud model experimentation. "
-                        "The recommended control is to route repeated low-value prompts locally or cache approved answers."
+                        f"AWS cost summary from {source}: ${float(total):.2f} over the selected window. "
+                        f"The largest driver is {driver}. Recommended control: {recommendation}."
                     )
                 else:
                     answer = "Cost investigation requires manager or admin access."
@@ -457,7 +496,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         )
 
 
-def demo_actor_for_role(role: Role, team: str | None = None) -> Actor:
+def reviewer_actor_for_role(role: Role, team: str | None = None) -> Actor:
     if role == Role.admin:
         return actor_from("u-9001", role, team or "platform")
     if role == Role.manager:
@@ -478,4 +517,4 @@ def build_answer(intent: str, redacted_text: str, decision: str) -> str:
     if intent == "support_guidance":
         return "I can help with approved CloudOps support steps, create a ticket, or explain policy-safe next actions."
 
-    return f"Request processed through the local demo gateway. Sanitized input: {redacted_text[:180]}"
+    return f"Request processed through the governed CloudOps gateway. Sanitized input: {redacted_text[:180]}"

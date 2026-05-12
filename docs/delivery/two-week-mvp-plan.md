@@ -1,12 +1,12 @@
 # Two-Week MVP Plan
 
-Goal: build a complete, demoable, low-cost portfolio project in two weeks.
+Goal: build a complete, reviewable, low-cost portfolio project in two weeks.
 
 ## Success Criteria
 
 The project is successful if a reviewer can:
 
-- Run the demo locally.
+- Run the app locally.
 - Use the chat UI.
 - Trigger PII/secret redaction.
 - See OPA allow/deny decisions.
@@ -82,11 +82,11 @@ The project is successful if a reviewer can:
 - GitHub Actions
 - API and policy tests
 
-### Day 10: Demo Polish
+### Day 10: Walkthrough Polish
 
-- seed demo data
+- seed reviewer data
 - screenshot script
-- demo video outline
+- walkthrough video outline
 - final README polish
 - production hardening notes
 
@@ -94,7 +94,7 @@ The project is successful if a reviewer can:
 
 Must-have:
 
-- Working local demo
+- Working local app
 - Policy decisions
 - Redaction
 - Model route explanation

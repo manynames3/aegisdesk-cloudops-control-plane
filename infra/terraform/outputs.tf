@@ -18,14 +18,29 @@ output "frontend_bucket_name" {
   value       = aws_s3_bucket.web.bucket
 }
 
+output "artifact_bucket_name" {
+  description = "Private S3 bucket for Lambda deployment artifacts."
+  value       = aws_s3_bucket.artifacts.bucket
+}
+
 output "state_table_name" {
-  description = "DynamoDB table used for durable demo state."
+  description = "DynamoDB table used for durable application state."
   value       = aws_dynamodb_table.state.name
 }
 
 output "jwks_url" {
-  description = "Public JWKS endpoint for the portfolio demo issuer."
-  value       = "${aws_apigatewayv2_api.http.api_endpoint}/.well-known/jwks.json"
+  description = "Public Cognito JWKS endpoint used for JWT verification."
+  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}/.well-known/jwks.json"
+}
+
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID."
+  value       = aws_cognito_user_pool.main.id
+}
+
+output "cognito_user_pool_client_id" {
+  description = "Cognito User Pool app client ID."
+  value       = aws_cognito_user_pool_client.web.id
 }
 
 output "monthly_budget_name" {

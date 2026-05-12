@@ -105,15 +105,19 @@ class ApprovalRequest(BaseModel):
     decided_at: datetime | None = None
 
 
-class DemoTokenRequest(BaseModel):
+class PersonaTokenRequest(BaseModel):
     role: Role
     team: str | None = None
 
 
-class DemoTokenResponse(BaseModel):
+class PersonaTokenResponse(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
     actor: Actor
+
+
+DemoTokenRequest = PersonaTokenRequest
+DemoTokenResponse = PersonaTokenResponse
 
 
 class EventList(BaseModel):

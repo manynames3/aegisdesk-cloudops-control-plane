@@ -1,22 +1,93 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  name           = "${var.project_name}-${var.environment}"
-  account_id     = data.aws_caller_identity.current.account_id
-  web_bucket     = "${local.name}-${local.account_id}-web"
-  lambda_package = abspath("${path.module}/${var.lambda_package_path}")
+  name            = "${var.project_name}-${var.environment}"
+  account_id      = data.aws_caller_identity.current.account_id
+  web_bucket      = "${local.name}-${local.account_id}-web"
+  artifact_bucket = "${local.name}-${local.account_id}-artifacts"
+  lambda_package  = abspath("${path.module}/${var.lambda_package_path}")
 
   tags = {
     Project     = "AegisDesk"
     Environment = var.environment
     ManagedBy   = "Terraform"
-    CostOwner   = "portfolio-demo"
+    CostOwner   = "portfolio"
   }
 }
 
-resource "tls_private_key" "demo_jwks" {
-  algorithm = "RSA"
-  rsa_bits  = 2048
+resource "random_password" "persona_password_seed" {
+  length  = 32
+  special = false
+}
+
+resource "aws_cognito_user_pool" "main" {
+  name = "${local.name}-users"
+
+  admin_create_user_config {
+    allow_admin_create_user_only = true
+  }
+
+  password_policy {
+    minimum_length                   = 12
+    require_lowercase                = true
+    require_numbers                  = true
+    require_symbols                  = true
+    require_uppercase                = true
+    temporary_password_validity_days = 7
+  }
+
+  schema {
+    name                = "team"
+    attribute_data_type = "String"
+    mutable             = true
+    required            = false
+
+    string_attribute_constraints {
+      min_length = 1
+      max_length = 32
+    }
+  }
+}
+
+resource "aws_cognito_user_group" "role" {
+  for_each = {
+    admin    = 0
+    manager  = 1
+    employee = 2
+  }
+
+  name         = each.key
+  user_pool_id = aws_cognito_user_pool.main.id
+  precedence   = each.value
+}
+
+resource "aws_cognito_user_pool_client" "web" {
+  name         = "${local.name}-web"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  generate_secret                      = false
+  prevent_user_existence_errors        = "ENABLED"
+  explicit_auth_flows                  = ["ALLOW_ADMIN_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["email", "openid", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+  callback_urls                        = concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"])
+  logout_urls                          = concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"])
+  access_token_validity                = 1
+  id_token_validity                    = 1
+  refresh_token_validity               = 1
+
+  token_validity_units {
+    access_token  = "hours"
+    id_token      = "hours"
+    refresh_token = "days"
+  }
+}
+
+resource "aws_cognito_user_pool_domain" "main" {
+  domain       = "${local.name}-${local.account_id}"
+  user_pool_id = aws_cognito_user_pool.main.id
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -43,6 +114,55 @@ resource "aws_dynamodb_table" "state" {
   server_side_encryption {
     enabled = true
   }
+}
+
+resource "aws_s3_bucket" "artifacts" {
+  bucket        = local.artifact_bucket
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    id     = "expire-lambda-build-artifacts"
+    status = "Enabled"
+
+    filter {
+      prefix = "lambda/"
+    }
+
+    expiration {
+      days = 14
+    }
+  }
+}
+
+resource "aws_s3_object" "api_lambda_package" {
+  bucket       = aws_s3_bucket.artifacts.id
+  key          = "lambda/aegisdesk-api-lambda.zip"
+  source       = local.lambda_package
+  source_hash  = fileexists(local.lambda_package) ? filebase64sha256(local.lambda_package) : null
+  content_type = "application/zip"
 }
 
 resource "aws_iam_role" "api_lambda" {
@@ -79,7 +199,7 @@ resource "aws_iam_role_policy" "api_lambda" {
         Resource = "${aws_cloudwatch_log_group.api.arn}:*"
       },
       {
-        Sid    = "UseDemoStateTable"
+        Sid    = "UseStateTable"
         Effect = "Allow"
         Action = [
           "dynamodb:BatchWriteItem",
@@ -91,6 +211,25 @@ resource "aws_iam_role_policy" "api_lambda" {
           "dynamodb:UpdateItem"
         ]
         Resource = aws_dynamodb_table.state.arn
+      },
+      {
+        Sid    = "ManagePortfolioPersonas"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminAddUserToGroup",
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminUpdateUserAttributes"
+        ]
+        Resource = aws_cognito_user_pool.main.arn
+      },
+      {
+        Sid      = "ReadCostExplorer"
+        Effect   = "Allow"
+        Action   = "ce:GetCostAndUsage"
+        Resource = "*"
       },
       {
         Sid    = "InvokeApprovedBedrockModel"
@@ -110,7 +249,8 @@ resource "aws_iam_role_policy" "api_lambda" {
 
 resource "aws_lambda_function" "api" {
   function_name    = "${local.name}-api"
-  filename         = local.lambda_package
+  s3_bucket        = aws_s3_bucket.artifacts.id
+  s3_key           = aws_s3_object.api_lambda_package.key
   source_code_hash = fileexists(local.lambda_package) ? filebase64sha256(local.lambda_package) : null
   handler          = "app.lambda_handler.handler"
   runtime          = "python3.12"
@@ -121,25 +261,35 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      DEMO_MODE                      = "true"
-      AEGISDESK_AUTH_MODE            = "jwks"
-      AEGISDESK_DB_PATH              = "/tmp/aegisdesk.db"
-      AEGISDESK_JWKS_KEY_ID          = "${local.name}-demo-rs256"
-      AEGISDESK_JWKS_PRIVATE_KEY_PEM = tls_private_key.demo_jwks.private_key_pem
-      AEGISDESK_JWKS_PUBLIC_KEY_PEM  = tls_private_key.demo_jwks.public_key_pem
-      AEGISDESK_JWT_ISSUER           = "${local.name}-issuer"
-      AEGISDESK_POLICY_MODE          = "python"
-      AEGISDESK_STORE_BACKEND        = "dynamodb"
-      AEGISDESK_DYNAMODB_TABLE       = aws_dynamodb_table.state.name
-      AEGISDESK_ENABLE_BEDROCK       = "true"
-      AEGISDESK_BEDROCK_MODEL_ID     = var.bedrock_model_id
-      AEGISDESK_BEDROCK_MAX_TOKENS   = "180"
-      AEGISDESK_CORS_ORIGINS         = join(",", concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"]))
-      OTEL_SERVICE_NAME              = "aegisdesk-api"
+      AEGISDESK_AUTH_MODE               = "cognito"
+      AEGISDESK_PERSONA_ISSUER_ENABLED  = "true"
+      AEGISDESK_DB_PATH                 = "/tmp/aegisdesk.db"
+      AEGISDESK_COGNITO_CLIENT_ID       = aws_cognito_user_pool_client.web.id
+      AEGISDESK_COGNITO_REGION          = var.aws_region
+      AEGISDESK_COGNITO_USER_POOL_ID    = aws_cognito_user_pool.main.id
+      AEGISDESK_JWT_AUDIENCE            = aws_cognito_user_pool_client.web.id
+      AEGISDESK_JWT_ISSUER              = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+      AEGISDESK_PERSONA_PASSWORD_SEED   = random_password.persona_password_seed.result
+      AEGISDESK_POLICY_MODE             = "opa"
+      AEGISDESK_OPA_EXECUTABLE          = "/var/task/bin/opa"
+      AEGISDESK_OPA_POLICY_PATH         = "/var/task/policies"
+      AEGISDESK_OPA_TIMEOUT_SECONDS     = "3"
+      AEGISDESK_STORE_BACKEND           = "dynamodb"
+      AEGISDESK_DYNAMODB_TABLE          = aws_dynamodb_table.state.name
+      AEGISDESK_ENABLE_BEDROCK          = "true"
+      AEGISDESK_BEDROCK_MODEL_ID        = var.bedrock_model_id
+      AEGISDESK_BEDROCK_MAX_TOKENS      = "180"
+      AEGISDESK_ENABLE_COST_EXPLORER    = "true"
+      AEGISDESK_COST_CACHE_TTL_SECONDS  = "21600"
+      AEGISDESK_COST_EXPLORER_SCOPE     = "tagged"
+      AEGISDESK_COST_EXPLORER_TAG_KEY   = "Project"
+      AEGISDESK_COST_EXPLORER_TAG_VALUE = "AegisDesk"
+      AEGISDESK_CORS_ORIGINS            = join(",", concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"]))
+      OTEL_SERVICE_NAME                 = "aegisdesk-api"
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.api, aws_dynamodb_table.state]
+  depends_on = [aws_cloudwatch_log_group.api, aws_dynamodb_table.state, aws_cognito_user_group.role, aws_s3_object.api_lambda_package]
 }
 
 resource "aws_apigatewayv2_api" "http" {

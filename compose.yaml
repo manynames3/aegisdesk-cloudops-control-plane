@@ -5,7 +5,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DEMO_MODE: "true"
+      AEGISDESK_PERSONA_ISSUER_ENABLED: "true"
       AEGISDESK_AUTH_SECRET: "local-compose-secret-change-me"
       AEGISDESK_DB_PATH: "/app/data/aegisdesk.db"
       AEGISDESK_POLICY_MODE: "opa"

@@ -6,14 +6,14 @@ Use this before applying to jobs.
 
 - README explains the project in plain English.
 - Screenshots show a real frontend.
-- Demo video is under six minutes.
+- Walkthrough video is under six minutes.
 - The first 30 seconds explain why the project matters.
 - Use cases are obvious without deep technical knowledge.
 - Resume bullets match the project exactly.
 
 ## Senior Hiring Manager Review
 
-- Docker Compose demo works from clean checkout.
+- Docker Compose path works from clean checkout.
 - API has tests.
 - OPA policies have tests.
 - Security controls are not only UI labels.
@@ -29,7 +29,7 @@ Use this before applying to jobs.
 
 - Containerized services
 - CI pipeline
-- AWS Terraform that validates and deploys the low-cost hosted demo
+- AWS Terraform that validates and deploys the low-cost hosted environment
 - Kubernetes/Helm path only if target roles require it
 - Observability
 - Secrets handling plan
