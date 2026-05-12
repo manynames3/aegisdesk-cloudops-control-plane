@@ -14,6 +14,7 @@ from .llm import LLMUnavailable, maybe_generate_with_bedrock
 from .model_router import select_model_route
 from .models import (
     Actor,
+    AnswerSource,
     ApprovalList,
     AuditEvent,
     ChatRequest,
@@ -422,6 +423,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         tool_calls = []
         incident_context = None
         answer = build_answer(intent, redaction.redacted_text, policy.decision)
+        bedrock_answer_used = False
 
         if intent == "incident_triage":
             incident_context = lookup_incident_context(
@@ -458,6 +460,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                 )
                 if bedrock_answer:
                     answer = bedrock_answer
+                    bedrock_answer_used = True
             except LLMUnavailable:
                 route = route.model_copy(
                     update={
@@ -599,6 +602,13 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             policy=policy,
             tool_calls=tool_calls,
             incident_context=incident_context,
+            answer_sources=build_answer_sources(
+                route=route,
+                policy=policy,
+                tool_calls=tool_calls,
+                incident_context=incident_context,
+                bedrock_answer_used=bedrock_answer_used,
+            ),
             trace_id=trace_id,
         )
 
@@ -632,3 +642,78 @@ def enrich_incident_answer(answer: str, incident_context) -> str:
         f"{answer} Incident context points to {incident_context.suspected_cause} "
         f"I found {len(incident_context.entries)} relevant log entries in {incident_context.log_group}."
     )
+
+
+def build_answer_sources(
+    *,
+    route,
+    policy,
+    tool_calls,
+    incident_context,
+    bedrock_answer_used: bool,
+) -> list[AnswerSource]:
+    sources: list[AnswerSource] = []
+
+    if bedrock_answer_used:
+        sources.append(
+            AnswerSource(
+                kind="model",
+                name="Amazon Bedrock",
+                detail=f"{route.model} generated the response from sanitized input.",
+            )
+        )
+    else:
+        sources.append(
+            AnswerSource(
+                kind="deterministic",
+                name="AegisDesk deterministic responder",
+                detail="Backend control-plane logic generated the response without a general LLM call.",
+            )
+        )
+
+    sources.append(
+        AnswerSource(
+            kind="policy",
+            name="OPA/Rego policy decision",
+            detail=f"{policy.decision} from {policy.policy_name}: {policy.reason}.",
+        )
+    )
+
+    if incident_context:
+        sources.append(
+            AnswerSource(
+                kind="operational_context",
+                name="Seeded CloudWatch-style incident logs",
+                detail=(
+                    f"{incident_context.incident_id}; {len(incident_context.entries)} entries "
+                    f"from {incident_context.log_group}."
+                ),
+            )
+        )
+
+    for tool_call in tool_calls:
+        if tool_call.name == "incident.context":
+            continue
+        if tool_call.name == "cost.summary" and tool_call.status == "allowed":
+            source = str(tool_call.result.get("source") or "cost_summary")
+            cache_hit = bool(tool_call.result.get("cache_hit"))
+            sources.append(
+                AnswerSource(
+                    kind="cost",
+                    name="AWS Cost Explorer cache" if cache_hit else source.replace("_", " ").title(),
+                    detail=(
+                        f"{tool_call.result.get('period', 'selected window')}; largest driver "
+                        f"{tool_call.result.get('largest_driver', 'unknown')}."
+                    ),
+                )
+            )
+            continue
+        sources.append(
+            AnswerSource(
+                kind="tool",
+                name=f"MCP tool: {tool_call.name}",
+                detail=f"Tool status {tool_call.status}; policy reason {tool_call.policy.reason}.",
+            )
+        )
+
+    return sources

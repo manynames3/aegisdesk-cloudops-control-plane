@@ -79,6 +79,13 @@ class IncidentContext(BaseModel):
     suspected_cause: str
 
 
+class AnswerSource(BaseModel):
+    kind: Literal["deterministic", "model", "operational_context", "tool", "policy", "cost"]
+    name: str
+    detail: str
+    trusted: bool = True
+
+
 class ChatResponse(BaseModel):
     request_id: str
     answer: str
@@ -87,6 +94,7 @@ class ChatResponse(BaseModel):
     policy: PolicyDecision
     tool_calls: list[ToolCall] = Field(default_factory=list)
     incident_context: IncidentContext | None = None
+    answer_sources: list[AnswerSource] = Field(default_factory=list)
     trace_id: str
 
 

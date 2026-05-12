@@ -503,6 +503,53 @@ button:disabled {
   padding-top: 12px;
 }
 
+.answerSources {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.sourceHeader,
+.sourceRow {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.sourceHeader {
+  color: var(--text);
+}
+
+.sourceHeader strong {
+  font-size: 13px;
+}
+
+.sourceRow {
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.sourceRow > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sourceRow strong {
+  font-size: 13px;
+}
+
+.sourceRow span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .incidentEvidence > div:first-child {
   align-items: center;
   display: flex;

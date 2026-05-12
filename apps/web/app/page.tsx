@@ -80,7 +80,15 @@ type ChatResponse = {
     result: Record<string, JsonValue>;
   }[];
   incident_context?: IncidentContext | null;
+  answer_sources: AnswerSource[];
   trace_id: string;
+};
+
+type AnswerSource = {
+  kind: "deterministic" | "model" | "operational_context" | "tool" | "policy" | "cost";
+  name: string;
+  detail: string;
+  trusted: boolean;
 };
 
 type IncidentContext = {
@@ -743,6 +751,7 @@ export default function Home() {
                   <div className={`bubble ${item.role}`} key={`${item.role}-${index}`}>
                     <p>{item.text}</p>
                     {item.response && <ResponseMeta response={item.response} />}
+                    {item.response?.answer_sources?.length ? <AnswerSources sources={item.response.answer_sources} /> : null}
                     {item.response?.incident_context && <IncidentEvidence context={item.response.incident_context} />}
                   </div>
                 ))}
@@ -980,15 +989,41 @@ function IncidentEvidence({ context }: { context: IncidentContext }) {
   );
 }
 
+function AnswerSources({ sources }: { sources: AnswerSource[] }) {
+  return (
+    <div className="answerSources">
+      <div className="sourceHeader">
+        <ListFilter size={16} />
+        <strong>Answer sources</strong>
+      </div>
+      {sources.map((source) => (
+        <div className="sourceRow" key={`${source.kind}-${source.name}`}>
+          <Badge tone={source.kind === "model" ? "warn" : source.kind === "policy" ? "neutral" : "good"}>
+            {source.kind.replaceAll("_", " ")}
+          </Badge>
+          <div>
+            <strong>{source.name}</strong>
+            <span>{source.detail}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DecisionTrail({ response }: { response: ChatResponse }) {
   const plainDecision = explainDecision(response);
   const redaction = response.redaction.findings.length
     ? response.redaction.findings.map((finding) => finding.kind).join(", ")
     : "No sensitive values detected.";
+  const sourceSummary = response.answer_sources?.length
+    ? response.answer_sources.map((source) => source.name).join(" + ")
+    : "No source metadata returned.";
 
   return (
     <div className="decisionStack">
       <DecisionItem label="Decision" value={plainDecision} emphasis />
+      <DecisionItem label="Answer source" value={sourceSummary} />
       <DecisionItem label="Technical policy" value={`${response.policy.policy_name}: ${response.policy.reason}`} />
       <DecisionItem label="Route" value={explainRoute(response)} />
       <DecisionItem label="Redaction" value={redaction} />

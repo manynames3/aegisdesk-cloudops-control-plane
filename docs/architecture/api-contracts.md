@@ -102,9 +102,31 @@ Response:
     ],
     "suspected_cause": "Database connection pool saturation is the strongest signal."
   },
+  "answer_sources": [
+    {
+      "kind": "deterministic",
+      "name": "AegisDesk deterministic responder",
+      "detail": "Backend control-plane logic generated the response without a general LLM call.",
+      "trusted": true
+    },
+    {
+      "kind": "policy",
+      "name": "OPA/Rego policy decision",
+      "detail": "allow from chat_policy: incident_triage_allowed_for_employee.",
+      "trusted": true
+    },
+    {
+      "kind": "operational_context",
+      "name": "Seeded CloudWatch-style incident logs",
+      "detail": "INC-1042; 4 entries from /aws/lambda/aegisdesk/checkout.",
+      "trusted": true
+    }
+  ],
   "trace_id": "trace-123"
 }
 ```
+
+`answer_sources` exists so reviewers can tell whether an answer came from deterministic backend logic, Amazon Bedrock, OPA/Rego policy, an MCP tool, seeded CloudWatch-style incident context, AWS Cost Explorer, or a cached cost summary.
 
 ## Tool Calls Through /chat
 

@@ -151,6 +151,11 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert body["model_route"]["provider"] == "local"
     assert body["incident_context"]["source"] == "seeded_cloudwatch_logs"
     assert body["tool_calls"][0]["name"] == "incident.context"
+    assert {source["kind"] for source in body["answer_sources"]} >= {
+        "deterministic",
+        "policy",
+        "operational_context",
+    }
 
 
 def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disabled():
@@ -165,6 +170,7 @@ def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disa
     assert response.status_code == 200
     assert body["model_route"]["provider"] == "simulated-cloud"
     assert body["model_route"]["model"] == "bedrock-disabled-deterministic-fallback"
+    assert body["answer_sources"][0]["name"] == "AegisDesk deterministic responder"
 
 
 def test_employee_cannot_approve_pending_access_request():

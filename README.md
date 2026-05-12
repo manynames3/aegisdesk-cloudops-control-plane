@@ -79,6 +79,7 @@ This is the current MVP stack and deployment shape:
 - **Real LLM path with cost control:** approved low-sensitivity prompts call Amazon Bedrock Nova Lite; sensitive, denied, or failed routes use deterministic/local fallback.
 - **Real cost governance path:** manager/admin cost investigations call AWS Cost Explorer and cache results in DynamoDB to reduce repeated API calls.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
+- **Answer provenance:** chat responses include explicit source metadata so reviewers can see whether an answer came from deterministic control logic, Bedrock, OPA/Rego, MCP tools, seeded incident context, Cost Explorer, or cache.
 - **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
 - **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, incident context, tool call, approval, cost estimate, and trace ID.
 - **Audit event explorer:** governance reviewers can filter persisted events by request ID, user, policy decision, model route, and tool.
