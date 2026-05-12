@@ -309,7 +309,7 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p>Local demo</p>
+            <p>Live AWS demo</p>
             <h1>{tabTitle(tab)}</h1>
           </div>
           <div className="topActions">
