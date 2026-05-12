@@ -6,7 +6,8 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from .auth import create_demo_token, require_actor, require_admin, require_manager_or_admin
+from .auth import create_demo_token, jwks_document, require_actor, require_admin, require_manager_or_admin
+from .llm import LLMUnavailable, maybe_generate_with_bedrock
 from .model_router import select_model_route
 from .models import (
     Actor,
@@ -25,7 +26,7 @@ from .policy import classify_intent
 from .policy_engine import PolicyEngine, PolicyUnavailable
 from .redaction import inspect_and_redact
 from .settings import get_settings
-from .store import DemoStore, actor_from
+from .store import actor_from, create_store
 from .tools import create_ticket, lookup_cost_summary, request_read_only_access
 
 settings = get_settings()
@@ -45,7 +46,7 @@ app.add_middleware(
 )
 configure_observability(app, settings)
 
-store = DemoStore()
+store = create_store()
 policy_engine = PolicyEngine()
 
 
@@ -58,9 +59,25 @@ def demo_token(request: DemoTokenRequest) -> DemoTokenResponse:
     return DemoTokenResponse(access_token=create_demo_token(actor), actor=actor)
 
 
+@app.get("/auth/jwks.json")
+def auth_jwks():
+    return jwks_document()
+
+
+@app.get("/.well-known/jwks.json")
+def well_known_jwks():
+    return jwks_document()
+
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", service="aegisdesk-api", mode="local-demo" if settings.demo_mode else "production")
+    if not settings.demo_mode:
+        mode = "production"
+    elif settings.store_backend == "dynamodb":
+        mode = "portfolio-demo"
+    else:
+        mode = "local-demo"
+    return HealthResponse(status="ok", service="aegisdesk-api", mode=mode)
 
 
 @app.get("/health/live")
@@ -199,6 +216,37 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         span.set_attribute("aegisdesk.role", actor.role.value)
         span.set_attribute("aegisdesk.team", actor.team)
 
+        try:
+            quota_count = store.quota_count(actor)
+            quota = policy_engine.evaluate_quota(actor, quota_count)
+        except PolicyUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+        if quota.decision == "deny":
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="quota.denied",
+                    summary="Request denied by quota policy.",
+                    metadata=quota.metadata,
+                    trace_id=trace_id,
+                )
+            )
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=quota.reason)
+
+        current_quota_count = store.increment_quota(actor)
+        store.add_event(
+            AuditEvent(
+                request_id=request_id,
+                actor=actor,
+                event_type="quota.allowed",
+                summary="Request allowed by quota policy.",
+                metadata={**quota.metadata, "new_count": current_quota_count},
+                trace_id=trace_id,
+            )
+        )
+
         store.add_event(
             AuditEvent(
                 request_id=request_id,
@@ -250,18 +298,6 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             provider_override=model_policy.metadata.get("provider"),
             reason_override=model_policy.reason,
         )
-        store.add_route(route)
-
-        store.add_event(
-            AuditEvent(
-                request_id=request_id,
-                actor=actor,
-                event_type="model.route.selected",
-                summary=f"Request routed to {route.provider}.",
-                metadata={"model": route.model, "reason": route.reason, "policy_reason": model_policy.reason},
-                trace_id=trace_id,
-            )
-        )
 
         if policy.decision == "deny":
             store.add_event(
@@ -288,6 +324,56 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
 
         tool_calls = []
         answer = build_answer(intent, redaction.redacted_text, policy.decision)
+
+        if policy.decision == "allow":
+            try:
+                bedrock_answer, route = maybe_generate_with_bedrock(
+                    route,
+                    sanitized_input=redaction.redacted_text,
+                    intent=intent,
+                    settings=settings,
+                )
+                if bedrock_answer:
+                    answer = bedrock_answer
+            except LLMUnavailable:
+                route = route.model_copy(
+                    update={
+                        "provider": "simulated-cloud",
+                        "model": "bedrock-unavailable-deterministic-fallback",
+                        "external_call": False,
+                        "estimated_cost_usd": 0.0008,
+                    }
+                )
+                store.add_event(
+                    AuditEvent(
+                        request_id=request_id,
+                        actor=actor,
+                        event_type="model.fallback",
+                        summary="Bedrock was unavailable; deterministic fallback was used.",
+                        metadata={"provider": "bedrock", "fallback_model": route.model},
+                        trace_id=trace_id,
+                    )
+                )
+
+        store.add_route(route)
+
+        store.add_event(
+            AuditEvent(
+                request_id=request_id,
+                actor=actor,
+                event_type="model.route.selected",
+                summary=f"Request routed to {route.provider}.",
+                metadata={
+                    "model": route.model,
+                    "reason": route.reason,
+                    "policy_reason": model_policy.reason,
+                    "external_call": route.external_call,
+                    "input_tokens": route.input_tokens,
+                    "output_tokens": route.output_tokens,
+                },
+                trace_id=trace_id,
+            )
+        )
 
         try:
             if intent == "create_ticket":

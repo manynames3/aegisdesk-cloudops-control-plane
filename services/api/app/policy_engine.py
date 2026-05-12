@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from .models import Actor, PolicyDecision, RedactionResult, Role
-from .policy import evaluate_chat_policy, evaluate_model_route, evaluate_tool_policy
+from .policy import evaluate_chat_policy, evaluate_model_route, evaluate_quota_policy, evaluate_tool_policy
 from .settings import get_settings
 
 logger = logging.getLogger("aegisdesk.policy")
@@ -72,6 +72,16 @@ class PolicyEngine:
             {"role": role.value, "tool": tool_name, "action": action},
         )
         return self._policy_decision(result, "tool_authorization")
+
+    def evaluate_quota(self, actor: Actor, current_count: int) -> PolicyDecision:
+        if self.mode == "python":
+            return evaluate_quota_policy(actor, current_count)
+
+        result = self._query(
+            "/v1/data/aegisdesk/quota/decision",
+            {"role": actor.role.value, "team": actor.team, "current_count": current_count},
+        )
+        return self._policy_decision(result, "quota")
 
     def _query(self, path: str, input_payload: dict[str, Any]) -> dict[str, Any]:
         if not self.settings.opa_url:

@@ -7,7 +7,7 @@ Responsibilities:
 - Validate chat and action requests
 - Detect PII and secrets
 - Evaluate OPA policies
-- Route to local or cloud models
+- Route to local fallback or Amazon Bedrock
 - Gate MCP tool calls
 - Create audit events
 - Emit OpenTelemetry traces
@@ -36,6 +36,8 @@ python3 -m venv .venv
 ```
 
 Direct local runs default to `AEGISDESK_POLICY_MODE=auto`, which uses OPA when `OPA_URL` is set and falls back to the mirrored Python policy evaluator when OPA is not configured. Docker Compose sets `AEGISDESK_POLICY_MODE=opa`.
+
+Local runs default to SQLite storage, HMAC demo tokens, and deterministic model fallback. The hosted Terraform path sets DynamoDB storage, JWKS token verification, and Bedrock Nova Lite routing.
 
 ## Lambda Package
 
@@ -67,4 +69,4 @@ AEGISDESK_DB_PATH=:memory:
 
 The API uses deterministic mock tools. It does not call paid model providers or modify real cloud resources through chat actions.
 
-The `/auth/demo-token` endpoint is a local demo issuer only. Production identity should use OIDC/JWT verification from a real identity provider.
+The `/auth/demo-token` endpoint is a portfolio demo issuer. In hosted mode it issues RS256 tokens verified through `/.well-known/jwks.json`. Production identity should use OIDC/JWT verification from a real identity provider such as Cognito, Entra ID, or Okta.

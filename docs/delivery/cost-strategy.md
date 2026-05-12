@@ -33,15 +33,16 @@ Why:
 - Keeps demo safe
 - Shows control pattern without requiring paid cloud resources
 
-### Optional Cloud Model
+### Governed Bedrock Route
 
-Cloud model integration should be optional and controlled by environment variables.
+Amazon Bedrock Nova Lite is enabled in the hosted demo only for approved low-sensitivity prompts. Local development and tests use deterministic fallback unless Bedrock is explicitly enabled.
 
 Why:
 
 - Project works without paid API keys
-- Demo can still show cloud routing logic
+- Demo shows a real AWS model invocation path
 - Cost exposure is explicit
+- Sensitive, denied, or quota-blocked requests do not call Bedrock
 
 ### Estimated Cost Display
 
@@ -68,8 +69,9 @@ Why:
 - Avoids NAT gateways, EKS, RDS, and always-on compute before there is a real need
 - Uses a private S3 static site behind CloudFront
 - Runs the API only on request through Lambda and HTTP API Gateway
+- Uses DynamoDB on-demand capacity for small durable state
 - Adds an AWS Budget guardrail at the portfolio threshold
-- Keeps paid model providers disabled
+- Enforces per-role/team quota policy before Bedrock or tool execution
 
 ## Production Cost Considerations
 
@@ -97,4 +99,4 @@ Optimization options:
 
 Say:
 
-> After validating the architecture locally, I deployed the portfolio version on a static/serverless AWS footprint: S3, CloudFront, Lambda, HTTP API Gateway, CloudWatch, IAM, and an AWS Budget guardrail. I avoided EKS, NAT gateways, RDS, and paid model calls because they would add cost without improving the demo signal.
+> After validating the architecture locally, I deployed the portfolio version on a static/serverless AWS footprint: S3, CloudFront, Lambda, HTTP API Gateway, DynamoDB, Bedrock Nova Lite, CloudWatch, IAM, and an AWS Budget guardrail. I avoided EKS, NAT gateways, RDS, and always-on compute because they would add cost without improving the demo signal.

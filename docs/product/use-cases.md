@@ -62,7 +62,7 @@ An engineering manager says:
 
 ### System Behavior
 
-- Calls a mock cloud cost MCP tool.
+- Calls the governed cost summary MCP tool.
 - Summarizes usage by team, service, model, and time period.
 - Identifies high-cost request patterns.
 - Suggests lower-cost routing or caching options.
@@ -86,10 +86,11 @@ Two users ask similar questions:
 
 ### System Behavior
 
-- Routes public/low-risk request to a cloud model if configured.
+- Routes public/low-risk request to Amazon Bedrock Nova Lite in the hosted demo.
 - Routes sensitive request to local Ollama or blocks it.
 - Shows route reason in admin dashboard.
 - Tracks estimated cost and budget impact.
+- Enforces quota before the model call.
 
 ### Enterprise Value
 
@@ -138,4 +139,3 @@ An admin clicks:
 - Compliance evidence
 - Executive reporting
 - Clear proof that controls are measurable
-

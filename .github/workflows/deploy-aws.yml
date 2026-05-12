@@ -1,0 +1,84 @@
+name: deploy-aws
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type deploy to run Terraform apply and publish the frontend.
+        required: true
+        default: plan
+
+env:
+  AWS_REGION: us-east-1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TF_INPUT: false
+
+jobs:
+  deploy:
+    if: inputs.confirm == 'deploy'
+    runs-on: ubuntu-latest
+    environment: aws-portfolio
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.9"
+          terraform_wrapper: false
+
+      - name: Build Lambda package
+        run: scripts/build-lambda-package.sh
+
+      - name: Terraform init
+        run: terraform -chdir=infra/terraform init
+
+      - name: Terraform validate
+        run: terraform -chdir=infra/terraform validate
+
+      - name: Terraform plan
+        run: terraform -chdir=infra/terraform plan -out=tfplan
+
+      - name: Terraform apply
+        run: terraform -chdir=infra/terraform apply -auto-approve tfplan
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Build static frontend
+        run: |
+          API_URL=$(terraform -chdir=infra/terraform output -raw api_gateway_url)
+          NEXT_PUBLIC_API_BASE_URL="$API_URL" npm run build:web
+
+      - name: Publish frontend
+        run: |
+          BUCKET=$(terraform -chdir=infra/terraform output -raw frontend_bucket_name)
+          DIST_ID=$(terraform -chdir=infra/terraform output -raw frontend_distribution_id)
+          aws s3 sync apps/web/out "s3://$BUCKET" --delete
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+
+      - name: Smoke test API
+        run: |
+          API_URL=$(terraform -chdir=infra/terraform output -raw api_gateway_url)
+          curl -fsS "$API_URL/health"

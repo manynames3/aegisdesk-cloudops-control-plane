@@ -51,6 +51,8 @@ class ModelRoute(BaseModel):
     reason: str
     estimated_cost_usd: float
     external_call: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class ToolCall(BaseModel):

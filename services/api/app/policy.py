@@ -3,6 +3,13 @@ from __future__ import annotations
 from .models import Actor, PolicyDecision, RedactionResult, Role
 
 
+QUOTA_LIMITS_BY_ROLE = {
+    Role.employee: 25,
+    Role.manager: 50,
+    Role.admin: 100,
+}
+
+
 def classify_intent(message: str) -> str:
     lower = message.lower()
 
@@ -108,6 +115,25 @@ def evaluate_model_route(redaction: RedactionResult, intent: str) -> PolicyDecis
 
     return PolicyDecision(
         decision="allow",
-        reason="low_sensitivity_request_can_use_simulated_cloud_route",
+        reason="low_sensitivity_request_can_use_bedrock_route",
         policy_name="model_routing",
+        metadata={"provider": "bedrock"},
+    )
+
+
+def evaluate_quota_policy(actor: Actor, current_count: int) -> PolicyDecision:
+    limit = QUOTA_LIMITS_BY_ROLE[actor.role]
+    if current_count >= limit:
+        return PolicyDecision(
+            decision="deny",
+            reason="daily_role_quota_exceeded",
+            policy_name="quota",
+            metadata={"limit": limit, "current_count": current_count, "window": "daily"},
+        )
+
+    return PolicyDecision(
+        decision="allow",
+        reason="daily_role_quota_available",
+        policy_name="quota",
+        metadata={"limit": limit, "current_count": current_count, "window": "daily"},
     )

@@ -2,7 +2,7 @@
 
 AegisDesk is a portfolio project for a policy-aware AI gateway in cloud operations. The goal is to show how an enterprise can let employees use AI for incident triage, access requests, ticket workflows, and cost investigation while enforcing privacy controls, role-based policy, model routing, approvals, audit logs, and cost visibility.
 
-This repository includes a runnable and deployed MVP slice: a Next.js frontend, FastAPI gateway, signed demo auth tokens, OPA/Rego policy enforcement, redaction/model-routing logic, mock MCP-style tools, approvals, audit events, OpenTelemetry instrumentation, CI checks, Docker Compose, and low-cost AWS Terraform.
+This repository includes a runnable and deployed MVP slice: a Next.js frontend, FastAPI gateway, JWKS-verified demo auth tokens, OPA/Rego policy enforcement, Amazon Bedrock routing with deterministic fallback, MCP tool server, DynamoDB-backed audit state, approvals, OpenTelemetry instrumentation, CI checks, Docker Compose, and low-cost AWS Terraform.
 
 ## About
 
@@ -37,7 +37,7 @@ Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health]
 - **Cloud incident triage:** summarize logs, detect secrets, search runbooks, and recommend next steps.
 - **Access request governance:** deny unsafe production admin requests and route safer alternatives for approval.
 - **Cost-aware model routing:** choose local or cloud models based on sensitivity, budget, and route policy.
-- **Ticket automation:** create or check tickets through policy-gated MCP-style tools.
+- **Ticket automation:** create or check tickets through policy-gated MCP tools.
 - **Governance dashboard:** show model usage, cost estimates, redactions, denied actions, approvals, and tool calls.
 
 ## Tech Stack
@@ -48,24 +48,26 @@ This is the current MVP stack and deployment shape:
 | --- | --- | --- |
 | Frontend | Next.js | Employee chat, manager approvals, admin dashboard |
 | API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
-| Auth | Signed local demo JWT-style tokens | Backend-derived identity and role claims for portfolio demo |
+| Auth | RS256 demo tokens with JWKS verification | Backend-derived identity and role claims for portfolio demo |
 | Policy | OPA/Rego via HTTP, explicit Python fallback | Authorization, model routing, approval, and budget rules |
-| AI routing | deterministic local route simulator, Ollama path documented | Shows routing decisions without paid model calls |
-| Tooling | MCP-style Python tool layer | Ticket, access request, and cost lookup tools |
+| AI routing | Amazon Bedrock Nova Lite, deterministic fallback, Ollama path documented | Shows real provider routing while preserving low-cost local review |
+| Tooling | MCP Python SDK server plus Lambda in-process adapter | Ticket, access request, cost lookup, and runbook tools |
 | Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and review |
-| Data | SQLite MVP state, Postgres path documented | Audit events and dashboard summaries |
+| Data | DynamoDB hosted state, SQLite local fallback, Postgres path documented | Audit events, approvals, route history, quota counters, dashboard summaries |
 | Runtime | direct local run, Docker Compose path, Lambda zip handler | Low-cost reproducible demo |
-| Cloud path | AWS Terraform with S3, CloudFront, Lambda, API Gateway, IAM, CloudWatch, Budget | Hosted portfolio demo without always-on compute |
-| CI | GitHub Actions | API tests, evals, web build, OPA tests, Terraform validate, container builds |
+| Cloud path | AWS Terraform with S3, CloudFront, Lambda, API Gateway, DynamoDB, Bedrock IAM, CloudWatch, Budget | Hosted portfolio demo without always-on compute |
+| CI/CD | GitHub Actions | API tests, evals, web build, OPA tests, MCP import, Terraform validate, container builds, manual AWS deploy |
 
 ## Engineering Highlights
 
-- **Backend-enforced identity boundary:** protected API routes derive user, role, and team from signed demo tokens instead of trusting frontend role fields.
+- **Backend-enforced identity boundary:** protected API routes derive user, role, and team from JWKS-verified token claims instead of trusting frontend role fields.
 - **Policy outside the model:** OPA/Rego is the runtime policy path for tool use, access requests, routing, and approvals, with Python fallback only for direct local/test mode.
-- **Local-first cost control:** the demo does not call paid model providers; the hosted path uses static/serverless AWS services and a $1 monthly budget guardrail.
+- **Real LLM path with cost control:** approved low-sensitivity prompts call Amazon Bedrock Nova Lite; sensitive, denied, or failed routes use deterministic/local fallback.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
 - **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
-- **Deployed AWS architecture:** Terraform provisions a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
+- **Durable cloud state:** hosted audit events, approvals, model routes, metrics, and quota counters persist in DynamoDB.
+- **Deployed AWS architecture:** Terraform provisions a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, DynamoDB, Bedrock IAM, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
+- **Deployment automation:** a manual GitHub Actions deploy workflow builds the Lambda package, runs Terraform, publishes the static frontend, and invalidates CloudFront.
 - **Safe portfolio boundaries:** destructive cloud actions are mocked or approval-only in the MVP, with a production hardening path documented separately.
 - **Cloud role alignment:** the project emphasizes containers, policy-as-code, identity boundaries, observability, FinOps thinking, CI/CD, and deployable architecture.
 
@@ -81,8 +83,8 @@ flowchart LR
     API --> OPA["OPA / Rego Policy"]
     API --> Router["Model Router"]
     Router --> Local["Local Route Simulator / Ollama Path"]
-    Router --> Cloud["Optional Cloud Model"]
-    API --> Tools["MCP-Style Tool Layer"]
+    Router --> Cloud["Amazon Bedrock Nova Lite"]
+    API --> Tools["MCP Tool Server / In-Process Adapter"]
     Tools --> Ticket["Ticket Tool"]
     Tools --> Access["Access Request Tool"]
     Tools --> Cost["Cost Lookup Tool"]
@@ -106,16 +108,20 @@ Architecture docs:
 Completed:
 
 - Local Next.js frontend with Chat, Approvals, Governance, and Evaluations views
-- FastAPI gateway with signed demo auth, `/chat`, `/events`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
-- Redaction, policy decisions, model route metadata, approvals, mock tool calls, and audit events
-- SQLite-backed local audit/event state
+- FastAPI gateway with JWKS-verified demo auth, `/chat`, `/events`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
+- Redaction, policy decisions, model route metadata, approvals, governed tool calls, and audit events
+- JWKS-verified demo auth tokens for the hosted portfolio environment
+- Amazon Bedrock Nova Lite route for approved low-sensitivity prompts
+- DynamoDB-backed hosted audit/event state with SQLite local fallback
+- Per-role/team quota counters and quota policy
+- Real MCP server using the Python MCP SDK
 - Admin-protected demo seed/reset actions for fast reviewer walkthroughs
 - API tests, web build, OPA tests, Terraform validation, and container builds in GitHub Actions
 - Deterministic control evals for redaction, routing, policy denial, approvals, and tool authorization
 - Rego policy files and policy tests for chat, model routing, tool authorization, and approvals
 - OpenTelemetry instrumentation and local Jaeger export path
 - Docker Compose deployment shape with API, web, OPA, Jaeger, and persistent local API data
-- Hosted AWS demo using private S3, CloudFront, API Gateway, Lambda, CloudWatch, IAM, and AWS Budget
+- Hosted AWS demo using private S3, CloudFront, API Gateway, Lambda, DynamoDB, Bedrock, CloudWatch, IAM, and AWS Budget
 - Screenshots for recruiter review
 - Product framing and target users
 - Recruiter and hiring manager positioning
@@ -125,19 +131,19 @@ Completed:
 - Governance and threat model
 - Cost strategy and two-week MVP plan
 - GitHub Actions validation
+- Manual GitHub Actions AWS deploy workflow backed by S3 Terraform state
 
 Next implementation milestone:
 
 - Add a short demo video
-- Add rate limiting and quota policy for cost-abuse scenarios
-- Replace local demo token issuer with OIDC/JWKS verification for a production-grade hosted deployment
+- Add a production identity-provider walkthrough using Cognito, Entra ID, or Okta
 
 ## Repository Structure
 
 ```text
 apps/web/                 Frontend app workspace
 services/api/             Gateway API workspace
-services/mcp-tools/       MCP-style tool service workspace
+services/mcp-tools/       MCP tool server workspace
 policies/                 OPA/Rego policy workspace
 evals/                    Safety and policy evaluation workspace
 infra/docker/             Local Docker runtime assets

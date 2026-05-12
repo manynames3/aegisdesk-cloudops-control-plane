@@ -10,7 +10,7 @@ The project is successful if a reviewer can:
 - Use the chat UI.
 - Trigger PII/secret redaction.
 - See OPA allow/deny decisions.
-- Create or check a mock ticket through an MCP-style tool.
+- Create or check a governed ticket through the MCP tool path.
 - Trigger an approval workflow.
 - View admin dashboard events.
 - Read clear architecture, cost, security, and deployment docs.

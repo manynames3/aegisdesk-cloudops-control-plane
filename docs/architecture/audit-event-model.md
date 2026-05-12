@@ -44,12 +44,15 @@ The audit event model is central to AegisDesk. The system should be able to expl
 | `secret.detected` | Secret-like value was found |
 | `input.redacted` | Input was modified before model/tool use |
 | `model.route.selected` | Model route was chosen |
+| `model.fallback` | Bedrock was unavailable and deterministic fallback was used |
+| `quota.allowed` | Request was within role/team quota |
+| `quota.denied` | Request exceeded role/team quota |
 | `policy.allowed` | Policy allowed an action |
 | `policy.denied` | Policy denied an action |
 | `approval.requested` | Human approval was required |
 | `approval.granted` | Manager approved an action |
 | `approval.denied` | Manager rejected an action |
-| `tool.called` | MCP-style tool was called |
+| `tool.called` | Governed tool was called |
 | `tool.blocked` | Tool call was blocked |
 | `eval.failed` | Safety or policy evaluation failed |
 
@@ -62,4 +65,3 @@ The admin dashboard should not invent its own data. It should render summaries f
 - Approval metrics come from approval events.
 - Tool call history comes from `tool.called`.
 - Route split comes from `model.route.selected`.
-

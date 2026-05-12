@@ -14,14 +14,35 @@ locals {
   }
 }
 
-resource "random_password" "demo_auth_secret" {
-  length  = 32
-  special = false
+resource "tls_private_key" "demo_jwks" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
 }
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/lambda/${local.name}-api"
   retention_in_days = 7
+}
+
+resource "aws_dynamodb_table" "state" {
+  name         = "${local.name}-state"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
 }
 
 resource "aws_iam_role" "api_lambda" {
@@ -56,6 +77,32 @@ resource "aws_iam_role_policy" "api_lambda" {
           "logs:PutLogEvents"
         ]
         Resource = "${aws_cloudwatch_log_group.api.arn}:*"
+      },
+      {
+        Sid    = "UseDemoStateTable"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:BatchWriteItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:DescribeTable",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem"
+        ]
+        Resource = aws_dynamodb_table.state.arn
+      },
+      {
+        Sid    = "InvokeApprovedBedrockModel"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+        Resource = [
+          "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0",
+          "arn:aws:bedrock:*:${local.account_id}:inference-profile/${var.bedrock_model_id}"
+        ]
       }
     ]
   })
@@ -74,15 +121,24 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      DEMO_MODE             = "true"
-      AEGISDESK_AUTH_SECRET = random_password.demo_auth_secret.result
-      AEGISDESK_DB_PATH     = "/tmp/aegisdesk.db"
-      AEGISDESK_POLICY_MODE = "python"
-      OTEL_SERVICE_NAME     = "aegisdesk-api"
+      DEMO_MODE                      = "true"
+      AEGISDESK_AUTH_MODE            = "jwks"
+      AEGISDESK_DB_PATH              = "/tmp/aegisdesk.db"
+      AEGISDESK_JWKS_KEY_ID          = "${local.name}-demo-rs256"
+      AEGISDESK_JWKS_PRIVATE_KEY_PEM = tls_private_key.demo_jwks.private_key_pem
+      AEGISDESK_JWKS_PUBLIC_KEY_PEM  = tls_private_key.demo_jwks.public_key_pem
+      AEGISDESK_JWT_ISSUER           = "${local.name}-issuer"
+      AEGISDESK_POLICY_MODE          = "python"
+      AEGISDESK_STORE_BACKEND        = "dynamodb"
+      AEGISDESK_DYNAMODB_TABLE       = aws_dynamodb_table.state.name
+      AEGISDESK_ENABLE_BEDROCK       = "true"
+      AEGISDESK_BEDROCK_MODEL_ID     = var.bedrock_model_id
+      AEGISDESK_BEDROCK_MAX_TOKENS   = "180"
+      OTEL_SERVICE_NAME              = "aegisdesk-api"
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.api]
+  depends_on = [aws_cloudwatch_log_group.api, aws_dynamodb_table.state]
 }
 
 resource "aws_apigatewayv2_api" "http" {

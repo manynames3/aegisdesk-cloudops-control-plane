@@ -32,7 +32,7 @@ Responsibilities:
 
 ### Demo Auth Boundary
 
-The local demo uses signed JWT-style bearer tokens issued by `/auth/demo-token`. The API derives `user_id`, `role`, and `team` from token claims and ignores role fields sent in chat request bodies.
+The local demo can use HMAC-signed bearer tokens for fast tests. The hosted portfolio environment issues RS256 demo tokens from `/auth/demo-token` and verifies them with the public key exposed at `/.well-known/jwks.json`. The API derives `user_id`, `role`, and `team` from token claims and ignores role fields sent in chat request bodies.
 
 Production extension:
 
@@ -72,10 +72,11 @@ Policy decisions:
 
 MVP routing rules:
 
-- Public and low-risk requests can use the simulated cloud route.
+- Public and low-risk requests can use Amazon Bedrock Nova Lite.
 - Sensitive requests route to the local route.
 - Requests with secrets can be blocked or redacted before routing.
 - Budget threshold can force lower-cost routes.
+- If Bedrock is disabled or unavailable, deterministic fallback keeps the demo usable.
 
 Production extension:
 
@@ -94,6 +95,8 @@ MVP tools:
 - Cloud cost lookup tool
 - Knowledge search tool
 
+The repository includes a real MCP server in `services/mcp-tools` using the Python MCP SDK. The hosted Lambda API uses an in-process adapter for the same deterministic demo actions to avoid spawning subprocesses in Lambda.
+
 Tool safety pattern:
 
 1. Convert user request into structured intent.
@@ -104,7 +107,7 @@ Tool safety pattern:
 
 ### Audit Store
 
-MVP storage: SQLite demo state. Production path: managed Postgres and immutable audit sink.
+Hosted storage: DynamoDB single-table demo state. Local fallback: SQLite. Production path: managed Postgres or a stricter immutable audit sink, depending on retention and reporting requirements.
 
 Events:
 
@@ -133,6 +136,10 @@ Trace spans:
 - Tool call
 - Audit write
 
+### Quotas
+
+Per-role/team quota counters are enforced before model or tool execution. Policy defines daily limits by role, and the store records counters in SQLite locally or DynamoDB in AWS.
+
 ## Request Flow
 
 ```mermaid
@@ -143,7 +150,7 @@ sequenceDiagram
     participant R as Redaction
     participant OPA as OPA Policy
     participant MR as Model Router
-    participant M as Model
+    participant M as Bedrock or Fallback
     participant Tool as MCP Tool
     participant Audit as Audit Store
 
@@ -154,8 +161,8 @@ sequenceDiagram
     API->>OPA: Evaluate model/tool policy
     OPA-->>API: allow/deny/approval_required
     API->>MR: Select local or cloud model
-    MR->>M: Select local or simulated cloud route
-    M-->>MR: Route metadata
+    MR->>M: Invoke approved route
+    M-->>MR: Answer + route metadata
     MR-->>API: AI response
     API->>OPA: Evaluate tool action if needed
     OPA-->>API: tool decision
@@ -180,10 +187,13 @@ sequenceDiagram
 
 - Terraform-provisioned private S3 bucket behind CloudFront for the static frontend
 - FastAPI packaged as a Lambda zip with Mangum behind HTTP API Gateway
+- DynamoDB table for audit events, approvals, route history, metrics, and quotas
+- Bedrock Nova Lite invocation for approved low-sensitivity prompts
 - IAM role scoped to Lambda log writes
 - CloudWatch log group with seven-day retention
 - S3 server-side encryption, public access block, and noncurrent version cleanup
 - AWS Budget guardrail for the portfolio cost threshold
+- S3 remote Terraform state for manual GitHub Actions deployment
 
 ### Production Hardening Path
 

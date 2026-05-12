@@ -3,6 +3,7 @@ package aegisdesk_test
 import data.aegisdesk.chat_policy
 import data.aegisdesk.approval_rules
 import data.aegisdesk.model_routing
+import data.aegisdesk.quota
 import data.aegisdesk.tool_authorization
 
 test_chat_denies_production_admin_access if {
@@ -34,6 +35,37 @@ test_model_routes_secrets_local if {
   }
 
   result.provider == "local"
+}
+
+test_model_routes_low_sensitivity_to_bedrock if {
+  result := model_routing.decision with input as {
+    "intent": "support_guidance",
+    "pii_detected": false,
+    "secrets_detected": false,
+  }
+
+  result.provider == "bedrock"
+}
+
+test_quota_allows_employee_below_limit if {
+  result := quota.decision with input as {
+    "role": "employee",
+    "team": "payments",
+    "current_count": 24,
+  }
+
+  result.decision == "allow"
+  result.limit == 25
+}
+
+test_quota_denies_employee_at_limit if {
+  result := quota.decision with input as {
+    "role": "employee",
+    "team": "payments",
+    "current_count": 25,
+  }
+
+  result.decision == "deny"
 }
 
 test_employee_can_create_ticket if {

@@ -2,8 +2,8 @@ package aegisdesk.model_routing
 
 default decision := {
   "decision": "allow",
-  "provider": "simulated-cloud",
-  "reason": "low_sensitivity_request_can_use_simulated_cloud_route",
+  "provider": "bedrock",
+  "reason": "low_sensitivity_request_can_use_bedrock_route",
 }
 
 decision := {

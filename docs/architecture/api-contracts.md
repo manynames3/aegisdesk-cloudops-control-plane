@@ -1,6 +1,6 @@
 # API Contracts
 
-These contracts describe the current MVP shape. Protected endpoints require `Authorization: Bearer <demo token>` locally.
+These contracts describe the current MVP shape. Protected endpoints require `Authorization: Bearer <demo token>`. The hosted demo token is RS256-signed and verified through JWKS.
 
 ## POST /auth/demo-token
 
@@ -27,7 +27,11 @@ Response:
 }
 ```
 
-This is a portfolio demo issuer only. Production hosted deployments should replace it with OIDC/JWKS verification.
+This is a portfolio demo issuer only. The hosted demo verifies RS256 tokens through JWKS; production deployments should replace the demo issuer with Cognito, Entra ID, Okta, or another OIDC provider.
+
+## GET /.well-known/jwks.json
+
+Returns the public JSON Web Key Set used to verify hosted demo tokens.
 
 ## POST /chat
 
@@ -52,7 +56,10 @@ Response:
     "provider": "local",
     "model": "llama3.1",
     "reason": "internal_operational_context",
-    "estimated_cost_usd": 0.0
+    "estimated_cost_usd": 0.0,
+    "external_call": false,
+    "input_tokens": 0,
+    "output_tokens": 0
   },
   "redaction": {
     "pii_detected": false,
@@ -72,7 +79,7 @@ Response:
 
 ## Tool Calls Through /chat
 
-The MVP does not expose separate public tool endpoints. Tool actions are selected by intent inside `/chat`, authorized by OPA, and returned as structured `tool_calls`.
+The public API does not expose separate public tool endpoints. Tool actions are selected by intent inside `/chat`, authorized by OPA, and returned as structured `tool_calls`. The same deterministic tool set is also exposed by `services/mcp-tools` as a real MCP server for local agent clients.
 
 Example tool call response:
 

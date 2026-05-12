@@ -17,10 +17,11 @@ Use this before applying to jobs.
 - API has tests.
 - OPA policies have tests.
 - Security controls are not only UI labels.
-- API derives role from signed token claims, not request body fields.
+- API derives role from JWKS-verified token claims, not request body fields.
 - Tool calls are actually policy checked.
 - Audit events are real records.
-- Cost routing is deterministic and explainable.
+- Cost routing is real for Bedrock and deterministic when falling back.
+- Quotas are enforced before model/tool execution.
 - Failure cases are documented.
 - Production hardening path is honest.
 
@@ -34,6 +35,7 @@ Use this before applying to jobs.
 - Secrets handling plan
 - Least-privilege design
 - Cost governance
+- Manual deployment workflow
 - Deployment runbook
 
 ## Red Flags To Avoid

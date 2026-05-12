@@ -7,9 +7,12 @@ This directory contains the low-cost AWS deployment path for AegisDesk.
 - Private S3 bucket for the exported static frontend
 - CloudFront distribution with origin access control
 - FastAPI Lambda zip package behind HTTP API Gateway
+- DynamoDB table for hosted audit events, approvals, route history, metrics, and quotas
+- Amazon Bedrock Nova Lite invoke permission for approved low-sensitivity prompts
 - Least-privilege Lambda execution role
 - CloudWatch log group with seven-day retention
 - S3 public access block, server-side encryption, versioning, and noncurrent version cleanup
+- S3 backend for shared Terraform state
 - AWS Budget capped at the portfolio threshold
 - Consistent default tags for ownership and cost tracking
 
@@ -46,4 +49,4 @@ The Terraform path includes an AWS Budget resource set by `monthly_budget_usd`, 
 
 ## State Boundary
 
-Terraform state contains deployment metadata and the generated demo auth secret. Do not commit `*.tfstate` files. For a team or production environment, move state to a remote backend with encryption and access controls.
+Terraform state is stored in the encrypted S3 backend configured in `backend.tf`. It contains deployment metadata and demo JWKS private key material, so state bucket access must stay restricted.

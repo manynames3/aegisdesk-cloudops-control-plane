@@ -3,9 +3,13 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
+from decimal import Decimal
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
+
+import boto3
+from boto3.dynamodb.conditions import Key
 
 from .models import (
     Actor,
@@ -16,6 +20,15 @@ from .models import (
     ModelRoute,
     Role,
 )
+from .settings import get_settings
+
+
+def _quota_window() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%d")
+
+
+def _quota_key(actor: Actor) -> str:
+    return f"{actor.role.value}#{actor.team}#{_quota_window()}"
 
 
 class DemoStore:
@@ -57,6 +70,17 @@ class DemoStore:
                     route_id TEXT PRIMARY KEY,
                     provider TEXT NOT NULL,
                     payload TEXT NOT NULL
+                )
+                """
+            )
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS quota_counters (
+                    quota_key TEXT PRIMARY KEY,
+                    role TEXT NOT NULL,
+                    team TEXT NOT NULL,
+                    window TEXT NOT NULL,
+                    count INTEGER NOT NULL
                 )
                 """
             )
@@ -138,7 +162,7 @@ class DemoStore:
 
     def metrics(self) -> MetricsSummary:
         local_model_requests = sum(1 for route in self.model_routes if route.provider == "local")
-        cloud_model_requests = sum(1 for route in self.model_routes if route.provider == "simulated-cloud")
+        cloud_model_requests = sum(1 for route in self.model_routes if route.provider in {"simulated-cloud", "bedrock"})
         redactions_total = sum(1 for event in self.events if event.event_type in {"pii.detected", "secret.detected"})
         denied_actions = sum(1 for event in self.events if event.event_type in {"policy.denied", "tool.blocked"})
         tool_calls_total = sum(1 for event in self.events if event.event_type == "tool.called")
@@ -146,7 +170,7 @@ class DemoStore:
 
         return MetricsSummary(
             requests_total=sum(1 for event in self.events if event.event_type == "request.received"),
-            estimated_spend_usd=round(sum(route.estimated_cost_usd for route in self.model_routes), 4),
+            estimated_spend_usd=round(sum(route.estimated_cost_usd for route in self.model_routes), 6),
             local_model_requests=local_model_requests,
             cloud_model_requests=cloud_model_requests,
             redactions_total=redactions_total,
@@ -160,6 +184,7 @@ class DemoStore:
             self._conn.execute("DELETE FROM audit_events")
             self._conn.execute("DELETE FROM approvals")
             self._conn.execute("DELETE FROM model_routes")
+            self._conn.execute("DELETE FROM quota_counters")
 
     def ready(self) -> bool:
         try:
@@ -167,6 +192,174 @@ class DemoStore:
         except sqlite3.Error:
             return False
         return True
+
+    def quota_count(self, actor: Actor) -> int:
+        row = self._conn.execute("SELECT count FROM quota_counters WHERE quota_key = ?", (_quota_key(actor),)).fetchone()
+        return int(row["count"]) if row else 0
+
+    def increment_quota(self, actor: Actor) -> int:
+        key = _quota_key(actor)
+        window = _quota_window()
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO quota_counters (quota_key, role, team, window, count)
+                VALUES (?, ?, ?, ?, 1)
+                ON CONFLICT(quota_key) DO UPDATE SET count = count + 1
+                """,
+                (key, actor.role.value, actor.team, window),
+            )
+            row = self._conn.execute("SELECT count FROM quota_counters WHERE quota_key = ?", (key,)).fetchone()
+        return int(row["count"])
+
+
+class DynamoStore:
+    def __init__(self, table_name: str | None = None) -> None:
+        settings = get_settings()
+        self.table_name = table_name or settings.dynamodb_table
+        if not self.table_name:
+            raise ValueError("dynamodb_table_required")
+        self._table = boto3.resource("dynamodb", region_name=settings.aws_region).Table(self.table_name)
+
+    def _query_payloads(self, pk: str) -> list[str]:
+        response = self._table.query(KeyConditionExpression=Key("pk").eq(pk), ScanIndexForward=True)
+        return [item["payload"] for item in response.get("Items", [])]
+
+    @property
+    def events(self) -> list[AuditEvent]:
+        return [AuditEvent.model_validate_json(payload) for payload in self._query_payloads("AUDIT")]
+
+    @property
+    def approvals(self) -> list[ApprovalRequest]:
+        return [ApprovalRequest.model_validate_json(payload) for payload in self._query_payloads("APPROVAL")]
+
+    @property
+    def model_routes(self) -> list[ModelRoute]:
+        return [ModelRoute.model_validate_json(payload) for payload in self._query_payloads("ROUTE")]
+
+    def add_event(self, event: AuditEvent) -> None:
+        self._table.put_item(
+            Item={
+                "pk": "AUDIT",
+                "sk": f"{event.timestamp.isoformat()}#{event.event_id}",
+                "entity": "audit_event",
+                "request_id": event.request_id,
+                "event_type": event.event_type,
+                "payload": event.model_dump_json(),
+            }
+        )
+
+    def add_route(self, route: ModelRoute) -> None:
+        self._table.put_item(
+            Item={
+                "pk": "ROUTE",
+                "sk": f"{datetime.now(UTC).isoformat()}#route-{uuid4().hex[:10]}",
+                "entity": "model_route",
+                "provider": route.provider,
+                "payload": route.model_dump_json(),
+            }
+        )
+
+    def add_approval(self, approval: ApprovalRequest) -> None:
+        self._save_approval(approval)
+
+    def _save_approval(self, approval: ApprovalRequest) -> None:
+        self._table.put_item(
+            Item={
+                "pk": "APPROVAL",
+                "sk": f"{approval.created_at.isoformat()}#{approval.approval_id}",
+                "approval_id": approval.approval_id,
+                "entity": "approval",
+                "status": approval.status.value,
+                "payload": approval.model_dump_json(),
+            }
+        )
+
+    def get_approval(self, approval_id: str) -> ApprovalRequest:
+        for approval in self.approvals:
+            if approval.approval_id == approval_id:
+                return approval
+        raise KeyError(approval_id)
+
+    def decide_approval(self, approval_id: str, actor_id: str, role: Role, approved: bool) -> ApprovalRequest:
+        approval = self.get_approval(approval_id)
+        if role not in {Role.manager, Role.admin}:
+            raise PermissionError("approval_decision_requires_manager_or_admin")
+        if approval.status != ApprovalStatus.pending:
+            raise ValueError("approval_already_decided")
+
+        approval.status = ApprovalStatus.approved if approved else ApprovalStatus.denied
+        approval.decided_by = actor_id
+        approval.decided_at = datetime.now(UTC)
+        self._save_approval(approval)
+        return approval
+
+    def metrics(self) -> MetricsSummary:
+        local_model_requests = sum(1 for route in self.model_routes if route.provider == "local")
+        cloud_model_requests = sum(1 for route in self.model_routes if route.provider in {"simulated-cloud", "bedrock"})
+        redactions_total = sum(1 for event in self.events if event.event_type in {"pii.detected", "secret.detected"})
+        denied_actions = sum(1 for event in self.events if event.event_type in {"policy.denied", "tool.blocked", "quota.denied"})
+        tool_calls_total = sum(1 for event in self.events if event.event_type == "tool.called")
+        approvals_pending = sum(1 for approval in self.approvals if approval.status == ApprovalStatus.pending)
+
+        return MetricsSummary(
+            requests_total=sum(1 for event in self.events if event.event_type == "request.received"),
+            estimated_spend_usd=round(sum(route.estimated_cost_usd for route in self.model_routes), 6),
+            local_model_requests=local_model_requests,
+            cloud_model_requests=cloud_model_requests,
+            redactions_total=redactions_total,
+            denied_actions=denied_actions,
+            approvals_pending=approvals_pending,
+            tool_calls_total=tool_calls_total,
+        )
+
+    def reset(self) -> None:
+        for pk in ("AUDIT", "APPROVAL", "ROUTE", "QUOTA"):
+            items = self._table.query(KeyConditionExpression=Key("pk").eq(pk), ProjectionExpression="pk, sk").get("Items", [])
+            with self._table.batch_writer() as batch:
+                for item in items:
+                    batch.delete_item(Key={"pk": item["pk"], "sk": item["sk"]})
+
+    def ready(self) -> bool:
+        try:
+            self._table.table_status
+        except Exception:
+            return False
+        return True
+
+    def quota_count(self, actor: Actor) -> int:
+        response = self._table.get_item(Key={"pk": "QUOTA", "sk": _quota_key(actor)})
+        item = response.get("Item")
+        return int(item["count"]) if item else 0
+
+    def increment_quota(self, actor: Actor) -> int:
+        response = self._table.update_item(
+            Key={"pk": "QUOTA", "sk": _quota_key(actor)},
+            UpdateExpression=(
+                "SET #role = :role, team = :team, #window = :window "
+                "ADD #count :one"
+            ),
+            ExpressionAttributeNames={
+                "#role": "role",
+                "#window": "window",
+                "#count": "count",
+            },
+            ExpressionAttributeValues={
+                ":role": actor.role.value,
+                ":team": actor.team,
+                ":window": _quota_window(),
+                ":one": Decimal(1),
+            },
+            ReturnValues="UPDATED_NEW",
+        )
+        return int(response["Attributes"]["count"])
+
+
+def create_store():
+    settings = get_settings()
+    if settings.store_backend == "dynamodb":
+        return DynamoStore(settings.dynamodb_table)
+    return DemoStore()
 
 
 def actor_from(user_id: str, role: Role, team: str) -> Actor:

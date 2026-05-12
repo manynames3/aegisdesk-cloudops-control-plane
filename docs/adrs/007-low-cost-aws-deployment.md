@@ -10,13 +10,13 @@ The project should prove AWS architecture and infrastructure-as-code ability wit
 
 ## Decision
 
-Use Terraform to deploy a low-idle-cost AWS shape: private S3 and CloudFront for the static frontend, a FastAPI Lambda zip behind HTTP API Gateway, least-privilege IAM, CloudWatch logs with short retention, S3 encryption and lifecycle cleanup, and an AWS Budget guardrail.
+Use Terraform to deploy a low-idle-cost AWS shape: private S3 and CloudFront for the static frontend, a FastAPI Lambda zip behind HTTP API Gateway, DynamoDB for durable demo state, least-privilege IAM, Bedrock invoke permission for the approved model, CloudWatch logs with short retention, S3 encryption and lifecycle cleanup, S3 remote Terraform state, and an AWS Budget guardrail.
 
-Keep paid model providers disabled in the hosted demo. Keep destructive cloud actions mocked or approval-only.
+Keep destructive cloud actions mocked or approval-only. Only approved low-sensitivity prompts can call Bedrock, and quota policy limits role/team usage.
 
 ## Consequences
 
 - Reviewers can inspect real deployed AWS resource choices, IAM boundaries, logging, and cost guardrails.
 - The hosted demo avoids EKS, NAT gateways, RDS, and always-on compute until there is a stronger reason to pay for them.
-- Terraform local state now contains deployment metadata and the generated demo auth secret, so state files must remain uncommitted.
-- Production identity, managed secrets, immutable audit storage, and rate limiting remain future hardening work.
+- Remote Terraform state contains deployment metadata and demo JWKS private key material, so access to the state bucket must stay restricted.
+- Production identity, managed secrets, immutable audit storage, and stronger tenant isolation remain future hardening work.

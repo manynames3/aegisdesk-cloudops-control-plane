@@ -21,7 +21,7 @@ def select_model_route(
     if intent in {"incident_triage", "production_admin_access", "temporary_read_only_access"}:
         return _route_for_provider("local", "internal_cloudops_context")
 
-    return _route_for_provider("simulated-cloud", "low_sensitivity_demo_route")
+    return _route_for_provider("bedrock", "low_sensitivity_request_can_use_bedrock_route")
 
 
 def _route_for_provider(provider: str, reason: str) -> ModelRoute:
@@ -32,6 +32,15 @@ def _route_for_provider(provider: str, reason: str) -> ModelRoute:
             reason=reason,
             estimated_cost_usd=0.0,
             external_call=False,
+        )
+
+    if provider == "bedrock":
+        return ModelRoute(
+            provider="bedrock",
+            model="us.amazon.nova-lite-v1:0",
+            reason=reason,
+            estimated_cost_usd=0.0,
+            external_call=True,
         )
 
     return ModelRoute(

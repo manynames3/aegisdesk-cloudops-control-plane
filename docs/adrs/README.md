@@ -9,5 +9,6 @@ This directory records the major architecture decisions for AegisDesk.
 | [ADR-003](003-policy-outside-the-model.md) | Accepted | Enforce policy outside the model with OPA/Rego |
 | [ADR-004](004-mock-destructive-cloud-actions.md) | Accepted | Mock destructive cloud actions in the portfolio demo |
 | [ADR-005](005-audit-event-model-first.md) | Accepted | Design around audit events from the start |
-| [ADR-006](006-demo-token-auth-boundary.md) | Accepted | Use signed demo tokens before hosted OIDC |
+| [ADR-006](006-demo-token-auth-boundary.md) | Accepted | Use JWKS-verified demo tokens before production OIDC |
 | [ADR-007](007-low-cost-aws-deployment.md) | Accepted | Deploy a low-cost AWS portfolio environment after approval |
+| [ADR-008](008-real-bedrock-dynamodb-mcp.md) | Accepted | Add real Bedrock, DynamoDB, MCP, and quota paths |

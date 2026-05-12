@@ -18,6 +18,16 @@ output "frontend_bucket_name" {
   value       = aws_s3_bucket.web.bucket
 }
 
+output "state_table_name" {
+  description = "DynamoDB table used for durable demo state."
+  value       = aws_dynamodb_table.state.name
+}
+
+output "jwks_url" {
+  description = "Public JWKS endpoint for the portfolio demo issuer."
+  value       = "${aws_apigatewayv2_api.http.api_endpoint}/.well-known/jwks.json"
+}
+
 output "monthly_budget_name" {
   description = "AWS Budget guardrail resource name."
   value       = aws_budgets_budget.portfolio_guardrail.name

@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
-from app.auth import create_demo_token
+from app.auth import create_demo_token, decode_token, jwks_document
 from app.main import app, store
 from app.models import Actor, Role
 from app.redaction import inspect_and_redact
@@ -42,10 +44,45 @@ def test_redaction_detects_pii_and_secret():
     assert "[REDACTED_CREDENTIAL]" in result.redacted_text
 
 
+def test_demo_tokens_can_use_jwks_rs256_mode(monkeypatch):
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+
+    monkeypatch.setenv("AEGISDESK_AUTH_MODE", "jwks")
+    monkeypatch.setenv("AEGISDESK_JWKS_PRIVATE_KEY_PEM", private_pem)
+    monkeypatch.setenv("AEGISDESK_JWKS_PUBLIC_KEY_PEM", public_pem)
+    monkeypatch.setenv("AEGISDESK_JWKS_KEY_ID", "test-key")
+    monkeypatch.setenv("AEGISDESK_JWT_ISSUER", "aegisdesk-test-issuer")
+
+    actor = Actor(user_id="u-jwks", role=Role.manager, team="platform")
+    token = create_demo_token(actor)
+    decoded = decode_token(token)
+    jwks = jwks_document()
+
+    assert decoded == actor
+    assert jwks["keys"][0]["kid"] == "test-key"
+
+
 def test_chat_requires_bearer_token():
     response = client.post("/chat", json={"message": "Create a ticket."})
 
     assert response.status_code == 401
+
+
+def test_quota_counter_tracks_role_team_window():
+    actor = Actor(user_id="u-quota", role=Role.employee, team="payments")
+
+    assert store.quota_count(actor) == 0
+    assert store.increment_quota(actor) == 1
+    assert store.quota_count(actor) == 1
 
 
 def test_role_spoofing_in_body_is_ignored():
@@ -112,6 +149,20 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert response.status_code == 200
     assert body["policy"]["reason"] == "incident_triage_allowed_for_employee"
     assert body["model_route"]["provider"] == "local"
+
+
+def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disabled():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-1004"),
+        json={"message": "What is the safest way to ask for help with a CloudOps issue?"},
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["model_route"]["provider"] == "simulated-cloud"
+    assert body["model_route"]["model"] == "bedrock-disabled-deterministic-fallback"
 
 
 def test_employee_cannot_approve_pending_access_request():

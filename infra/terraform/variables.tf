@@ -28,6 +28,12 @@ variable "monthly_budget_usd" {
   default     = "1"
 }
 
+variable "bedrock_model_id" {
+  description = "Amazon Bedrock model or inference profile used for approved low-sensitivity prompts."
+  type        = string
+  default     = "us.amazon.nova-lite-v1:0"
+}
+
 variable "allowed_cors_origins" {
   description = "Allowed browser origins for the API Gateway CORS policy."
   type        = list(string)

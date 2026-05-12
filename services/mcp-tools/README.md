@@ -1,18 +1,22 @@
-# MCP Tools Placeholder
+# MCP Tool Server
 
-Planned tools:
+This service exposes the AegisDesk demo tools through a real Model Context Protocol server using the Python MCP SDK.
 
-- Ticket tool
-- Access request tool
-- Cloud cost lookup tool
-- Knowledge search tool
+Implemented tools:
 
-Tool safety pattern:
+- `create_ticket`
+- `request_temporary_read_only_access`
+- `lookup_cost_summary`
+- `search_runbook`
 
-1. Receive structured action request.
-2. Validate schema.
-3. Ask gateway/OPA for authorization.
-4. Execute allowed action.
-5. Return structured result.
-6. Log tool call metadata.
+The hosted Lambda API uses an in-process adapter for these deterministic demo actions so it does not need to spawn a subprocess. This MCP server proves protocol interoperability for local reviewers and future agent clients.
 
+## Run
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python server.py
+```
+
+The default transport is stdio, which is the expected mode for local MCP clients.

@@ -62,7 +62,7 @@ Show:
 - Denied result
 - OPA policy explanation
 - Safer alternative: temporary read-only access with approval
-- Backend-derived employee role from signed demo token
+- Backend-derived employee role from verified token claims
 
 Explain:
 

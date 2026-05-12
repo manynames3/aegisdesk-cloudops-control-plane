@@ -9,6 +9,10 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+import jwt
+from jwt.algorithms import RSAAlgorithm
+from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 
 from .models import Actor, Role
@@ -44,8 +48,21 @@ def create_demo_token(actor: Actor, expires_in_seconds: int = 3600) -> str:
         "team": actor.team,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=expires_in_seconds)).timestamp()),
-        "iss": "aegisdesk-local-demo",
+        "iss": settings.jwt_issuer,
     }
+    if settings.jwt_audience:
+        payload["aud"] = settings.jwt_audience
+
+    if settings.auth_mode == "jwks":
+        if not settings.jwks_private_key_pem:
+            raise AuthError("missing_jwks_private_key")
+        return jwt.encode(
+            payload,
+            settings.jwks_private_key_pem,
+            algorithm="RS256",
+            headers={"kid": settings.jwks_key_id, "typ": "JWT"},
+        )
+
     header = {"alg": "HS256", "typ": "JWT"}
     encoded_header = _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
     encoded_payload = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
@@ -55,6 +72,9 @@ def create_demo_token(actor: Actor, expires_in_seconds: int = 3600) -> str:
 
 def decode_token(token: str) -> Actor:
     settings = get_settings()
+    if settings.auth_mode == "jwks":
+        return _decode_jwks_token(token)
+
     try:
         encoded_header, encoded_payload, signature = token.split(".", maxsplit=2)
     except ValueError as exc:
@@ -82,6 +102,45 @@ def decode_token(token: str) -> Actor:
         return Actor(user_id=payload["sub"], role=Role(payload["role"]), team=payload["team"])
     except (KeyError, ValidationError, ValueError) as exc:
         raise AuthError("invalid_actor_claims") from exc
+
+
+def _decode_jwks_token(token: str) -> Actor:
+    settings = get_settings()
+    if not settings.jwks_public_key_pem:
+        raise AuthError("missing_jwks_public_key")
+
+    try:
+        options = {"require": ["exp", "iat", "iss", "sub"]}
+        payload = jwt.decode(
+            token,
+            settings.jwks_public_key_pem,
+            algorithms=["RS256"],
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
+            options=options,
+        )
+        header = jwt.get_unverified_header(token)
+    except InvalidTokenError as exc:
+        raise AuthError("invalid_jwks_token") from exc
+
+    if header.get("kid") != settings.jwks_key_id:
+        raise AuthError("unknown_jwks_key_id")
+
+    try:
+        return Actor(user_id=payload["sub"], role=Role(payload["role"]), team=payload["team"])
+    except (KeyError, ValidationError, ValueError) as exc:
+        raise AuthError("invalid_actor_claims") from exc
+
+
+def jwks_document() -> dict:
+    settings = get_settings()
+    if not settings.jwks_public_key_pem:
+        return {"keys": []}
+
+    public_key = load_pem_public_key(settings.jwks_public_key_pem.encode("utf-8"))
+    jwk = json.loads(RSAAlgorithm.to_jwk(public_key))
+    jwk.update({"kid": settings.jwks_key_id, "alg": "RS256", "use": "sig"})
+    return {"keys": [jwk]}
 
 
 def require_actor(

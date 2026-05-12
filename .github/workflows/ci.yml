@@ -32,6 +32,7 @@ jobs:
           test -f docs/adrs/003-policy-outside-the-model.md
           test -f docs/adrs/006-demo-token-auth-boundary.md
           test -f docs/adrs/007-low-cost-aws-deployment.md
+          test -f docs/adrs/008-real-bedrock-dynamodb-mcp.md
           test -f docs/demo/README.md
           test -f docs/demo/screenshots/policy-aware-chat.png
           test -f docs/security/threat-model.md
@@ -40,7 +41,9 @@ jobs:
           test -f policies/chat_policy.rego
           test -f policies/model_routing.rego
           test -f policies/tool_authorization.rego
+          test -f policies/quota.rego
           test -f infra/terraform/main.tf
+          test -f services/mcp-tools/server.py
 
   api:
     runs-on: ubuntu-latest
@@ -73,6 +76,20 @@ jobs:
           opa version
       - name: Run Rego policy tests
         run: opa test policies
+
+  mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install MCP dependencies
+        working-directory: services/mcp-tools
+        run: pip install -r requirements.txt
+      - name: Import MCP server
+        working-directory: services/mcp-tools
+        run: python -c "import server; assert server.mcp"
 
   infra:
     runs-on: ubuntu-latest
@@ -120,3 +137,5 @@ jobs:
         run: docker build -t aegisdesk-api:ci services/api
       - name: Build web image
         run: docker build -t aegisdesk-web:ci apps/web
+      - name: Build MCP tools image
+        run: docker build -t aegisdesk-mcp-tools:ci services/mcp-tools
