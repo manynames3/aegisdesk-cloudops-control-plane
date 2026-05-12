@@ -134,6 +134,7 @@ resource "aws_lambda_function" "api" {
       AEGISDESK_ENABLE_BEDROCK       = "true"
       AEGISDESK_BEDROCK_MODEL_ID     = var.bedrock_model_id
       AEGISDESK_BEDROCK_MAX_TOKENS   = "180"
+      AEGISDESK_CORS_ORIGINS         = join(",", concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"]))
       OTEL_SERVICE_NAME              = "aegisdesk-api"
     }
   }

@@ -227,7 +227,7 @@ export default function Home() {
         ...current,
         {
           role: "assistant",
-          text: "API is offline. Start the FastAPI service on port 8000 and retry."
+          text: `API request failed. Verify the gateway is reachable at ${API_BASE} and retry.`
         }
       ]);
       setApiStatus("offline");

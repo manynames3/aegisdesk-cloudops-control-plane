@@ -36,6 +36,7 @@ class Settings:
     bedrock_input_price_per_1m_tokens: float
     bedrock_output_price_per_1m_tokens: float
     quota_window_seconds: int
+    cors_origins: list[str]
 
 
 def get_settings() -> Settings:
@@ -64,4 +65,12 @@ def get_settings() -> Settings:
         bedrock_input_price_per_1m_tokens=float(os.getenv("AEGISDESK_BEDROCK_INPUT_PRICE_PER_1M_TOKENS", "0.06")),
         bedrock_output_price_per_1m_tokens=float(os.getenv("AEGISDESK_BEDROCK_OUTPUT_PRICE_PER_1M_TOKENS", "0.24")),
         quota_window_seconds=int(os.getenv("AEGISDESK_QUOTA_WINDOW_SECONDS", "86400")),
+        cors_origins=[
+            origin.strip()
+            for origin in os.getenv(
+                "AEGISDESK_CORS_ORIGINS",
+                "http://localhost:3000,http://127.0.0.1:3000",
+            ).split(",")
+            if origin.strip()
+        ],
     )
