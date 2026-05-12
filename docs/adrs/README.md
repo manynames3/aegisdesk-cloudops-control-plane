@@ -13,3 +13,4 @@ This directory records the major architecture decisions for AegisDesk.
 | [ADR-007](007-low-cost-aws-deployment.md) | Accepted | Deploy a low-cost AWS portfolio environment after approval |
 | [ADR-008](008-real-bedrock-dynamodb-mcp.md) | Accepted | Add real Bedrock, DynamoDB, MCP, and quota paths |
 | [ADR-009](009-cognito-opa-cost-explorer.md) | Accepted | Pair Cognito identity, live OPA/Rego, and Cost Explorer governance |
+| [ADR-010](010-seeded-incident-context.md) | Accepted | Use seeded CloudWatch-style incident context before real log queries |

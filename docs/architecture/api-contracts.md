@@ -73,6 +73,21 @@ Response:
     "metadata": {}
   },
   "tool_calls": [],
+  "incident_context": {
+    "incident_id": "INC-1042",
+    "source": "seeded_cloudwatch_logs",
+    "log_group": "/aws/lambda/aegisdesk/checkout",
+    "query": "fields @timestamp, @message | filter incident_id = 'INC-1042' | sort @timestamp asc | limit 20",
+    "entries": [
+      {
+        "timestamp": "2026-05-12T19:41:03Z",
+        "level": "ERROR",
+        "service": "checkout-api",
+        "message": "Database connection pool exhausted while opening checkout transaction."
+      }
+    ],
+    "suspected_cause": "Database connection pool saturation is the strongest signal."
+  },
   "trace_id": "trace-123"
 }
 ```
@@ -103,9 +118,11 @@ Example tool call response:
 
 Manager/admin cost investigations call AWS Cost Explorer when enabled and cache the summary in DynamoDB. Employee cost investigations return `approval_required`.
 
+Incident triage responses include `incident_context` when the request supplies a known incident ID. The hosted portfolio uses a seeded CloudWatch Logs-style source to show the CloudWatch shape without running paid log queries.
+
 ## GET /events
 
-Requires admin role.
+Requires manager or admin role.
 
 Response:
 
@@ -117,7 +134,18 @@ Response:
       "request_id": "req-abc123",
       "event_type": "model.route.selected",
       "timestamp": "2026-05-09T05:00:00Z",
-      "summary": "Request routed to local model due to internal operational context."
+      "summary": "Request routed to local model due to internal operational context.",
+      "actor": {
+        "user_id": "aegisdesk-employee",
+        "role": "employee",
+        "team": "payments"
+      },
+      "metadata": {
+        "provider": "local",
+        "model": "deterministic-control-plane",
+        "reason": "sensitive_content_local_only"
+      },
+      "trace_id": "trace-123"
     }
   ]
 }

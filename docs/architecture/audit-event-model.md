@@ -47,6 +47,7 @@ The audit event model is central to AegisDesk. The system should be able to expl
 | `model.fallback` | Bedrock was unavailable and deterministic fallback was used |
 | `quota.allowed` | Request was within role/team quota |
 | `quota.denied` | Request exceeded role/team quota |
+| `incident.context.loaded` | Read-only incident context was loaded for triage |
 | `policy.allowed` | Policy allowed an action |
 | `policy.denied` | Policy denied an action |
 | `approval.requested` | Human approval was required |
@@ -65,3 +66,14 @@ The admin dashboard should not invent its own data. It should render summaries f
 - Approval metrics come from approval events.
 - Tool call history comes from `tool.called`.
 - Route split comes from `model.route.selected`.
+- Incident evidence comes from `incident.context.loaded`.
+
+The governance dashboard supports filtering these persisted records by request ID, user, policy decision, route, and tool so reviewers can inspect one workflow end to end instead of reading raw logs.
+
+## Approval Trail
+
+Approval records link back to audit events through request IDs and approval metadata:
+
+- `approval.requested` records requester, resource, permission, and approval ID.
+- `approval.granted` or `approval.denied` records approver, status, decision timestamp, and approval ID.
+- The frontend shows the before/after trail on the approval card so the workflow is understandable without inspecting DynamoDB directly.

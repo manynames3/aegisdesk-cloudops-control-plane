@@ -149,6 +149,8 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert response.status_code == 200
     assert body["policy"]["reason"] == "incident_triage_allowed_for_employee"
     assert body["model_route"]["provider"] == "local"
+    assert body["incident_context"]["source"] == "seeded_cloudwatch_logs"
+    assert body["tool_calls"][0]["name"] == "incident.context"
 
 
 def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disabled():
@@ -182,10 +184,12 @@ def test_governance_endpoints_require_admin_role():
     employee_events = client.get("/events", headers=auth_headers(Role.employee))
     employee_metrics = client.get("/metrics/summary", headers=auth_headers(Role.employee))
     manager_approvals = client.get("/approvals", headers=auth_headers(Role.manager))
+    manager_events = client.get("/events", headers=auth_headers(Role.manager))
 
     assert employee_events.status_code == 403
     assert employee_metrics.status_code == 403
     assert manager_approvals.status_code == 200
+    assert manager_events.status_code == 200
 
 
 def test_approval_decisions_are_pending_only():

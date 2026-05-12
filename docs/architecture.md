@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AegisDesk is a local-first and hosted portfolio implementation of a CloudOps AI control plane. The current system sends employee, manager, and admin workflows through a FastAPI gateway that verifies Cognito ID tokens through JWKS, performs redaction, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, queries AWS Cost Explorer for manager/admin cost investigations, emits OpenTelemetry spans, and writes audit/cache state to DynamoDB in the hosted environment.
+AegisDesk is a local-first and hosted portfolio implementation of a CloudOps AI control plane. The current system sends employee, manager, and admin workflows through a FastAPI gateway that verifies Cognito ID tokens through JWKS, performs redaction, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, loads seeded CloudWatch-style incident context, queries AWS Cost Explorer for manager/admin cost investigations, emits OpenTelemetry spans, and writes audit/cache state to DynamoDB in the hosted environment.
 
 ## Container Diagram
 
@@ -25,6 +25,7 @@ flowchart LR
         Bedrock["Amazon Bedrock<br/>Nova Lite"]
         Tools["MCP Tool Server<br/>Python MCP SDK<br/>Ticket, access, cost, knowledge tools"]
         Cost["AWS Cost Explorer<br/>Cached cloud cost summaries"]
+        Logs["Seeded CloudWatch-style Logs<br/>Read-only incident context"]
         Audit[("Audit + Cache Store<br/>DynamoDB hosted / SQLite local")]
         Quota["Quota Policy<br/>Role/team counters"]
         Trace["Trace Backend<br/>CloudWatch logs now / Jaeger local path"]
@@ -51,6 +52,7 @@ flowchart LR
     Router --> Bedrock
     API --> Tools
     Tools --> Cost
+    Tools --> Logs
     API --> Audit
     API --> Trace
     Budget -.->|monitors AWS spend| CDN
@@ -65,9 +67,10 @@ flowchart LR
 3. The gateway inspects input for PII, secrets, and privileged-action intent.
 4. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
 5. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, and policy.
-6. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
-7. The gateway writes audit events for redaction, policy, model route, tool calls, approvals, estimated cost, and trace IDs.
-8. The frontend shows the answer and decision metadata to the user, manager, or admin.
+6. For incident triage, the gateway loads read-only incident evidence from a seeded CloudWatch Logs-style source and records the lookup as a governed tool call.
+7. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
+8. The gateway writes audit events for redaction, policy, model route, incident context, tool calls, approvals, estimated cost, and trace IDs.
+9. The frontend shows the answer and decision metadata to the user, manager, or admin in plain English, with technical policy IDs underneath.
 
 ## Deployment Shape
 
@@ -101,6 +104,7 @@ The current hosted deployment uses a low-idle-cost AWS shape:
 - DynamoDB table for durable audit events, approvals, model routes, metrics, quotas, and Cost Explorer cache entries
 - Amazon Bedrock Nova Lite for approved low-sensitivity prompts
 - AWS Cost Explorer for manager/admin cost investigations
+- seeded CloudWatch Logs-style incident context for checkout latency triage
 - IAM execution role scoped to CloudWatch log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention
 - AWS Budget guardrail set to the portfolio threshold
@@ -124,6 +128,7 @@ The hosted deployment intentionally stays below production complexity. A product
 - Sensitive data controls happen before model routing.
 - Cloud model use must be optional so the app can run at low cost.
 - Audit events must be based on backend decisions, not invented dashboard values.
+- Operational context shown in the hosted portfolio must be read-only and low-cost.
 
 ## Related Docs
 

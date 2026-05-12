@@ -63,6 +63,22 @@ class ToolCall(BaseModel):
     result: dict[str, Any] = Field(default_factory=dict)
 
 
+class IncidentLogEntry(BaseModel):
+    timestamp: str
+    level: Literal["INFO", "WARN", "ERROR"]
+    service: str
+    message: str
+
+
+class IncidentContext(BaseModel):
+    incident_id: str
+    source: Literal["seeded_cloudwatch_logs"]
+    log_group: str
+    query: str
+    entries: list[IncidentLogEntry] = Field(default_factory=list)
+    suspected_cause: str
+
+
 class ChatResponse(BaseModel):
     request_id: str
     answer: str
@@ -70,6 +86,7 @@ class ChatResponse(BaseModel):
     redaction: RedactionResult
     policy: PolicyDecision
     tool_calls: list[ToolCall] = Field(default_factory=list)
+    incident_context: IncidentContext | None = None
     trace_id: str
 
 

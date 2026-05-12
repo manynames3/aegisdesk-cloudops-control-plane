@@ -10,7 +10,7 @@ Open three views:
 2. Manager approval queue
 3. Admin governance dashboard
 
-Before presenting, switch to `Admin` and click `Seed` so the governance dashboard has audit history.
+Before presenting, switch to `Admin` and click `Seed` so the governance dashboard has audit history. For a shorter path, click `Walkthrough` in the top bar and run the four guided steps.
 
 ## 30-Second Introduction
 
@@ -29,10 +29,11 @@ Show:
 - AI answer
 - Model used
 - Route reason and trace ID
+- CloudWatch-style incident context when the checkout incident prompt is used
 
 Explain:
 
-> This is the simple employee-facing experience. The deeper work happens in the gateway behind it.
+> This is the simple employee-facing experience. The gateway is using read-only incident evidence, policy, model routing, and audit logging behind the answer.
 
 ## Flow 2: Secret Detection
 
@@ -60,7 +61,8 @@ Prompt:
 Show:
 
 - Denied result
-- OPA policy explanation
+- Plain-English denial explanation
+- OPA policy ID underneath
 - Safer alternative: temporary read-only access with approval
 - Backend-derived employee role from verified token claims
 
@@ -78,13 +80,16 @@ Show:
 
 - Approval record
 - Scoped permission
+- Requester and approver identity
+- Decision timestamp
+- Before and after audit events
 - Audit event
 
 Explain:
 
 > Risky actions move through a human approval workflow. This is how AI becomes usable in enterprise operations.
 
-## Flow 5: Admin Dashboard
+## Flow 5: Admin Governance
 
 Show:
 
@@ -96,10 +101,28 @@ Show:
 - Denied actions
 - Approval status
 - Trace IDs
+- Audit event filters by request ID, user, decision, route, and tool
 
 Explain:
 
 > The admin view turns AI from an uncontrolled chat tool into an observable platform.
+
+## Flow 6: Cost Governance
+
+Prompt as Manager or Admin:
+
+> Why did our AI and cloud costs spike this week?
+
+Show:
+
+- AWS Cost Explorer path
+- DynamoDB cache indicator when repeated
+- Role-gated access
+- Cost summary event in the audit trail
+
+Explain:
+
+> Cost governance is part of the product. Managers can investigate spend, while employees cannot trigger broad cost queries.
 
 ## Closing Statement
 

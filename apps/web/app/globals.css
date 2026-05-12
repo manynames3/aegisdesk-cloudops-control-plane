@@ -32,6 +32,8 @@ body {
 }
 
 button,
+input,
+select,
 textarea {
   font: inherit;
 }
@@ -210,6 +212,7 @@ button:disabled {
 
 .topActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -233,6 +236,80 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(16, 24, 32, 0.05);
+}
+
+.walkthrough {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 16px;
+}
+
+.walkthroughHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.walkthroughHeader strong,
+.walkthroughHeader span {
+  display: block;
+}
+
+.walkthroughHeader span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.walkthroughSteps {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.walkthroughStep {
+  align-items: center;
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 104px;
+  padding: 12px;
+  text-align: left;
+}
+
+.walkthroughStep.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.walkthroughStep > span {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  font-weight: 700;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.walkthroughStep strong,
+.walkthroughStep small {
+  display: block;
+}
+
+.walkthroughStep small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 4px;
 }
 
 .chatGrid {
@@ -354,6 +431,56 @@ button:disabled {
   margin-top: 12px;
 }
 
+.incidentEvidence {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.incidentEvidence > div:first-child {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.incidentEvidence > div:first-child span,
+.incidentEvidence p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.incidentEvidence p {
+  margin: 0;
+}
+
+.logEntries {
+  display: grid;
+  gap: 8px;
+}
+
+.logEntry {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto 96px minmax(0, 1fr);
+  padding: 8px;
+}
+
+.logEntry span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.logEntry strong {
+  font-size: 13px;
+}
+
 .badge {
   border-radius: 999px;
   display: inline-flex;
@@ -410,6 +537,18 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.decisionItem.emphasis {
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.decisionItem.emphasis strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
 .governanceGrid {
   display: grid;
   gap: 16px;
@@ -450,6 +589,46 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.eventFilters {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  padding: 12px 18px;
+}
+
+.eventFilters label {
+  align-items: center;
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.eventFilters select {
+  min-width: 0;
+}
+
+.eventFilters input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+
+.eventFilters select {
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  min-height: 38px;
+  padding: 0 10px;
+}
+
 .eventList,
 .table,
 .evalPanel {
@@ -475,6 +654,13 @@ button:disabled {
   display: block;
 }
 
+.eventMeta {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .eventItem:last-child,
 .approvalRow:last-child,
 .evalRow:last-child {
@@ -482,7 +668,34 @@ button:disabled {
 }
 
 .approvalRow {
+  align-items: start;
   grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.approvalMain {
+  display: grid;
+  gap: 10px;
+}
+
+.approvalFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.approvalFacts span {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.approvalTimeline {
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
 }
 
 .rowActions {
@@ -548,6 +761,11 @@ button:disabled {
   .governanceGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .walkthroughSteps,
+  .eventFilters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -576,7 +794,14 @@ button:disabled {
   }
 
   .approvalRow,
-  .eventItem {
+  .eventItem,
+  .eventFilters,
+  .logEntry,
+  .walkthroughSteps {
     grid-template-columns: 1fr;
+  }
+
+  .walkthroughHeader {
+    align-items: stretch;
   }
 }

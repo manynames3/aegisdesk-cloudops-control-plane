@@ -23,11 +23,14 @@ Views:
 - Employee chat
 - Manager approval queue
 - Admin governance dashboard
+- Guided reviewer walkthrough
+- Audit event explorer
 
 Responsibilities:
 
 - Present AI responses and workflow state
-- Show clear policy, redaction, and route indicators
+- Show clear policy, redaction, incident context, approval, and route indicators
+- Explain decisions in plain English before exposing technical policy identifiers
 - Provide non-technical visibility into enterprise controls
 
 ### Identity Boundary
@@ -94,6 +97,7 @@ MVP tools:
 - Access request tool
 - Cloud cost lookup tool
 - Knowledge search tool
+- Incident context lookup tool
 
 The repository includes a real MCP server in `services/mcp-tools` using the Python MCP SDK. The hosted Lambda API uses an in-process adapter for the same controlled actions to avoid spawning subprocesses in Lambda.
 
@@ -119,8 +123,22 @@ Events:
 - policy.denied
 - approval.requested
 - approval.granted
+- incident.context.loaded
 - tool.called
 - eval.failed
+
+The governance view reads these persisted records directly and supports filters for request ID, actor, policy decision, model route, and tool name. Approval cards show the requester, approver, decision timestamp, and the correlated before/after audit events for the approval workflow.
+
+### Incident Context
+
+The hosted portfolio uses a read-only seeded CloudWatch Logs-style source for checkout latency triage. The gateway returns the log group, query text, matched entries, and suspected cause, then records `incident.context.loaded` as an audit event. This makes incident triage feel operationally real while avoiding recurring log-query cost or access to a real production workload.
+
+Production extension:
+
+- CloudWatch Logs Insights `StartQuery`/`GetQueryResults` with strict time windows
+- service/team allow lists by role
+- query cost and duration limits
+- immutable linkage between incident ID, log query, answer, and approval trail
 
 ### Observability
 
@@ -151,6 +169,7 @@ sequenceDiagram
     participant OPA as OPA Policy
     participant MR as Model Router
     participant M as Bedrock or Fallback
+    participant Logs as Incident Context
     participant Tool as MCP Tool
     participant Audit as Audit Store
 
@@ -164,6 +183,8 @@ sequenceDiagram
     MR->>M: Invoke approved route
     M-->>MR: Answer + route metadata
     MR-->>API: AI response
+    API->>Logs: Load read-only incident evidence when relevant
+    Logs-->>API: Log entries + suspected cause
     API->>OPA: Evaluate tool action if needed
     OPA-->>API: tool decision
     API->>Tool: Execute allowed tool
@@ -191,6 +212,7 @@ sequenceDiagram
 - DynamoDB table for audit events, approvals, route history, metrics, quotas, and cached cost summaries
 - Bedrock Nova Lite invocation for approved low-sensitivity prompts
 - AWS Cost Explorer read path for manager/admin cost investigations
+- Read-only seeded CloudWatch Logs-style incident context for triage workflows
 - IAM role scoped to Lambda log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention
 - S3 server-side encryption, public access block, and noncurrent version cleanup

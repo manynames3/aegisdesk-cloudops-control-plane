@@ -14,11 +14,11 @@ An employee says:
 
 - Detects secrets or customer data in the pasted log.
 - Redacts sensitive values.
-- Searches approved runbooks.
+- Loads read-only CloudWatch-style incident evidence for the checkout service.
 - Summarizes likely cause.
 - Suggests next steps.
 - Offers to create an incident ticket.
-- Logs model route, redaction result, and tool call.
+- Logs model route, redaction result, incident context lookup, and tool call.
 
 ### Enterprise Value
 
@@ -26,6 +26,7 @@ An employee says:
 - Reduced accidental data leakage
 - Consistent runbook-driven troubleshooting
 - Auditable support workflow
+- Clear evidence that AI answers are grounded in operational context
 
 ## Use Case 2: Production Access Request
 
@@ -44,6 +45,7 @@ An employee says:
 - Suggests temporary read-only access tied to an incident ticket.
 - Sends approval request to a manager.
 - Records the policy decision and reason.
+- Shows requester, approver, decision timestamp, and correlated before/after audit events.
 
 ### Enterprise Value
 
@@ -63,6 +65,7 @@ An engineering manager says:
 ### System Behavior
 
 - Calls the governed cost summary MCP tool.
+- Reads AWS Cost Explorer for manager/admin users and uses DynamoDB cache entries to avoid repeated billing API calls.
 - Summarizes usage by team, service, model, and time period.
 - Identifies high-cost request patterns.
 - Suggests lower-cost routing or caching options.
@@ -139,3 +142,24 @@ An admin clicks:
 - Compliance evidence
 - Executive reporting
 - Clear proof that controls are measurable
+
+## Use Case 7: Recruiter Walkthrough
+
+### Scenario
+
+A non-technical reviewer wants to understand the project quickly without reading the code.
+
+### System Behavior
+
+- Provides a four-step guided walkthrough.
+- Runs a secret-redaction request.
+- Shows denial of unsafe production admin access.
+- Shows a manager approval workflow with audit evidence.
+- Shows Bedrock routing and DynamoDB-backed audit events.
+- Explains decisions in plain English before showing policy IDs.
+
+### Enterprise Value
+
+- Makes the control-plane story understandable to recruiters.
+- Gives hiring managers a repeatable path to inspect the technical depth.
+- Demonstrates product thinking around trust, governance, and reviewability.

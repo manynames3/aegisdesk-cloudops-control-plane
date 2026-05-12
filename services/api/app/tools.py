@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import ApprovalRequest, PolicyDecision, ToolCall
+from .models import ApprovalRequest, IncidentContext, PolicyDecision, ToolCall
 from .store import actor_from
 
 
@@ -34,6 +34,19 @@ def lookup_cost_summary(policy: PolicyDecision, summary: dict | None = None) -> 
         }
 
     return ToolCall(name="cost.summary", status=status, policy=policy, result=result)
+
+
+def lookup_incident_context_tool(context: IncidentContext) -> ToolCall:
+    return ToolCall(
+        name="incident.context",
+        status="allowed",
+        policy=PolicyDecision(
+            decision="allow",
+            reason="read_only_incident_context_allowed",
+            policy_name="incident_context",
+        ),
+        result=context.model_dump(),
+    )
 
 
 def request_read_only_access(

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth import create_demo_token, jwks_document, require_actor, require_admin, require_manager_or_admin
 from .cognito_auth import CognitoSessionError, create_persona_session
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
+from .incident_context import lookup_incident_context
 from .llm import LLMUnavailable, maybe_generate_with_bedrock
 from .model_router import select_model_route
 from .models import (
@@ -29,7 +30,7 @@ from .policy_engine import PolicyEngine, PolicyUnavailable
 from .redaction import inspect_and_redact
 from .settings import get_settings
 from .store import actor_from, create_store
-from .tools import create_ticket, lookup_cost_summary, request_read_only_access
+from .tools import create_ticket, lookup_cost_summary, lookup_incident_context_tool, request_read_only_access
 
 settings = get_settings()
 
@@ -117,7 +118,7 @@ def chat(request: ChatRequest, actor: Annotated[Actor, Depends(require_actor)]) 
 
 
 @app.get("/events", response_model=EventList)
-def events(_actor: Annotated[Actor, Depends(require_admin)]) -> EventList:
+def events(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> EventList:
     return EventList(events=list(reversed(store.events))[:100])
 
 
@@ -148,7 +149,13 @@ def approve(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or
             actor=actor,
             event_type="approval.granted",
             summary="Manager approved scoped temporary access.",
-            metadata={"approval_id": approval.approval_id, "permission": approval.permission},
+            metadata={
+                "approval_id": approval.approval_id,
+                "permission": approval.permission,
+                "decided_by": actor.user_id,
+                "decided_at": approval.decided_at.isoformat() if approval.decided_at else None,
+                "status": approval.status.value,
+            },
             trace_id=current_trace_id(),
         )
     )
@@ -172,7 +179,13 @@ def deny(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or_ad
             actor=actor,
             event_type="approval.denied",
             summary="Manager denied scoped temporary access.",
-            metadata={"approval_id": approval.approval_id, "permission": approval.permission},
+            metadata={
+                "approval_id": approval.approval_id,
+                "permission": approval.permission,
+                "decided_by": actor.user_id,
+                "decided_at": approval.decided_at.isoformat() if approval.decided_at else None,
+                "status": approval.status.value,
+            },
             trace_id=current_trace_id(),
         )
     )
@@ -347,7 +360,33 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             )
 
         tool_calls = []
+        incident_context = None
         answer = build_answer(intent, redaction.redacted_text, policy.decision)
+
+        if intent == "incident_triage":
+            incident_context = lookup_incident_context(
+                str(request.context.get("incident_id") or "INC-1042"),
+                redaction.redacted_text,
+            )
+            tool_call = lookup_incident_context_tool(incident_context)
+            tool_calls.append(tool_call)
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="incident.context.loaded",
+                    summary="Read-only incident context loaded from seeded CloudWatch-style logs.",
+                    metadata={
+                        "tool": tool_call.name,
+                        "source": incident_context.source,
+                        "incident_id": incident_context.incident_id,
+                        "log_group": incident_context.log_group,
+                        "entries": len(incident_context.entries),
+                    },
+                    trace_id=trace_id,
+                )
+            )
+            answer = enrich_incident_answer(answer, incident_context)
 
         if policy.decision == "allow":
             try:
@@ -389,6 +428,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                 summary=f"Request routed to {route.provider}.",
                 metadata={
                     "model": route.model,
+                    "provider": route.provider,
                     "reason": route.reason,
                     "policy_reason": model_policy.reason,
                     "external_call": route.external_call,
@@ -436,7 +476,13 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         actor=actor,
                         event_type="approval.requested",
                         summary="Temporary read-only access was sent for manager approval.",
-                        metadata={"approval_id": approval.approval_id, "resource": approval.resource},
+                        metadata={
+                            "approval_id": approval.approval_id,
+                            "resource": approval.resource,
+                            "permission": approval.permission,
+                            "requester": approval.requester.user_id,
+                            "status": approval.status.value,
+                        },
                         trace_id=trace_id,
                     )
                 )
@@ -492,6 +538,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             redaction=redaction,
             policy=policy,
             tool_calls=tool_calls,
+            incident_context=incident_context,
             trace_id=trace_id,
         )
 
@@ -518,3 +565,10 @@ def build_answer(intent: str, redacted_text: str, decision: str) -> str:
         return "I can help with approved CloudOps support steps, create a ticket, or explain policy-safe next actions."
 
     return f"Request processed through the governed CloudOps gateway. Sanitized input: {redacted_text[:180]}"
+
+
+def enrich_incident_answer(answer: str, incident_context) -> str:
+    return (
+        f"{answer} Incident context points to {incident_context.suspected_cause} "
+        f"I found {len(incident_context.entries)} relevant log entries in {incident_context.log_group}."
+    )

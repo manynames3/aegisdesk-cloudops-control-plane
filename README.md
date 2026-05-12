@@ -18,6 +18,8 @@ Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health]
 
 ## Screenshots
 
+![Guided walkthrough](docs/evidence/screenshots/guided-walkthrough.png)
+
 ![Policy-aware chat](docs/evidence/screenshots/policy-aware-chat.png)
 
 ![Governance dashboard](docs/evidence/screenshots/governance-dashboard.png)
@@ -34,11 +36,12 @@ Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health]
 
 ## Core Use Cases
 
-- **Cloud incident triage:** summarize logs, detect secrets, search runbooks, and recommend next steps.
+- **Cloud incident triage:** summarize seeded CloudWatch-style incident logs, detect secrets, search runbooks, and recommend next steps.
 - **Access request governance:** deny unsafe production admin requests and route safer alternatives for approval.
 - **Cost-aware model routing:** choose local or cloud models based on sensitivity, budget, and route policy.
 - **Ticket automation:** create or check tickets through policy-gated MCP tools.
-- **Governance dashboard:** show model usage, cost estimates, redactions, denied actions, approvals, and tool calls.
+- **Governance dashboard:** filter audit events by request, user, policy decision, route, and tool call.
+- **Guided walkthrough:** a four-step reviewer path shows redaction, policy denial, manager approval, Bedrock routing, and persisted audit evidence.
 
 ## Tech Stack
 
@@ -52,6 +55,7 @@ This is the current MVP stack and deployment shape:
 | Policy | OPA/Rego in Lambda or HTTP, explicit Python fallback | Authorization, model routing, approval, and budget rules |
 | AI routing | Amazon Bedrock Nova Lite, deterministic fallback, Ollama path documented | Shows real provider routing while preserving low-cost local review |
 | Tooling | MCP Python SDK server plus Lambda in-process adapter | Ticket, access request, cost lookup, and runbook tools |
+| Incident context | Seeded CloudWatch Logs-style source | Read-only operational evidence for incident triage without running log queries that add cost |
 | Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and review |
 | Data | DynamoDB hosted state/cache, SQLite local fallback, Postgres path documented | Audit events, approvals, route history, quota counters, Cost Explorer cache, dashboard summaries |
 | Runtime | direct local run, Docker Compose path, Lambda zip handler | Low-cost reproducible review |
@@ -65,7 +69,10 @@ This is the current MVP stack and deployment shape:
 - **Real LLM path with cost control:** approved low-sensitivity prompts call Amazon Bedrock Nova Lite; sensitive, denied, or failed routes use deterministic/local fallback.
 - **Real cost governance path:** manager/admin cost investigations call AWS Cost Explorer and cache results in DynamoDB to reduce repeated API calls.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
-- **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, tool call, approval, cost estimate, and trace ID.
+- **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
+- **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, incident context, tool call, approval, cost estimate, and trace ID.
+- **Audit event explorer:** governance reviewers can filter persisted events by request ID, user, policy decision, model route, and tool.
+- **Approval workflow evidence:** approval cards show requester, approver identity, decision timestamp, and before/after audit events.
 - **Durable cloud state:** hosted audit events, approvals, model routes, metrics, and quota counters persist in DynamoDB.
 - **Deployed AWS architecture:** Terraform provisions Cognito, a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, DynamoDB, Bedrock IAM, Cost Explorer access, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
 - **Deployment automation:** a manual GitHub Actions deploy workflow builds the Lambda package, runs Terraform, publishes the static frontend, and invalidates CloudFront.
@@ -90,6 +97,7 @@ flowchart LR
     Tools --> Ticket["Ticket Tool"]
     Tools --> Access["Access Request Tool"]
     Tools --> Cost["AWS Cost Explorer<br/>Cached summary"]
+    Tools --> Logs["Seeded CloudWatch-style<br/>Incident context"]
     API --> Audit["DynamoDB<br/>Audit + cache state"]
     API --> Trace["OpenTelemetry / Jaeger"]
     Audit --> Dashboard["Governance Dashboard"]
@@ -115,7 +123,12 @@ Completed:
 - Cognito-backed persona tokens for the hosted portfolio environment
 - Amazon Bedrock Nova Lite route for approved low-sensitivity prompts
 - AWS Cost Explorer summaries for manager/admin cost investigations with DynamoDB caching
+- Read-only incident context from a seeded CloudWatch Logs-style source for checkout latency triage
 - DynamoDB-backed hosted audit/event state with SQLite local fallback
+- Guided walkthrough for recruiter review
+- Plain-English decision trail for policy, routing, approval, and redaction outcomes
+- Audit event explorer with filters for request ID, user, decision, route, and tool
+- Approval timeline showing pending counts, approver identity, timestamps, and correlated audit events
 - Per-role/team quota counters and quota policy
 - Real MCP server using the Python MCP SDK
 - Admin-protected seed/reset actions for fast reviewer walkthroughs
