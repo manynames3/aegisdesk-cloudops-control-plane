@@ -823,7 +823,7 @@ export default function Home() {
         {tab === "governance" && (
           <div className="governanceGrid">
             <Metric icon={Activity} label="Requests" value={metrics.requests_total} />
-            <Metric icon={DollarSign} label="Spend" value={`$${metrics.estimated_spend_usd.toFixed(4)}`} />
+            <Metric icon={DollarSign} label="Spend" value={formatUsd(metrics.estimated_spend_usd)} />
             <Metric icon={Lock} label="Redactions" value={metrics.redactions_total} />
             <Metric icon={AlertTriangle} label="Denied" value={metrics.denied_actions} />
             <Metric icon={KeyRound} label="Pending" value={metrics.approvals_pending} />
@@ -1151,6 +1151,15 @@ function formatTime(value?: string | null) {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 function capitalize(value: string) {
