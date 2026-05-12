@@ -48,6 +48,7 @@ The visible Cognito credentials are demo-only portfolio accounts (`aegisdesk-emp
 - **Cloud incident triage:** summarize seeded CloudWatch-style incident logs, detect secrets, search runbooks, and recommend next steps.
 - **Access request governance:** deny unsafe production admin requests and route safer alternatives for approval.
 - **Cost-aware model routing:** choose local or cloud models based on sensitivity, budget, and route policy.
+- **Source-grounded answers:** retrieve trusted runbook, access policy, and cost governance excerpts before producing an answer.
 - **Ticket automation:** create or check tickets through policy-gated MCP tools.
 - **Governance dashboard:** filter audit events by request, user, policy decision, route, and tool call.
 - **Guided walkthrough:** a four-step reviewer path shows redaction, policy denial, manager approval, Bedrock routing, and persisted audit evidence.
@@ -64,6 +65,7 @@ This is the current MVP stack and deployment shape:
 | Policy | OPA/Rego in Lambda or HTTP, explicit Python fallback | Authorization, model routing, approval, and budget rules |
 | AI routing | Amazon Bedrock Nova Lite, deterministic fallback, Ollama path documented | Shows real provider routing while preserving low-cost local review |
 | Tooling | MCP Python SDK server plus Lambda in-process adapter | Ticket, access request, cost lookup, and runbook tools |
+| Knowledge | Markdown runbooks and governance policies packaged with the API | Source-grounded answers with citations and document ownership |
 | Incident context | Seeded CloudWatch Logs-style source | Read-only operational evidence for incident triage without running log queries that add cost |
 | Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and review |
 | Data | DynamoDB hosted state/cache, SQLite local fallback, Postgres path documented | Audit events, approvals, route history, quota counters, Cost Explorer cache, dashboard summaries |
@@ -79,7 +81,8 @@ This is the current MVP stack and deployment shape:
 - **Real LLM path with cost control:** approved low-sensitivity prompts call Amazon Bedrock Nova Lite; sensitive, denied, or failed routes use deterministic/local fallback.
 - **Real cost governance path:** manager/admin cost investigations call AWS Cost Explorer and cache results in DynamoDB to reduce repeated API calls.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
-- **Answer provenance:** chat responses include explicit source metadata so reviewers can see whether an answer came from deterministic control logic, Bedrock, OPA/Rego, MCP tools, seeded incident context, Cost Explorer, or cache.
+- **Trusted knowledge grounding:** incident, access, and cost answers retrieve internal Markdown runbooks and policies before response generation, then show citations with owner and review date.
+- **Answer provenance:** chat responses include explicit source metadata so reviewers can see whether an answer came from deterministic control logic, Bedrock, OPA/Rego, internal knowledge, MCP tools, seeded incident context, Cost Explorer, or cache.
 - **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
 - **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, incident context, tool call, approval, cost estimate, and trace ID.
 - **Audit event explorer:** governance reviewers can filter persisted events by request ID, user, policy decision, model route, and tool.
@@ -101,6 +104,7 @@ flowchart LR
     API --> Redaction["PII and Secret Inspection"]
     API --> Cognito["Amazon Cognito<br/>ID tokens + JWKS"]
     API --> OPA["OPA / Rego Policy"]
+    API --> Knowledge["Trusted Knowledge Base<br/>Runbooks + policies"]
     API --> Router["Model Router"]
     Router --> Local["Local Route Simulator / Ollama Path"]
     Router --> Cloud["Amazon Bedrock Nova Lite"]
@@ -120,6 +124,7 @@ Architecture docs:
 - [System Architecture](docs/architecture/system-architecture.md)
 - [API Contracts](docs/architecture/api-contracts.md)
 - [Audit Event Model](docs/architecture/audit-event-model.md)
+- [Trusted Knowledge Base](docs/knowledge/README.md)
 - [ADRs](docs/adrs/README.md)
 - [Threat Model](docs/security/threat-model.md)
 - [Governance Model](docs/security/governance-model.md)
@@ -132,6 +137,7 @@ Completed:
 - FastAPI gateway with Cognito/JWKS auth, `/chat`, `/events`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
 - Cognito Hosted UI sign-in with backend OAuth code exchange and JWKS-verified ID tokens
 - Redaction, policy decisions, model route metadata, approvals, governed tool calls, and audit events
+- Trusted Markdown knowledge base with checkout runbook, production access policy, and AI/cloud cost governance policy
 - Cognito-backed persona tokens for the hosted portfolio environment
 - Amazon Bedrock Nova Lite route for approved low-sensitivity prompts
 - AWS Cost Explorer summaries for manager/admin cost investigations with DynamoDB caching
@@ -179,6 +185,7 @@ infra/terraform/          AWS Terraform deployment path
 infra/helm/               Optional Kubernetes packaging path
 docs/product/             Product framing, users, use cases, reviewer script
 docs/evidence/            Screenshots and reviewer walkthrough evidence
+docs/knowledge/           Trusted runbooks and internal governance policies used for answer citations
 docs/architecture/        Detailed system docs, API contracts, audit model
 docs/adrs/                Architecture decision records
 docs/security/            Governance model and threat model

@@ -22,6 +22,7 @@ def maybe_generate_with_bedrock(
     *,
     sanitized_input: str,
     intent: str,
+    knowledge_context: str | None,
     settings: Settings,
 ) -> tuple[str | None, ModelRoute]:
     if route.provider != "bedrock":
@@ -38,7 +39,7 @@ def maybe_generate_with_bedrock(
         )
         return None, fallback_route
 
-    prompt = _build_cloudops_prompt(sanitized_input, intent)
+    prompt = _build_cloudops_prompt(sanitized_input, intent, knowledge_context)
     client = boto3.client(
         "bedrock-runtime",
         region_name=settings.aws_region,
@@ -76,13 +77,16 @@ def maybe_generate_with_bedrock(
     )
 
 
-def _build_cloudops_prompt(sanitized_input: str, intent: str) -> str:
+def _build_cloudops_prompt(sanitized_input: str, intent: str, knowledge_context: str | None) -> str:
+    trusted_context = knowledge_context or "No trusted internal knowledge excerpt was retrieved for this request."
     return (
         "You are AegisDesk, a concise CloudOps assistant inside a governed enterprise AI gateway. "
         "Answer in 2-4 sentences. Do not invent tool results, secrets, ticket IDs, or approvals. "
+        "Use the trusted internal knowledge excerpts when they are relevant. "
         "Mention that sensitive values are redacted when relevant.\n\n"
         f"Intent: {intent}\n"
-        f"Sanitized user request: {sanitized_input}"
+        f"Sanitized user request: {sanitized_input}\n\n"
+        f"Trusted internal knowledge excerpts:\n{trusted_context}"
     )
 
 

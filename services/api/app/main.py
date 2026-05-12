@@ -10,6 +10,7 @@ from .auth import AuthError, create_demo_token, decode_token, jwks_document, req
 from .cognito_auth import CognitoSessionError, create_persona_session, ensure_persona_user, exchange_oauth_code
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
 from .incident_context import lookup_incident_context
+from .knowledge_base import format_knowledge_context, retrieve_knowledge, summarize_knowledge_guidance
 from .llm import LLMUnavailable, maybe_generate_with_bedrock
 from .model_router import select_model_route
 from .models import (
@@ -382,6 +383,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             )
 
         intent = classify_intent(request.message)
+        knowledge_citations = retrieve_knowledge(intent, redaction.redacted_text)
         try:
             with tracer.start_as_current_span("aegisdesk.policy.chat"):
                 policy = policy_engine.evaluate_chat(actor, intent)
@@ -450,12 +452,29 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             )
             answer = enrich_incident_answer(answer, incident_context)
 
+        if knowledge_citations:
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="knowledge.retrieved",
+                    summary="Trusted internal knowledge documents retrieved for answer grounding.",
+                    metadata={
+                        "documents": [citation.doc_id for citation in knowledge_citations],
+                        "titles": [citation.title for citation in knowledge_citations],
+                    },
+                    trace_id=trace_id,
+                )
+            )
+            answer = f"{answer}{summarize_knowledge_guidance(intent, knowledge_citations)}"
+
         if policy.decision == "allow":
             try:
                 bedrock_answer, route = maybe_generate_with_bedrock(
                     route,
                     sanitized_input=redaction.redacted_text,
                     intent=intent,
+                    knowledge_context=format_knowledge_context(knowledge_citations),
                     settings=settings,
                 )
                 if bedrock_answer:
@@ -519,7 +538,11 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     )
                 )
                 if tool_call.status == "allowed":
-                    answer = f"Ticket {tool_call.result['ticket_id']} was created for {actor.team} with medium severity."
+                    bedrock_answer_used = False
+                    answer = (
+                        f"Ticket {tool_call.result['ticket_id']} was created for {actor.team} with medium severity."
+                        f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
+                    )
 
             if intent == "production_admin_access":
                 tool_policy = policy_engine.evaluate_tool(actor.role, "access", "request_temporary_read_only")
@@ -549,9 +572,11 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         trace_id=trace_id,
                     )
                 )
+                bedrock_answer_used = False
                 answer = (
                     "Production admin access was denied. A safer temporary read-only access request "
                     f"was opened for manager approval: {approval.approval_id}."
+                    f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
                 )
 
             if intent == "cost_investigation":
@@ -581,6 +606,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     )
                 )
                 if tool_call.status == "allowed":
+                    bedrock_answer_used = False
                     source = tool_call.result.get("source", "cost_summary")
                     total = tool_call.result.get("total_usd", 0)
                     driver = tool_call.result.get("largest_driver", "unknown service")
@@ -589,8 +615,10 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         f"AWS cost summary from {source}: ${float(total):.2f} over the selected window. "
                         f"The largest driver is {driver}. Recommended control: {recommendation}."
                     )
+                    answer = f"{answer}{summarize_knowledge_guidance(intent, knowledge_citations)}"
                 else:
-                    answer = "Cost investigation requires manager or admin access."
+                    bedrock_answer_used = False
+                    answer = f"Cost investigation requires manager or admin access.{summarize_knowledge_guidance(intent, knowledge_citations)}"
         except PolicyUnavailable as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
@@ -602,11 +630,13 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             policy=policy,
             tool_calls=tool_calls,
             incident_context=incident_context,
+            knowledge_citations=knowledge_citations,
             answer_sources=build_answer_sources(
                 route=route,
                 policy=policy,
                 tool_calls=tool_calls,
                 incident_context=incident_context,
+                knowledge_citations=knowledge_citations,
                 bedrock_answer_used=bedrock_answer_used,
             ),
             trace_id=trace_id,
@@ -650,6 +680,7 @@ def build_answer_sources(
     policy,
     tool_calls,
     incident_context,
+    knowledge_citations,
     bedrock_answer_used: bool,
 ) -> list[AnswerSource]:
     sources: list[AnswerSource] = []
@@ -678,6 +709,15 @@ def build_answer_sources(
             detail=f"{policy.decision} from {policy.policy_name}: {policy.reason}.",
         )
     )
+
+    for citation in knowledge_citations:
+        sources.append(
+            AnswerSource(
+                kind="knowledge",
+                name=f"{citation.title} ({citation.doc_id})",
+                detail=f"{citation.section}; owner {citation.owner}; reviewed {citation.last_reviewed}.",
+            )
+        )
 
     if incident_context:
         sources.append(

@@ -102,6 +102,17 @@ Response:
     ],
     "suspected_cause": "Database connection pool saturation is the strongest signal."
   },
+  "knowledge_citations": [
+    {
+      "doc_id": "KB-CLOUDOPS-001",
+      "title": "Checkout Timeout Triage Runbook",
+      "source_path": "docs/knowledge/checkout-timeout-triage-runbook.md",
+      "section": "Initial Triage Sequence",
+      "owner": "CloudOps Platform Team",
+      "last_reviewed": "2026-05-01",
+      "excerpt": "1. Confirm the alert scope and user impact. 2. Compare the alert start time with the last checkout deployment..."
+    }
+  ],
   "answer_sources": [
     {
       "kind": "deterministic",
@@ -116,6 +127,12 @@ Response:
       "trusted": true
     },
     {
+      "kind": "knowledge",
+      "name": "Checkout Timeout Triage Runbook (KB-CLOUDOPS-001)",
+      "detail": "Initial Triage Sequence; owner CloudOps Platform Team; reviewed 2026-05-01.",
+      "trusted": true
+    },
+    {
       "kind": "operational_context",
       "name": "Seeded CloudWatch-style incident logs",
       "detail": "INC-1042; 4 entries from /aws/lambda/aegisdesk/checkout.",
@@ -126,7 +143,7 @@ Response:
 }
 ```
 
-`answer_sources` exists so reviewers can tell whether an answer came from deterministic backend logic, Amazon Bedrock, OPA/Rego policy, an MCP tool, seeded CloudWatch-style incident context, AWS Cost Explorer, or a cached cost summary.
+`knowledge_citations` identifies the trusted internal document excerpt used to ground the response. `answer_sources` exists so reviewers can tell whether an answer came from deterministic backend logic, Amazon Bedrock, OPA/Rego policy, an internal runbook or policy, an MCP tool, seeded CloudWatch-style incident context, AWS Cost Explorer, or a cached cost summary.
 
 ## Tool Calls Through /chat
 

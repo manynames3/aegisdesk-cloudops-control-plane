@@ -79,8 +79,18 @@ class IncidentContext(BaseModel):
     suspected_cause: str
 
 
+class KnowledgeCitation(BaseModel):
+    doc_id: str
+    title: str
+    source_path: str
+    section: str
+    owner: str
+    last_reviewed: str
+    excerpt: str
+
+
 class AnswerSource(BaseModel):
-    kind: Literal["deterministic", "model", "operational_context", "tool", "policy", "cost"]
+    kind: Literal["deterministic", "model", "knowledge", "operational_context", "tool", "policy", "cost"]
     name: str
     detail: str
     trusted: bool = True
@@ -94,6 +104,7 @@ class ChatResponse(BaseModel):
     policy: PolicyDecision
     tool_calls: list[ToolCall] = Field(default_factory=list)
     incident_context: IncidentContext | None = None
+    knowledge_citations: list[KnowledgeCitation] = Field(default_factory=list)
     answer_sources: list[AnswerSource] = Field(default_factory=list)
     trace_id: str
 

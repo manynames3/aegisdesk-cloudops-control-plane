@@ -511,6 +511,12 @@ button:disabled {
   padding-top: 12px;
 }
 
+.knowledgeCitations {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .sourceHeader,
 .sourceRow {
   align-items: center;
@@ -548,6 +554,35 @@ button:disabled {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.citationRow {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.citationRow > div {
+  display: grid;
+  gap: 2px;
+}
+
+.citationRow strong {
+  font-size: 13px;
+}
+
+.citationRow span,
+.citationRow p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.citationRow p {
+  margin: 0;
 }
 
 .incidentEvidence > div:first-child {

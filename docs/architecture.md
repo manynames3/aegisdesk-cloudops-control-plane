@@ -1,6 +1,6 @@
 # Architecture Overview
 
-AegisDesk is a local-first and hosted portfolio implementation of a CloudOps AI control plane. The current system sends employee, manager, and admin workflows through a FastAPI gateway that exchanges Cognito Hosted UI authorization codes, verifies Cognito ID tokens through JWKS, performs redaction, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, loads seeded CloudWatch-style incident context, queries AWS Cost Explorer for manager/admin cost investigations, emits OpenTelemetry spans, and writes audit/cache state to DynamoDB in the hosted environment.
+AegisDesk is a local-first and hosted portfolio implementation of a CloudOps AI control plane. The current system sends employee, manager, and admin workflows through a FastAPI gateway that exchanges Cognito Hosted UI authorization codes, verifies Cognito ID tokens through JWKS, performs redaction, retrieves trusted runbook or governance policy excerpts, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, loads seeded CloudWatch-style incident context, queries AWS Cost Explorer for manager/admin cost investigations, emits OpenTelemetry spans, and writes audit/cache state to DynamoDB in the hosted environment.
 
 ## Container Diagram
 
@@ -21,6 +21,7 @@ flowchart LR
         Auth["Amazon Cognito<br/>Hosted UI + ID tokens + JWKS<br/>Hosted identity boundary"]
         API["Gateway API<br/>FastAPI / Pydantic<br/>Validation, orchestration, audit"]
         Policy["Policy Engine<br/>OPA / Rego in Lambda or HTTP<br/>Routing, authorization, approval rules"]
+        Knowledge["Trusted Knowledge Base<br/>Markdown runbooks and policies<br/>Packaged with Lambda"]
         Router["Model Router<br/>Python module<br/>Local/Bedrock route selection"]
         Bedrock["Amazon Bedrock<br/>Nova Lite"]
         Tools["MCP Tool Server<br/>Python MCP SDK<br/>Ticket, access, cost, knowledge tools"]
@@ -45,6 +46,7 @@ flowchart LR
     APIGW --> Lambda
     Lambda --> API
     API --> Auth
+    API --> Knowledge
     API --> Policy
     API --> Quota
     API --> Router
@@ -66,12 +68,13 @@ flowchart LR
 2. The user signs in through Cognito Hosted UI or uses a labeled reviewer shortcut.
 3. The FastAPI gateway validates the bearer token and derives user, role, and team from Cognito/JWKS claims.
 4. The gateway inspects input for PII, secrets, and privileged-action intent.
-5. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
-6. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, and policy.
-7. For incident triage, the gateway loads read-only incident evidence from a seeded CloudWatch Logs-style source and records the lookup as a governed tool call.
-8. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
-9. The gateway writes audit events for redaction, policy, model route, incident context, tool calls, approvals, estimated cost, and trace IDs.
-10. The frontend shows the answer and decision metadata to the user, manager, or admin in plain English, with technical policy IDs underneath.
+5. The gateway retrieves trusted knowledge excerpts from packaged runbooks and governance policies based on request intent.
+6. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
+7. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, and policy.
+8. For incident triage, the gateway loads read-only incident evidence from a seeded CloudWatch Logs-style source and records the lookup as a governed tool call.
+9. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
+10. The gateway writes audit events for redaction, knowledge retrieval, policy, model route, incident context, tool calls, approvals, estimated cost, and trace IDs.
+11. The frontend shows the answer, trusted citations, and decision metadata to the user, manager, or admin in plain English, with technical policy IDs underneath.
 
 ## Deployment Shape
 
@@ -105,6 +108,7 @@ The current hosted deployment uses a low-idle-cost AWS shape:
 - DynamoDB table for durable audit events, approvals, model routes, metrics, quotas, and Cost Explorer cache entries
 - Amazon Bedrock Nova Lite for approved low-sensitivity prompts
 - AWS Cost Explorer for manager/admin cost investigations
+- packaged Markdown knowledge base for checkout triage, production access control, and AI/cloud cost governance
 - seeded CloudWatch Logs-style incident context for checkout latency triage
 - IAM execution role scoped to CloudWatch log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention

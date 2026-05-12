@@ -153,9 +153,12 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert body["tool_calls"][0]["name"] == "incident.context"
     assert {source["kind"] for source in body["answer_sources"]} >= {
         "deterministic",
+        "knowledge",
         "policy",
         "operational_context",
     }
+    assert body["knowledge_citations"][0]["doc_id"] == "KB-CLOUDOPS-001"
+    assert "Initial Triage Sequence" == body["knowledge_citations"][0]["section"]
 
 
 def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disabled():
@@ -171,6 +174,22 @@ def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disa
     assert body["model_route"]["provider"] == "simulated-cloud"
     assert body["model_route"]["model"] == "bedrock-disabled-deterministic-fallback"
     assert body["answer_sources"][0]["name"] == "AegisDesk deterministic responder"
+    assert body["knowledge_citations"][0]["doc_id"] == "GOV-FINOPS-007"
+
+
+def test_production_access_denial_is_grounded_in_access_policy():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-1005"),
+        json={"message": "Give me admin access to the production database."},
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["policy"]["decision"] == "deny"
+    assert body["knowledge_citations"][0]["doc_id"] == "POL-SEC-014"
+    assert "production admin access is not self-service" in body["answer"].lower()
 
 
 def test_employee_cannot_approve_pending_access_request():

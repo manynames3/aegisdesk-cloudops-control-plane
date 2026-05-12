@@ -80,15 +80,26 @@ type ChatResponse = {
     result: Record<string, JsonValue>;
   }[];
   incident_context?: IncidentContext | null;
+  knowledge_citations: KnowledgeCitation[];
   answer_sources: AnswerSource[];
   trace_id: string;
 };
 
 type AnswerSource = {
-  kind: "deterministic" | "model" | "operational_context" | "tool" | "policy" | "cost";
+  kind: "deterministic" | "model" | "knowledge" | "operational_context" | "tool" | "policy" | "cost";
   name: string;
   detail: string;
   trusted: boolean;
+};
+
+type KnowledgeCitation = {
+  doc_id: string;
+  title: string;
+  source_path: string;
+  section: string;
+  owner: string;
+  last_reviewed: string;
+  excerpt: string;
 };
 
 type IncidentContext = {
@@ -752,6 +763,9 @@ export default function Home() {
                     <p>{item.text}</p>
                     {item.response && <ResponseMeta response={item.response} />}
                     {item.response?.answer_sources?.length ? <AnswerSources sources={item.response.answer_sources} /> : null}
+                    {item.response?.knowledge_citations?.length ? (
+                      <KnowledgeCitations citations={item.response.knowledge_citations} />
+                    ) : null}
                     {item.response?.incident_context && <IncidentEvidence context={item.response.incident_context} />}
                   </div>
                 ))}
@@ -1011,6 +1025,26 @@ function AnswerSources({ sources }: { sources: AnswerSource[] }) {
   );
 }
 
+function KnowledgeCitations({ citations }: { citations: KnowledgeCitation[] }) {
+  return (
+    <div className="knowledgeCitations">
+      <div className="sourceHeader">
+        <ClipboardList size={16} />
+        <strong>Trusted citations</strong>
+      </div>
+      {citations.map((citation) => (
+        <div className="citationRow" key={citation.doc_id}>
+          <div>
+            <strong>{citation.title}</strong>
+            <span>{citation.doc_id} - {citation.section} - {citation.source_path}</span>
+          </div>
+          <p>{citation.excerpt}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DecisionTrail({ response }: { response: ChatResponse }) {
   const plainDecision = explainDecision(response);
   const redaction = response.redaction.findings.length
@@ -1027,7 +1061,7 @@ function DecisionTrail({ response }: { response: ChatResponse }) {
       <DecisionItem label="Technical policy" value={`${response.policy.policy_name}: ${response.policy.reason}`} />
       <DecisionItem label="Route" value={explainRoute(response)} />
       <DecisionItem label="Redaction" value={redaction} />
-      <DecisionItem label="Cost" value={`$${response.model_route.estimated_cost_usd.toFixed(4)}`} />
+      <DecisionItem label="Cost" value={formatUsd(response.model_route.estimated_cost_usd)} />
       <DecisionItem label="Trace" value={response.trace_id} />
     </div>
   );

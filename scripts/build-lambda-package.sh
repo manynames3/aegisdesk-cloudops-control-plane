@@ -21,6 +21,7 @@ python3 -m pip install \
 
 cp -R "$ROOT_DIR/services/api/app" "$BUILD_DIR/app"
 cp -R "$ROOT_DIR/policies" "$BUILD_DIR/policies"
+cp -R "$ROOT_DIR/docs/knowledge" "$BUILD_DIR/knowledge"
 mkdir -p "$BUILD_DIR/bin"
 curl -fsSL -o "$BUILD_DIR/bin/opa" "$OPA_DOWNLOAD_URL"
 chmod 755 "$BUILD_DIR/bin/opa"
