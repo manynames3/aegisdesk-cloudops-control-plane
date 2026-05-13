@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
@@ -8,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import AuthError, create_demo_token, decode_token, jwks_document, require_actor, require_admin, require_manager_or_admin
+from .clarification import assess_clarification, build_clarification_answer
 from .cognito_auth import CognitoSessionError, create_persona_session, ensure_persona_user, exchange_oauth_code
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
 from .incident_context import lookup_incident_context
@@ -22,6 +24,7 @@ from .models import (
     AuditEvent,
     ChatRequest,
     ChatResponse,
+    ClarificationResult,
     EventList,
     HealthResponse,
     HostedAuthConfig,
@@ -303,11 +306,27 @@ def seed_state(_actor: Annotated[Actor, Depends(require_admin)]):
         ),
         (
             reviewer_actor_for_role(Role.employee, "cloudops"),
-            ChatRequest(message="Create a ticket for the VPN outage and assign it to CloudOps."),
+            ChatRequest(
+                message=(
+                    "Create a SEV-2 ticket for the VPN outage affecting remote employees. "
+                    "Impact: users cannot connect to corporate VPN. Assign it to CloudOps."
+                )
+            ),
         ),
         (
             reviewer_actor_for_role(Role.employee, "payments"),
             ChatRequest(message="Give me admin access to the production database.", context={"incident_id": "INC-1042"}),
+        ),
+        (
+            reviewer_actor_for_role(Role.employee, "payments"),
+            ChatRequest(
+                message=(
+                    "I need temporary read-only access to the production payments database for INC-1042. "
+                    "Duration: 2 hours. Business reason: inspect connection pool metrics during active incident. "
+                    "Approver: payments manager."
+                ),
+                context={"incident_id": "INC-1042"},
+            ),
         ),
         (
             reviewer_actor_for_role(Role.manager, "payments"),
@@ -447,16 +466,37 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             )
 
         intent = classify_intent(request.message)
+        clarification = assess_clarification(intent, request, actor)
         knowledge_citations = retrieve_knowledge(intent, redaction.redacted_text)
         policy_input = {
             "actor": actor.model_dump(mode="json"),
             "intent": intent,
+            "clarification": clarification.model_dump(mode="json"),
             "redaction": {
                 "pii_detected": redaction.pii_detected,
                 "secrets_detected": redaction.secrets_detected,
             },
             "team": actor.team,
         }
+        if clarification.status != "complete":
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="clarification.requested",
+                    summary="Request needs additional details before a sensitive tool action can run.",
+                    metadata={
+                        "intent": intent,
+                        "status": clarification.status,
+                        "risk_level": clarification.risk_level,
+                        "missing_fields": clarification.missing_fields,
+                        "questions": clarification.questions,
+                        "blocks_tool_call": clarification.blocks_tool_call,
+                        "reason": clarification.reason,
+                    },
+                    trace_id=trace_id,
+                )
+            )
         try:
             with tracer.start_as_current_span("aegisdesk.policy.chat"):
                 policy = policy_engine.evaluate_chat(actor, intent)
@@ -488,6 +528,33 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     event_type="model.kill_switch_applied",
                     summary="Cloud model kill switch forced local routing before any external model call.",
                     metadata={"original_provider": "bedrock", "fallback_model": route.model},
+                    trace_id=trace_id,
+                )
+            )
+
+        if clarification.status != "complete":
+            route = route.model_copy(
+                update={
+                    "provider": "local",
+                    "model": "clarification-required-local-responder",
+                    "reason": "clarification_required_before_action_or_external_model",
+                    "estimated_cost_usd": 0.0,
+                    "external_call": False,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            )
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="model.route.adjusted",
+                    summary="Clarification requirement forced local response before any external model call.",
+                    metadata={
+                        "intent": intent,
+                        "clarification_status": clarification.status,
+                        "missing_fields": clarification.missing_fields,
+                    },
                     trace_id=trace_id,
                 )
             )
@@ -530,11 +597,14 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         tool_calls = []
         incident_context = None
         answer = build_answer(intent, redaction.redacted_text, policy.decision)
+        if clarification.status != "complete":
+            answer = build_clarification_answer(intent, clarification, policy.decision)
         bedrock_answer_used = False
 
-        if intent == "incident_triage":
+        incident_id = _incident_id_from_request(request)
+        if intent == "incident_triage" and incident_id:
             incident_context = lookup_incident_context(
-                str(request.context.get("incident_id") or "INC-1042"),
+                incident_id,
                 redaction.redacted_text,
             )
             tool_call = lookup_incident_context_tool(incident_context)
@@ -573,7 +643,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             )
             answer = f"{answer}{summarize_knowledge_guidance(intent, knowledge_citations)}"
 
-        if policy.decision == "allow":
+        if policy.decision == "allow" and clarification.status == "complete":
             try:
                 bedrock_answer, route = maybe_generate_with_bedrock(
                     route,
@@ -628,7 +698,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         )
 
         try:
-            if intent == "create_ticket":
+            if intent == "create_ticket" and not clarification.blocks_tool_call:
                 tool_policy = policy_engine.evaluate_tool(actor.role, "ticket", "create_ticket")
                 tool_call = create_ticket(tool_policy, "CloudOps support request", actor.team, "medium")
                 tool_calls.append(tool_call)
@@ -650,7 +720,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
                     )
 
-            if intent == "production_admin_access":
+            if intent == "production_admin_access" and not clarification.blocks_tool_call:
                 tool_policy = policy_engine.evaluate_tool(actor.role, "access", "request_temporary_read_only")
                 tool_call, approval = request_read_only_access(
                     request_id,
@@ -685,7 +755,42 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
                 )
 
-            if intent == "cost_investigation":
+            if intent == "temporary_read_only_access" and not clarification.blocks_tool_call:
+                tool_policy = policy_engine.evaluate_tool(actor.role, "access", "request_temporary_read_only")
+                tool_call, approval = request_read_only_access(
+                    request_id,
+                    actor.user_id,
+                    actor.role,
+                    actor.team,
+                    "Scoped temporary read-only production access request.",
+                    tool_policy,
+                )
+                tool_calls.append(tool_call)
+                store.add_approval(approval)
+                store.add_event(
+                    AuditEvent(
+                        request_id=request_id,
+                        actor=actor,
+                        event_type="approval.requested",
+                        summary="Scoped temporary read-only access was sent for manager approval.",
+                        metadata={
+                            "approval_id": approval.approval_id,
+                            "resource": approval.resource,
+                            "permission": approval.permission,
+                            "requester": approval.requester.user_id,
+                            "status": approval.status.value,
+                        },
+                        trace_id=trace_id,
+                    )
+                )
+                bedrock_answer_used = False
+                answer = (
+                    "Temporary read-only access was routed to a manager for approval. "
+                    f"Approval request: {approval.approval_id}."
+                    f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
+                )
+
+            if intent == "cost_investigation" and not clarification.blocks_tool_call:
                 tool_policy = policy_engine.evaluate_tool(actor.role, "cost", "view_summary")
                 cost_summary = None
                 if tool_policy.decision == "allow":
@@ -734,6 +839,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             tool_calls=tool_calls,
             incident_context=incident_context,
             knowledge_citations=knowledge_citations,
+            clarification=clarification,
             bedrock_answer_used=bedrock_answer_used,
         )
         trusted_source_score = build_trusted_source_score(
@@ -753,6 +859,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             incident_context=incident_context,
             knowledge_citations=knowledge_citations,
             answer_sources=answer_sources,
+            clarification=clarification,
             trusted_source_score=trusted_source_score,
             trace_id=trace_id,
         )
@@ -797,6 +904,7 @@ def build_request_replay(request_id: str, request_events: list[AuditEvent]) -> R
             tool_calls=snapshot.get("tool_calls") if isinstance(snapshot.get("tool_calls"), list) else [],
             answer_sources=snapshot.get("answer_sources") if isinstance(snapshot.get("answer_sources"), list) else [],
             knowledge_citations=snapshot.get("knowledge_citations") if isinstance(snapshot.get("knowledge_citations"), list) else [],
+            clarification=snapshot.get("clarification"),
             trusted_source_score=snapshot.get("trusted_source_score"),
             answer_preview=snapshot.get("answer_preview"),
             audit_events=ordered_events,
@@ -857,6 +965,7 @@ def build_replay_snapshot(
         "tool_calls": [tool.model_dump(mode="json") for tool in response.tool_calls],
         "answer_sources": [source.model_dump(mode="json") for source in response.answer_sources],
         "knowledge_citations": [citation.model_dump(mode="json") for citation in response.knowledge_citations],
+        "clarification": response.clarification.model_dump(mode="json") if response.clarification else None,
         "trusted_source_score": response.trusted_source_score.model_dump(mode="json"),
         "answer_preview": _preview(response.answer, 1000),
     }
@@ -900,6 +1009,7 @@ def build_answer_sources(
     tool_calls,
     incident_context,
     knowledge_citations,
+    clarification: ClarificationResult,
     bedrock_answer_used: bool,
 ) -> list[AnswerSource]:
     sources: list[AnswerSource] = []
@@ -928,6 +1038,18 @@ def build_answer_sources(
             detail=f"{policy.decision} from {policy.policy_name}: {policy.reason}.",
         )
     )
+
+    if clarification.status != "complete":
+        sources.append(
+            AnswerSource(
+                kind="clarification",
+                name="Risk-based clarification policy",
+                detail=(
+                    f"{clarification.status}; missing "
+                    f"{', '.join(clarification.missing_fields) or 'required context'}."
+                ),
+            )
+        )
 
     for citation in knowledge_citations:
         sources.append(
@@ -1057,6 +1179,18 @@ def _source_freshness(knowledge_citations) -> str:
 
     oldest_days = max((datetime.now(UTC) - reviewed_at).days for reviewed_at in reviewed_dates)
     return "fresh" if oldest_days <= 365 else "stale"
+
+
+def _incident_id_from_request(request: ChatRequest) -> str | None:
+    context_incident_id = request.context.get("incident_id")
+    if context_incident_id:
+        return str(context_incident_id)
+
+    match = re.search(r"\binc[-_ ]?(\d{3,})\b", request.message, re.IGNORECASE)
+    if match:
+        return f"INC-{match.group(1)}"
+
+    return None
 
 
 def _preview(value: str, limit: int = 240) -> str:

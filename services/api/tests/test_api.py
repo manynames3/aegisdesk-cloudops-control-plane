@@ -104,7 +104,7 @@ def test_role_spoofing_in_body_is_ignored():
     assert body["tool_calls"][0]["status"] == "approval_required"
 
 
-def test_admin_access_request_is_denied_and_creates_approval():
+def test_broad_admin_access_request_is_denied_and_waits_for_required_details():
     response = client.post(
         "/chat",
         headers=auth_headers(Role.employee, team="payments", user_id="u-1001"),
@@ -118,6 +118,31 @@ def test_admin_access_request_is_denied_and_creates_approval():
 
     assert response.status_code == 200
     assert body["policy"]["decision"] == "deny"
+    assert body["tool_calls"] == []
+    assert body["clarification"]["status"] == "blocked_pending_details"
+    assert "duration" in body["clarification"]["missing_fields"]
+    assert client.get("/metrics/summary", headers=auth_headers(Role.admin)).json()["approvals_pending"] == 0
+
+
+def test_scoped_read_only_access_request_creates_approval():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-1001"),
+        json={
+            "message": (
+                "I need temporary read-only access to the production payments database for INC-1042. "
+                "Duration: 2 hours. Business reason: inspect connection pool metrics during active incident. "
+                "Approver: payments manager."
+            ),
+            "context": {"incident_id": "INC-1042"},
+        },
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["policy"]["decision"] == "allow"
+    assert body["clarification"]["status"] == "complete"
     assert body["tool_calls"][0]["status"] == "approval_required"
     assert client.get("/metrics/summary", headers=auth_headers(Role.admin)).json()["approvals_pending"] == 1
 
@@ -126,7 +151,12 @@ def test_employee_can_create_ticket():
     response = client.post(
         "/chat",
         headers=auth_headers(Role.employee, team="cloudops", user_id="u-1002"),
-        json={"message": "Create a ticket for the VPN outage and assign it to CloudOps."},
+        json={
+            "message": (
+                "Create a SEV-2 ticket for the VPN outage affecting remote employees. "
+                "Impact: users cannot connect to corporate VPN. Assign it to CloudOps."
+            )
+        },
     )
 
     body = response.json()
@@ -137,11 +167,30 @@ def test_employee_can_create_ticket():
     assert body["tool_calls"][0]["result"]["ticket_id"].startswith("TCK-")
 
 
+def test_vague_ticket_request_waits_for_ticket_fields():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="cloudops", user_id="u-1002"),
+        json={"message": "Create a ticket for the app issue."},
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["policy"]["decision"] == "allow"
+    assert body["tool_calls"] == []
+    assert body["clarification"]["status"] == "blocked_pending_details"
+    assert "severity or priority" in body["clarification"]["missing_fields"]
+
+
 def test_timing_out_prompt_routes_as_incident_triage():
     response = client.post(
         "/chat",
         headers=auth_headers(Role.employee, team="payments", user_id="u-1003"),
-        json={"message": "The checkout service is timing out. What should I check first?"},
+        json={
+            "message": "The checkout service is timing out. What should I check first?",
+            "context": {"incident_id": "INC-1042"},
+        },
     )
 
     body = response.json()
@@ -161,6 +210,24 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert body["trusted_source_score"]["sensitive_data_sent_externally"] is False
     assert body["knowledge_citations"][0]["doc_id"] == "KB-CLOUDOPS-001"
     assert "Initial Triage Sequence" == body["knowledge_citations"][0]["section"]
+
+
+def test_vague_incident_request_returns_partial_guidance_without_log_lookup():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-1003"),
+        json={"message": "app is not working"},
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["policy"]["reason"] == "incident_triage_allowed_for_employee"
+    assert body["model_route"]["provider"] == "local"
+    assert body["incident_context"] is None
+    assert body["tool_calls"] == []
+    assert body["clarification"]["status"] == "partial_guidance"
+    assert "affected service or system" in body["clarification"]["missing_fields"]
 
 
 def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disabled():
@@ -198,7 +265,12 @@ def test_employee_cannot_approve_pending_access_request():
     client.post(
         "/chat",
         headers=auth_headers(Role.employee, team="payments", user_id="u-1001"),
-        json={"message": "Give me admin access to the production database."},
+        json={
+            "message": (
+                "I need temporary read-only access to the production payments database for INC-1042. "
+                "Duration: 2 hours. Business reason: inspect connection pool metrics during active incident."
+            )
+        },
     )
     approval_id = client.get("/approvals", headers=auth_headers(Role.manager)).json()["approvals"][0]["approval_id"]
 
@@ -239,7 +311,10 @@ def test_request_replay_contains_trace_packet():
     response = client.post(
         "/chat",
         headers=auth_headers(Role.employee, team="payments", user_id="u-replay"),
-        json={"message": "The checkout service is timing out. What should I check first?"},
+        json={
+            "message": "The checkout service is timing out. What should I check first?",
+            "context": {"incident_id": "INC-1042"},
+        },
     )
     request_id = response.json()["request_id"]
 
@@ -259,7 +334,12 @@ def test_approval_decisions_are_pending_only():
     client.post(
         "/chat",
         headers=auth_headers(Role.employee, team="payments", user_id="u-1001"),
-        json={"message": "Give me admin access to the production database."},
+        json={
+            "message": (
+                "I need temporary read-only access to the production payments database for INC-1042. "
+                "Duration: 2 hours. Business reason: inspect connection pool metrics during active incident."
+            )
+        },
     )
     approval_id = client.get("/approvals", headers=auth_headers(Role.manager)).json()["approvals"][0]["approval_id"]
 
@@ -277,7 +357,7 @@ def test_seed_demo_requires_admin_and_populates_governance_state():
 
     assert forbidden.status_code == 403
     assert response.status_code == 200
-    assert metrics["requests_total"] == 5
+    assert metrics["requests_total"] == 6
     assert metrics["redactions_total"] >= 2
     assert metrics["denied_actions"] == 1
     assert metrics["tool_calls_total"] >= 2

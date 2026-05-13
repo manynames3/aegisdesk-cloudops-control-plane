@@ -44,7 +44,9 @@ The audit event model is central to AegisDesk. The system should be able to expl
 | `redaction.completed` | Redaction ran before policy and model routing |
 | `pii.detected` | PII was found |
 | `secret.detected` | Secret-like value was found |
+| `clarification.requested` | Request needs additional details before a sensitive tool action can run |
 | `model.route.selected` | Model route was chosen |
+| `model.route.adjusted` | Route was changed by a runtime guardrail such as clarification or kill switch |
 | `model.fallback` | Bedrock was unavailable and deterministic fallback was used |
 | `model.kill_switch_applied` | Cloud model kill switch forced local routing |
 | `quota.allowed` | Request was within role/team quota |
@@ -73,7 +75,7 @@ The admin dashboard should not invent its own data. It should render summaries f
 
 The governance dashboard supports filtering these persisted records by request ID, user, policy decision, route, and tool so reviewers can inspect one workflow end to end instead of reading raw logs.
 
-Clicking an audit event opens the request replay viewer. The replay is built from the `response.completed` snapshot and correlated audit events, including sanitized prompt, redaction result, policy input/output, model route, governed tool calls, answer sources, trust score, and trace ID.
+Clicking an audit event opens the request replay viewer. The replay is built from the `response.completed` snapshot and correlated audit events, including sanitized prompt, redaction result, clarification result, policy input/output, model route, governed tool calls, answer sources, trust score, and trace ID.
 
 ## Approval Trail
 

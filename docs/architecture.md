@@ -68,14 +68,15 @@ flowchart LR
 2. The user signs in through Cognito Hosted UI or uses a labeled reviewer shortcut.
 3. The FastAPI gateway validates the bearer token and derives user, role, and team from Cognito/JWKS claims.
 4. The gateway inspects input for PII, secrets, and privileged-action intent.
-5. The gateway retrieves trusted knowledge excerpts from packaged runbooks and governance policies based on request intent.
-6. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
-7. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, and policy.
-8. For incident triage, the gateway loads read-only incident evidence from a seeded CloudWatch Logs-style source and records the lookup as a governed tool call.
-9. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
-10. The gateway calculates an answer trust score from trusted source presence, source freshness, external model use, sensitive-data routing, and policy result.
-11. The gateway writes audit events and a sanitized replay snapshot for redaction, policy input/output, model route, incident context, tool calls, approvals, answer sources, estimated cost, and trace IDs.
-12. The frontend shows the answer, trusted citations, decision metadata, trust score, and request replay to the user, manager, or admin in plain English, with technical policy IDs underneath.
+5. The gateway evaluates whether the request has the minimum required context for the requested action. Vague incident requests can receive safe first-step guidance, while ticket, access, and cost tool calls pause until required fields are present.
+6. The gateway retrieves trusted knowledge excerpts from packaged runbooks and governance policies based on request intent.
+7. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
+8. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, policy, and clarification status.
+9. For incident triage, the gateway loads read-only incident evidence from a seeded CloudWatch Logs-style source only when the request supplies a usable incident reference.
+10. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
+11. The gateway calculates an answer trust score from trusted source presence, source freshness, external model use, sensitive-data routing, and policy result.
+12. The gateway writes audit events and a sanitized replay snapshot for redaction, clarification, policy input/output, model route, incident context, tool calls, approvals, answer sources, estimated cost, and trace IDs.
+13. The frontend shows the answer, trusted citations, decision metadata, clarification status, trust score, and request replay to the user, manager, or admin in plain English, with technical policy IDs underneath.
 
 ## Deployment Shape
 
@@ -109,6 +110,7 @@ The current hosted deployment uses a low-idle-cost AWS shape:
 - DynamoDB table for durable audit events, approvals, model routes, metrics, quotas, and Cost Explorer cache entries
 - Amazon Bedrock Nova Lite for approved low-sensitivity prompts
 - Runtime guardrails for per-role quotas, prompt size limits, and cloud-model kill switch routing
+- risk-based clarification before governed tool execution
 - AWS Cost Explorer for manager/admin cost investigations
 - packaged Markdown knowledge base for checkout triage, production access control, and AI/cloud cost governance
 - seeded CloudWatch Logs-style incident context for checkout latency triage
@@ -132,6 +134,7 @@ The hosted deployment intentionally stays below production complexity. A product
 - The current system must distinguish real provider calls from deterministic fallback behavior.
 - Destructive cloud actions are mocked or approval-only in the portfolio MVP.
 - Policy must be enforced outside the model.
+- Vague requests must be handled safely without silently inventing operational scope.
 - Sensitive data controls happen before model routing.
 - Cloud model use must be optional so the app can run at low cost.
 - Audit events must be based on backend decisions, not invented dashboard values.

@@ -47,12 +47,13 @@ The visible Cognito credentials are demo-only portfolio accounts (`aegisdesk-emp
 
 - **Cloud incident triage:** summarize seeded CloudWatch-style incident logs, detect secrets, search runbooks, and recommend next steps.
 - **Access request governance:** deny unsafe production admin requests and route safer alternatives for approval.
+- **Risk-based clarification:** return safe first-step guidance for vague incidents, but pause tickets, access requests, and cost lookups until required scope, impact, duration, or ownership details are provided.
 - **Cost-aware model routing:** choose local or cloud models based on sensitivity, budget, and route policy.
 - **Source-grounded answers:** retrieve trusted runbook, access policy, and cost governance excerpts before producing an answer.
 - **Ticket automation:** create or check tickets through policy-gated MCP tools.
 - **Governance dashboard:** filter audit events by request, user, policy decision, route, and tool call.
 - **Request replay:** click an audit event to inspect the sanitized prompt, redaction result, policy input/output, model route, tool calls, answer sources, audit events, and trace ID.
-- **Guided walkthrough:** a four-step reviewer path shows redaction, policy denial, manager approval, Bedrock routing, and persisted audit evidence.
+- **Guided walkthrough:** a four-step reviewer path shows redaction, scoped access approval, Bedrock routing, and persisted audit evidence.
 
 ## Tech Stack
 
@@ -83,6 +84,7 @@ This is the current MVP stack and deployment shape:
 - **Real cost governance path:** manager/admin cost investigations call AWS Cost Explorer and cache results in DynamoDB to reduce repeated API calls.
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
 - **Trusted knowledge grounding:** incident, access, and cost answers retrieve internal Markdown runbooks and policies before response generation, then show citations with owner and review date.
+- **Clarify before action:** vague human requests are handled deliberately. The API can answer with safe guidance, but it blocks governed tool calls until the request includes the minimum fields a real operations team would need.
 - **Answer provenance:** chat responses include explicit source metadata so reviewers can see whether an answer came from deterministic control logic, Bedrock, OPA/Rego, internal knowledge, MCP tools, seeded incident context, Cost Explorer, or cache.
 - **Trusted source score:** every response shows whether a trusted source was found, source freshness, external model use, sensitive external data status, and policy result.
 - **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
@@ -141,6 +143,7 @@ Completed:
 - Cognito Hosted UI sign-in with backend OAuth code exchange and JWKS-verified ID tokens
 - Redaction, policy decisions, model route metadata, approvals, governed tool calls, and audit events
 - Trusted Markdown knowledge base with checkout runbook, production access policy, and AI/cloud cost governance policy
+- Risk-based clarification gate for vague incident, ticket, access, and cost requests
 - Cognito-backed persona tokens for the hosted portfolio environment
 - Amazon Bedrock Nova Lite route for approved low-sensitivity prompts
 - AWS Cost Explorer summaries for manager/admin cost investigations with DynamoDB caching

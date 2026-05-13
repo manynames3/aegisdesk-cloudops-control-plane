@@ -90,10 +90,29 @@ class KnowledgeCitation(BaseModel):
 
 
 class AnswerSource(BaseModel):
-    kind: Literal["deterministic", "model", "knowledge", "operational_context", "tool", "policy", "cost"]
+    kind: Literal[
+        "deterministic",
+        "model",
+        "knowledge",
+        "operational_context",
+        "tool",
+        "policy",
+        "cost",
+        "clarification",
+    ]
     name: str
     detail: str
     trusted: bool = True
+
+
+class ClarificationResult(BaseModel):
+    status: Literal["complete", "partial_guidance", "blocked_pending_details"]
+    risk_level: Literal["low", "medium", "high"]
+    missing_fields: list[str] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
+    can_answer_partially: bool = False
+    blocks_tool_call: bool = False
+    reason: str
 
 
 class TrustedSourceScore(BaseModel):
@@ -116,6 +135,7 @@ class ChatResponse(BaseModel):
     incident_context: IncidentContext | None = None
     knowledge_citations: list[KnowledgeCitation] = Field(default_factory=list)
     answer_sources: list[AnswerSource] = Field(default_factory=list)
+    clarification: ClarificationResult | None = None
     trusted_source_score: TrustedSourceScore
     trace_id: str
 
@@ -213,6 +233,7 @@ class RequestReplay(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
     answer_sources: list[AnswerSource] = Field(default_factory=list)
     knowledge_citations: list[KnowledgeCitation] = Field(default_factory=list)
+    clarification: ClarificationResult | None = None
     trusted_source_score: TrustedSourceScore | None = None
     answer_preview: str | None = None
     audit_events: list[AuditEvent] = Field(default_factory=list)

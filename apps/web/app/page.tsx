@@ -92,8 +92,19 @@ type ChatResponse = {
   incident_context?: IncidentContext | null;
   knowledge_citations: KnowledgeCitation[];
   answer_sources: AnswerSource[];
+  clarification?: ClarificationResult | null;
   trusted_source_score?: TrustedSourceScore;
   trace_id: string;
+};
+
+type ClarificationResult = {
+  status: "complete" | "partial_guidance" | "blocked_pending_details";
+  risk_level: "low" | "medium" | "high";
+  missing_fields: string[];
+  questions: string[];
+  can_answer_partially: boolean;
+  blocks_tool_call: boolean;
+  reason: string;
 };
 
 type TrustedSourceScore = {
@@ -107,7 +118,7 @@ type TrustedSourceScore = {
 };
 
 type AnswerSource = {
-  kind: "deterministic" | "model" | "knowledge" | "operational_context" | "tool" | "policy" | "cost";
+  kind: "deterministic" | "model" | "knowledge" | "operational_context" | "tool" | "policy" | "cost" | "clarification";
   name: string;
   detail: string;
   trusted: boolean;
@@ -161,6 +172,7 @@ type RequestReplay = {
   tool_calls: ChatResponse["tool_calls"];
   answer_sources: AnswerSource[];
   knowledge_citations: KnowledgeCitation[];
+  clarification?: ClarificationResult | null;
   trusted_source_score?: TrustedSourceScore | null;
   answer_preview?: string | null;
   audit_events: AuditEvent[];
@@ -247,12 +259,12 @@ const prompts = [
   {
     label: "Ticket",
     icon: ClipboardList,
-    text: "Create a ticket for the VPN outage and assign it to CloudOps."
+    text: "Create a SEV-2 ticket for the VPN outage affecting remote employees. Impact: users cannot connect to corporate VPN. Assign it to CloudOps."
   },
   {
     label: "Access",
     icon: KeyRound,
-    text: "Give me admin access to the production database."
+    text: "I need temporary read-only access to the production payments database for INC-1042. Duration: 2 hours. Business reason: inspect connection pool metrics during active incident. Approver: payments manager."
   },
   {
     label: "Cost",
@@ -269,8 +281,8 @@ const walkthroughSteps = [
     tab: "chat" as Tab
   },
   {
-    title: "Block production admin access",
-    detail: "Show a plain-English denial and create a safer read-only approval request.",
+    title: "Route scoped access for approval",
+    detail: "Show the required access details, manager approval route, and audit record.",
     role: "employee" as Role,
     tab: "chat" as Tab
   },
@@ -537,7 +549,7 @@ export default function Home() {
       headers,
       body: JSON.stringify({
         message: text,
-        context: { incident_id: "INC-1042" }
+        context: contextForPrompt(text)
       })
     });
 
@@ -827,6 +839,9 @@ export default function Home() {
                   <div className={`bubble ${item.role}`} key={`${item.role}-${index}`}>
                     <p>{item.text}</p>
                     {item.response && <ResponseMeta response={item.response} />}
+                    {item.response?.clarification && item.response.clarification.status !== "complete" && (
+                      <ClarificationPanel clarification={item.response.clarification} />
+                    )}
                     {item.response?.trusted_source_score && <TrustedScore score={item.response.trusted_source_score} compact />}
                     {item.response?.answer_sources?.length ? <AnswerSources sources={item.response.answer_sources} /> : null}
                     {item.response?.knowledge_citations?.length ? (
@@ -1046,6 +1061,11 @@ function ResponseMeta({ response }: { response: ChatResponse }) {
         {response.policy.decision}
       </Badge>
       <Badge tone={response.model_route.provider === "local" ? "neutral" : "warn"}>{response.model_route.provider}</Badge>
+      {response.clarification && response.clarification.status !== "complete" && (
+        <Badge tone={response.clarification.blocks_tool_call ? "warn" : "neutral"}>
+          {formatClarificationStatus(response.clarification.status)}
+        </Badge>
+      )}
       {(response.redaction.pii_detected || response.redaction.secrets_detected) && <Badge tone="warn">redacted</Badge>}
       {response.tool_calls.map((tool) => (
         <Badge key={tool.tool_call_id} tone={tool.status === "allowed" ? "good" : tool.status === "blocked" ? "bad" : "warn"}>
@@ -1087,6 +1107,28 @@ function TrustedScore({ score, compact = false }: { score: TrustedSourceScore; c
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function ClarificationPanel({ clarification }: { clarification: ClarificationResult }) {
+  return (
+    <div className="clarificationPanel">
+      <div className="sourceHeader">
+        <AlertTriangle size={16} />
+        <strong>{clarification.blocks_tool_call ? "Action waiting on details" : "More context improves this answer"}</strong>
+      </div>
+      <div className="trustFacts">
+        <span>{formatClarificationStatus(clarification.status)}</span>
+        <span>Risk: {clarification.risk_level}</span>
+        {clarification.blocks_tool_call && <span>Tool call paused</span>}
+      </div>
+      <p>Missing: {clarification.missing_fields.join(", ")}</p>
+      <ol>
+        {clarification.questions.map((question) => (
+          <li key={question}>{question}</li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -1156,6 +1198,12 @@ function RequestReplayPanel({ replay, isLoading }: { replay: RequestReplay | nul
       {replay.trusted_source_score && <TrustedScore score={replay.trusted_source_score} />}
       <ReplayBlock title="Prompt stored for replay" value={replay.sanitized_prompt ?? replay.prompt ?? "Unavailable"} />
       <ReplayBlock title="Answer preview" value={replay.answer_preview ?? "Unavailable"} />
+      {replay.clarification && replay.clarification.status !== "complete" && (
+        <ReplayBlock
+          title="Clarification gate"
+          value={`${formatClarificationStatus(replay.clarification.status)} - missing ${replay.clarification.missing_fields.join(", ")}`}
+        />
+      )}
       <div className="replayFacts">
         <span>Trace ID <strong>{replay.trace_id}</strong></span>
         <span>Redaction <strong>{describeReplayRedaction(replay)}</strong></span>
@@ -1227,7 +1275,7 @@ function AnswerSources({ sources }: { sources: AnswerSource[] }) {
       </div>
       {sources.map((source) => (
         <div className="sourceRow" key={`${source.kind}-${source.name}`}>
-          <Badge tone={source.kind === "model" ? "warn" : source.kind === "policy" ? "neutral" : "good"}>
+          <Badge tone={source.kind === "model" || source.kind === "clarification" ? "warn" : source.kind === "policy" ? "neutral" : "good"}>
             {source.kind.replaceAll("_", " ")}
           </Badge>
           <div>
@@ -1272,6 +1320,9 @@ function DecisionTrail({ response }: { response: ChatResponse }) {
   return (
     <div className="decisionStack">
       <DecisionItem label="Decision" value={plainDecision} emphasis />
+      {response.clarification && response.clarification.status !== "complete" && (
+        <DecisionItem label="Clarification" value={explainClarification(response.clarification)} />
+      )}
       <DecisionItem label="Answer source" value={sourceSummary} />
       {response.trusted_source_score && (
         <DecisionItem label="Trusted source score" value={`${response.trusted_source_score.score}/100 - ${response.trusted_source_score.source_freshness}`} />
@@ -1396,11 +1447,27 @@ function EventMetadata({ event }: { event: AuditEvent }) {
   return <small className="eventMeta">{values.join(" - ")}</small>;
 }
 
+function contextForPrompt(text: string): Record<string, string> {
+  const incidentMatch = text.match(/\binc[-_ ]?(\d{3,})\b/i);
+  if (incidentMatch) {
+    return { incident_id: `INC-${incidentMatch[1]}` };
+  }
+  if (/\b(checkout|connection pool|timing out|timeout)\b/i.test(text)) {
+    return { incident_id: "INC-1042" };
+  }
+  return {};
+}
+
 function explainDecision(response: ChatResponse) {
   const toolNames = response.tool_calls.map((tool) => tool.name);
 
+  if (response.clarification && response.clarification.status !== "complete") {
+    return response.clarification.blocks_tool_call
+      ? "Action paused until the request includes the required scope and business context."
+      : "Allowed to provide safe guidance, but more context is needed before using operational tools.";
+  }
   if (response.policy.reason === "employees_cannot_request_production_admin_access") {
-    return "Denied because Employee cannot request production admin access. A safer read-only request was opened for manager approval.";
+    return "Denied because Employee cannot request production admin access.";
   }
   if (response.policy.reason === "cost_investigation_requires_manager_or_admin") {
     return "Approval required because cost investigation is limited to Manager or Admin roles.";
@@ -1420,6 +1487,13 @@ function explainDecision(response: ChatResponse) {
   return response.policy.decision === "allow" ? "Allowed by role and policy." : "Policy requires review before this action can proceed.";
 }
 
+function explainClarification(clarification: ClarificationResult) {
+  if (clarification.blocks_tool_call) {
+    return `Tool call paused. Missing: ${clarification.missing_fields.join(", ")}.`;
+  }
+  return `Safe partial guidance returned. Missing: ${clarification.missing_fields.join(", ")}.`;
+}
+
 function explainRoute(response: ChatResponse) {
   if (response.model_route.provider === "local") {
     return `Kept local with ${response.model_route.model}: ${response.model_route.reason}.`;
@@ -1428,6 +1502,12 @@ function explainRoute(response: ChatResponse) {
     return `Sent to Amazon Bedrock (${response.model_route.model}) under the low-sensitivity route.`;
   }
   return `Used ${response.model_route.model}: ${response.model_route.reason}.`;
+}
+
+function formatClarificationStatus(status: ClarificationResult["status"]) {
+  if (status === "partial_guidance") return "partial guidance";
+  if (status === "blocked_pending_details") return "needs details";
+  return "complete";
 }
 
 function describeReplayRedaction(replay: RequestReplay) {

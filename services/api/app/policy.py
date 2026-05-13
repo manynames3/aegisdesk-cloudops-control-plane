@@ -13,15 +13,33 @@ QUOTA_LIMITS_BY_ROLE = {
 def classify_intent(message: str) -> str:
     lower = message.lower()
 
-    if "admin access" in lower and ("production" in lower or "prod" in lower or "database" in lower):
+    if ("admin access" in lower or "administrator access" in lower) and (
+        "production" in lower or "prod" in lower or "database" in lower
+    ):
         return "production_admin_access"
-    if "read-only" in lower or "read only" in lower:
+    if any(marker in lower for marker in ("read-only", "read only", "readonly", "api access", "iam", "permission", "grant access")):
         return "temporary_read_only_access"
-    if "create" in lower and "ticket" in lower:
+    if "ticket" in lower and any(marker in lower for marker in ("create", "open", "file", "raise")):
         return "create_ticket"
     if "cost" in lower or "spend" in lower or "spike" in lower:
         return "cost_investigation"
-    if "timeout" in lower or "timing out" in lower or "error" in lower or "incident" in lower or "log" in lower:
+    if any(
+        marker in lower
+        for marker in (
+            "timeout",
+            "timing out",
+            "error",
+            "incident",
+            "log",
+            "not working",
+            "broken",
+            "failing",
+            "failed",
+            "outage",
+            "down",
+            "degraded",
+        )
+    ):
         return "incident_triage"
     return "support_guidance"
 

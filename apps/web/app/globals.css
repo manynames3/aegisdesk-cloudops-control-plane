@@ -521,6 +521,31 @@ button:disabled {
   padding: 10px;
 }
 
+.clarificationPanel {
+  background: #ffffff;
+  border: 1px solid #f0c66a;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px;
+}
+
+.clarificationPanel p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.clarificationPanel ol {
+  color: var(--text);
+  display: grid;
+  font-size: 13px;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .trustScore.compact ul {
   display: none;
 }

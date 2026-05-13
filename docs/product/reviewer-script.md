@@ -86,7 +86,7 @@ Show:
 - Denied result
 - Plain-English denial explanation
 - OPA policy ID underneath
-- Safer alternative: temporary read-only access with approval
+- Clarification gate requiring scope, reason, duration, and least-privilege permission before any access request is opened
 - Backend-derived employee role from verified token claims
 
 Explain:
@@ -95,9 +95,11 @@ Explain:
 
 ## Flow 4: Manager Approval
 
-Manager approves:
+Employee submits a scoped alternative:
 
-> Temporary read-only database access for incident INC-1042, expires in 2 hours.
+> I need temporary read-only access to the production payments database for INC-1042. Duration: 2 hours. Business reason: inspect connection pool metrics during active incident.
+
+Manager approves the resulting request.
 
 Show:
 

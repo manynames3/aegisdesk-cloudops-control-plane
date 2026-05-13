@@ -140,6 +140,15 @@ Response:
       "trusted": true
     }
   ],
+  "clarification": {
+    "status": "complete",
+    "risk_level": "medium",
+    "missing_fields": [],
+    "questions": [],
+    "can_answer_partially": false,
+    "blocks_tool_call": false,
+    "reason": "Incident request includes enough context for read-only triage."
+  },
   "trusted_source_score": {
     "score": 100,
     "trusted_source_found": true,
@@ -157,6 +166,8 @@ Response:
 ```
 
 `knowledge_citations` identifies the trusted internal document excerpt used to ground the response. `answer_sources` exists so reviewers can tell whether an answer came from deterministic backend logic, Amazon Bedrock, OPA/Rego policy, an internal runbook or policy, an MCP tool, seeded CloudWatch-style incident context, AWS Cost Explorer, or a cached cost summary.
+
+`clarification` shows whether the gateway had enough business and operational context to take action. For example, a vague incident can return safe partial guidance, but ticket creation, access approval, and cost lookup tool calls are paused until the request includes required fields such as service, severity, impact, resource, duration, reason, or time window.
 
 `trusted_source_score` gives reviewers a plain-English quality and governance signal for each answer: trusted source presence, source freshness, external model use, sensitive external data status, and policy result.
 
@@ -229,6 +240,7 @@ Response includes:
 
 - `prompt` and `sanitized_prompt`
 - `redaction`
+- `clarification`
 - `policy_input` and `policy`
 - `model_route`
 - `tool_calls`
