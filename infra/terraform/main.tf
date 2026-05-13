@@ -280,6 +280,10 @@ resource "aws_lambda_function" "api" {
       AEGISDESK_ENABLE_BEDROCK           = "true"
       AEGISDESK_BEDROCK_MODEL_ID         = var.bedrock_model_id
       AEGISDESK_BEDROCK_MAX_TOKENS       = "180"
+      AEGISDESK_API_THROTTLE_RATE_LIMIT  = tostring(var.api_throttling_rate_limit)
+      AEGISDESK_API_THROTTLE_BURST_LIMIT = tostring(var.api_throttling_burst_limit)
+      AEGISDESK_MAX_REQUEST_CHARS        = tostring(var.max_request_chars)
+      AEGISDESK_CLOUD_MODEL_KILL_SWITCH  = tostring(var.cloud_model_kill_switch)
       AEGISDESK_ENABLE_COST_EXPLORER     = "true"
       AEGISDESK_COST_CACHE_TTL_SECONDS   = "21600"
       AEGISDESK_COST_EXPLORER_SCOPE      = "tagged"
@@ -328,6 +332,11 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.http.id
   name        = "$default"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = var.api_throttling_burst_limit
+    throttling_rate_limit  = var.api_throttling_rate_limit
+  }
 }
 
 resource "aws_lambda_permission" "api_gateway" {

@@ -51,6 +51,7 @@ The visible Cognito credentials are demo-only portfolio accounts (`aegisdesk-emp
 - **Source-grounded answers:** retrieve trusted runbook, access policy, and cost governance excerpts before producing an answer.
 - **Ticket automation:** create or check tickets through policy-gated MCP tools.
 - **Governance dashboard:** filter audit events by request, user, policy decision, route, and tool call.
+- **Request replay:** click an audit event to inspect the sanitized prompt, redaction result, policy input/output, model route, tool calls, answer sources, audit events, and trace ID.
 - **Guided walkthrough:** a four-step reviewer path shows redaction, policy denial, manager approval, Bedrock routing, and persisted audit evidence.
 
 ## Tech Stack
@@ -83,9 +84,11 @@ This is the current MVP stack and deployment shape:
 - **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
 - **Trusted knowledge grounding:** incident, access, and cost answers retrieve internal Markdown runbooks and policies before response generation, then show citations with owner and review date.
 - **Answer provenance:** chat responses include explicit source metadata so reviewers can see whether an answer came from deterministic control logic, Bedrock, OPA/Rego, internal knowledge, MCP tools, seeded incident context, Cost Explorer, or cache.
+- **Trusted source score:** every response shows whether a trusted source was found, source freshness, external model use, sensitive external data status, and policy result.
 - **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
 - **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, incident context, tool call, approval, cost estimate, and trace ID.
-- **Audit event explorer:** governance reviewers can filter persisted events by request ID, user, policy decision, model route, and tool.
+- **Request replay and audit explorer:** governance reviewers can filter persisted events and click into a full request trace packet for review.
+- **Abuse and cost controls:** per-role quotas, prompt size limits, API Gateway throttling, Bedrock fallback, and a cloud-model kill switch are visible in the product and configured through Terraform.
 - **Approval workflow evidence:** approval cards show requester, current status, approver identity, decision timestamp, and admin-only technical audit details.
 - **Durable cloud state:** hosted audit events, approvals, model routes, metrics, and quota counters persist in DynamoDB.
 - **Deployed AWS architecture:** Terraform provisions Cognito, a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, DynamoDB, Bedrock IAM, Cost Explorer access, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
@@ -146,6 +149,9 @@ Completed:
 - Guided walkthrough for recruiter review
 - Plain-English decision trail for policy, routing, approval, and redaction outcomes
 - Audit event explorer with filters for request ID, user, decision, route, and tool
+- Request replay viewer with sanitized prompt, redaction, policy input/output, model route, tool calls, answer sources, audit events, and trace ID
+- Trusted source score per answer with source freshness, external model, sensitive external data, and policy result indicators
+- API Gateway throttling, application request size limit, role quotas, and cloud-model kill switch controls
 - Approval timeline showing pending counts, approver identity, timestamps, and correlated audit events
 - Per-role/team quota counters and quota policy
 - Real MCP server using the Python MCP SDK

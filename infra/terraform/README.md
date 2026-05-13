@@ -7,6 +7,7 @@ This directory contains the low-cost AWS deployment path for AegisDesk.
 - Private S3 bucket for the exported static frontend
 - CloudFront distribution with origin access control
 - FastAPI Lambda zip package behind HTTP API Gateway
+- HTTP API Gateway default route throttling for abuse and cost control
 - Amazon Cognito user pool, app client, and role groups for hosted identity
 - DynamoDB table for hosted audit events, approvals, route history, metrics, quotas, and cached cost summaries
 - Amazon Bedrock Nova Lite invoke permission for approved low-sensitivity prompts
@@ -48,6 +49,12 @@ aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 ## Cost Guardrails
 
 The Terraform path includes an AWS Budget resource set by `monthly_budget_usd`, which defaults to `1`. The architecture avoids fixed-cost infrastructure; actual cost depends on request volume, log volume, and data transfer.
+
+Additional runtime guardrails are controlled through Terraform variables:
+
+- `api_throttling_rate_limit` and `api_throttling_burst_limit` configure HTTP API Gateway throttles.
+- `max_request_chars` rejects oversized prompts before policy or model routing.
+- `cloud_model_kill_switch` forces approved Bedrock routes back to local deterministic handling when cost or abuse risk is elevated.
 
 ## State Boundary
 

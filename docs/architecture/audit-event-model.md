@@ -9,7 +9,7 @@ The audit event model is central to AegisDesk. The system should be able to expl
 - Events include user and role context.
 - Events include policy decisions and reasons.
 - Events include trace IDs for operational debugging.
-- Sensitive values must be redacted before storage.
+- Sensitive values must be redacted before replay storage; request replay stores sanitized prompt data, not raw secrets.
 
 ## Base Event Shape
 
@@ -39,12 +39,14 @@ The audit event model is central to AegisDesk. The system should be able to expl
 
 | Event Type | Meaning |
 | --- | --- |
-| `request.received` | User submitted a request |
+| `request.received` | User submitted a request and sanitized replay data was stored |
+| `request.rejected` | Request was rejected before routing, usually by size or abuse controls |
+| `redaction.completed` | Redaction ran before policy and model routing |
 | `pii.detected` | PII was found |
 | `secret.detected` | Secret-like value was found |
-| `input.redacted` | Input was modified before model/tool use |
 | `model.route.selected` | Model route was chosen |
 | `model.fallback` | Bedrock was unavailable and deterministic fallback was used |
+| `model.kill_switch_applied` | Cloud model kill switch forced local routing |
 | `quota.allowed` | Request was within role/team quota |
 | `quota.denied` | Request exceeded role/team quota |
 | `incident.context.loaded` | Read-only incident context was loaded for triage |
@@ -55,13 +57,14 @@ The audit event model is central to AegisDesk. The system should be able to expl
 | `approval.denied` | Manager rejected an action |
 | `tool.called` | Governed tool was called |
 | `tool.blocked` | Tool call was blocked |
+| `response.completed` | Sanitized request replay snapshot was persisted |
 | `eval.failed` | Safety or policy evaluation failed |
 
 ## Dashboard Use
 
 The admin dashboard should not invent its own data. It should render summaries from the event model:
 
-- Redactions count comes from `pii.detected`, `secret.detected`, and `input.redacted`.
+- Redactions count comes from `pii.detected` and `secret.detected`.
 - Denied actions come from `policy.denied` and `tool.blocked`.
 - Approval metrics come from approval events.
 - Tool call history comes from `tool.called`.
@@ -69,6 +72,8 @@ The admin dashboard should not invent its own data. It should render summaries f
 - Incident evidence comes from `incident.context.loaded`.
 
 The governance dashboard supports filtering these persisted records by request ID, user, policy decision, route, and tool so reviewers can inspect one workflow end to end instead of reading raw logs.
+
+Clicking an audit event opens the request replay viewer. The replay is built from the `response.completed` snapshot and correlated audit events, including sanitized prompt, redaction result, policy input/output, model route, governed tool calls, answer sources, trust score, and trace ID.
 
 ## Approval Trail
 

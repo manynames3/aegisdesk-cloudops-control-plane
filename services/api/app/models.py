@@ -96,6 +96,16 @@ class AnswerSource(BaseModel):
     trusted: bool = True
 
 
+class TrustedSourceScore(BaseModel):
+    score: int = Field(ge=0, le=100)
+    trusted_source_found: bool
+    source_freshness: Literal["fresh", "stale", "unknown"]
+    external_model_used: bool
+    sensitive_data_sent_externally: bool
+    policy_result: str
+    rationale: list[str] = Field(default_factory=list)
+
+
 class ChatResponse(BaseModel):
     request_id: str
     answer: str
@@ -106,6 +116,7 @@ class ChatResponse(BaseModel):
     incident_context: IncidentContext | None = None
     knowledge_citations: list[KnowledgeCitation] = Field(default_factory=list)
     answer_sources: list[AnswerSource] = Field(default_factory=list)
+    trusted_source_score: TrustedSourceScore
     trace_id: str
 
 
@@ -187,6 +198,35 @@ class OAuthExchangeResponse(BaseModel):
 
 class EventList(BaseModel):
     events: list[AuditEvent]
+
+
+class RequestReplay(BaseModel):
+    request_id: str
+    trace_id: str
+    actor: Actor | None = None
+    prompt: str | None = None
+    sanitized_prompt: str | None = None
+    redaction: RedactionResult | None = None
+    policy_input: dict[str, Any] = Field(default_factory=dict)
+    policy: PolicyDecision | None = None
+    model_route: ModelRoute | None = None
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    answer_sources: list[AnswerSource] = Field(default_factory=list)
+    knowledge_citations: list[KnowledgeCitation] = Field(default_factory=list)
+    trusted_source_score: TrustedSourceScore | None = None
+    answer_preview: str | None = None
+    audit_events: list[AuditEvent] = Field(default_factory=list)
+
+
+class AbuseControls(BaseModel):
+    api_gateway_throttling_rate_limit: float
+    api_gateway_throttling_burst_limit: int
+    max_request_chars: int
+    quota_window_seconds: int
+    role_quotas: dict[str, int]
+    cloud_model_kill_switch: bool
+    bedrock_enabled: bool
+    request_body_limit_note: str
 
 
 class ApprovalList(BaseModel):

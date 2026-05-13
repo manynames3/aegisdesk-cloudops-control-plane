@@ -78,7 +78,8 @@ Response:
   "redaction": {
     "pii_detected": false,
     "secrets_detected": false,
-    "redacted_fields": []
+    "redacted_text": "The checkout service is timing out. What should I check first?",
+    "findings": []
   },
   "policy": {
     "decision": "allow",
@@ -139,11 +140,25 @@ Response:
       "trusted": true
     }
   ],
+  "trusted_source_score": {
+    "score": 100,
+    "trusted_source_found": true,
+    "source_freshness": "fresh",
+    "external_model_used": false,
+    "sensitive_data_sent_externally": false,
+    "policy_result": "allow",
+    "rationale": [
+      "Answer is grounded in internal runbook, policy, operational, or cost data.",
+      "No detected sensitive values were sent to an external model."
+    ]
+  },
   "trace_id": "trace-123"
 }
 ```
 
 `knowledge_citations` identifies the trusted internal document excerpt used to ground the response. `answer_sources` exists so reviewers can tell whether an answer came from deterministic backend logic, Amazon Bedrock, OPA/Rego policy, an internal runbook or policy, an MCP tool, seeded CloudWatch-style incident context, AWS Cost Explorer, or a cached cost summary.
+
+`trusted_source_score` gives reviewers a plain-English quality and governance signal for each answer: trusted source presence, source freshness, external model use, sensitive external data status, and policy result.
 
 ## Tool Calls Through /chat
 
@@ -201,6 +216,47 @@ Response:
       "trace_id": "trace-123"
     }
   ]
+}
+```
+
+## GET /requests/{request_id}/replay
+
+Requires manager or admin role.
+
+Returns a sanitized replay packet for a single request. The replay is designed for review and debugging, so it stores the redacted prompt rather than raw sensitive input.
+
+Response includes:
+
+- `prompt` and `sanitized_prompt`
+- `redaction`
+- `policy_input` and `policy`
+- `model_route`
+- `tool_calls`
+- `answer_sources` and `knowledge_citations`
+- `trusted_source_score`
+- correlated `audit_events`
+- `trace_id`
+
+## GET /controls/abuse
+
+Requires manager or admin role.
+
+Returns active production-style abuse and cost controls:
+
+```json
+{
+  "api_gateway_throttling_rate_limit": 5,
+  "api_gateway_throttling_burst_limit": 20,
+  "max_request_chars": 2000,
+  "quota_window_seconds": 86400,
+  "role_quotas": {
+    "employee": 25,
+    "manager": 50,
+    "admin": 100
+  },
+  "cloud_model_kill_switch": false,
+  "bedrock_enabled": true,
+  "request_body_limit_note": "Application rejects oversized prompts before policy/model routing; API Gateway enforces route throttles."
 }
 ```
 

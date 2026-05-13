@@ -45,6 +45,10 @@ class Settings:
     bedrock_input_price_per_1m_tokens: float
     bedrock_output_price_per_1m_tokens: float
     quota_window_seconds: int
+    max_request_chars: int
+    cloud_model_kill_switch: bool
+    api_throttling_rate_limit: float
+    api_throttling_burst_limit: int
     enable_cost_explorer: bool
     cost_cache_ttl_seconds: int
     cost_explorer_scope: str
@@ -87,6 +91,10 @@ def get_settings() -> Settings:
         bedrock_input_price_per_1m_tokens=float(os.getenv("AEGISDESK_BEDROCK_INPUT_PRICE_PER_1M_TOKENS", "0.06")),
         bedrock_output_price_per_1m_tokens=float(os.getenv("AEGISDESK_BEDROCK_OUTPUT_PRICE_PER_1M_TOKENS", "0.24")),
         quota_window_seconds=int(os.getenv("AEGISDESK_QUOTA_WINDOW_SECONDS", "86400")),
+        max_request_chars=int(os.getenv("AEGISDESK_MAX_REQUEST_CHARS", "2000")),
+        cloud_model_kill_switch=_env_bool("AEGISDESK_CLOUD_MODEL_KILL_SWITCH", False),
+        api_throttling_rate_limit=float(os.getenv("AEGISDESK_API_THROTTLE_RATE_LIMIT", "5")),
+        api_throttling_burst_limit=int(os.getenv("AEGISDESK_API_THROTTLE_BURST_LIMIT", "20")),
         enable_cost_explorer=_env_bool("AEGISDESK_ENABLE_COST_EXPLORER", False),
         cost_cache_ttl_seconds=int(os.getenv("AEGISDESK_COST_CACHE_TTL_SECONDS", "21600")),
         cost_explorer_scope=os.getenv("AEGISDESK_COST_EXPLORER_SCOPE", "tagged").lower(),

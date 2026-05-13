@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from .models import (
     Actor,
     AnswerSource,
     ApprovalList,
+    AbuseControls,
     AuditEvent,
     ChatRequest,
     ChatResponse,
@@ -28,10 +30,12 @@ from .models import (
     OAuthExchangeResponse,
     PersonaTokenRequest,
     PersonaTokenResponse,
+    RequestReplay,
     Role,
+    TrustedSourceScore,
 )
 from .observability import configure_observability, current_trace_id, tracer
-from .policy import classify_intent
+from .policy import QUOTA_LIMITS_BY_ROLE, classify_intent
 from .policy_engine import PolicyEngine, PolicyUnavailable
 from .redaction import inspect_and_redact
 from .settings import get_settings
@@ -184,9 +188,31 @@ def events(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> Event
     return EventList(events=list(reversed(store.events))[:100])
 
 
+@app.get("/requests/{request_id}/replay", response_model=RequestReplay)
+def request_replay(request_id: str, _actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> RequestReplay:
+    request_events = [event for event in store.events if event.request_id == request_id]
+    if not request_events:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="request_not_found")
+    return build_request_replay(request_id, request_events)
+
+
 @app.get("/metrics/summary")
 def metrics(_actor: Annotated[Actor, Depends(require_admin)]):
     return store.metrics()
+
+
+@app.get("/controls/abuse", response_model=AbuseControls)
+def abuse_controls(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> AbuseControls:
+    return AbuseControls(
+        api_gateway_throttling_rate_limit=settings.api_throttling_rate_limit,
+        api_gateway_throttling_burst_limit=settings.api_throttling_burst_limit,
+        max_request_chars=settings.max_request_chars,
+        quota_window_seconds=settings.quota_window_seconds,
+        role_quotas={role.value: limit for role, limit in QUOTA_LIMITS_BY_ROLE.items()},
+        cloud_model_kill_switch=settings.cloud_model_kill_switch,
+        bedrock_enabled=settings.enable_bedrock,
+        request_body_limit_note="Application rejects oversized prompts before policy/model routing; API Gateway enforces route throttles.",
+    )
 
 
 @app.get("/approvals", response_model=ApprovalList)
@@ -315,6 +341,26 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         span.set_attribute("aegisdesk.role", actor.role.value)
         span.set_attribute("aegisdesk.team", actor.team)
 
+        if len(request.message) > settings.max_request_chars:
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="request.rejected",
+                    summary="Request rejected before routing because it exceeded the prompt size limit.",
+                    metadata={
+                        "limit_chars": settings.max_request_chars,
+                        "actual_chars": len(request.message),
+                        "control": "max_request_chars",
+                    },
+                    trace_id=trace_id,
+                )
+            )
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"request_message_exceeds_{settings.max_request_chars}_chars",
+            )
+
         try:
             quota_count = store.quota_count(actor)
             quota = policy_engine.evaluate_quota(actor, quota_count)
@@ -346,19 +392,37 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             )
         )
 
+        with tracer.start_as_current_span("aegisdesk.redaction"):
+            redaction = inspect_and_redact(request.message)
         store.add_event(
             AuditEvent(
                 request_id=request_id,
                 actor=actor,
                 event_type="request.received",
-                summary="CloudOps request received.",
-                metadata={"team": actor.team},
+                summary="CloudOps request received and stored with sanitized replay data.",
+                metadata={
+                    "team": actor.team,
+                    "prompt_preview": _preview(redaction.redacted_text, 240),
+                    "sanitized_prompt": redaction.redacted_text,
+                },
                 trace_id=trace_id,
             )
         )
-
-        with tracer.start_as_current_span("aegisdesk.redaction"):
-            redaction = inspect_and_redact(request.message)
+        store.add_event(
+            AuditEvent(
+                request_id=request_id,
+                actor=actor,
+                event_type="redaction.completed",
+                summary="Prompt redaction completed before policy and model routing.",
+                metadata={
+                    "pii_detected": redaction.pii_detected,
+                    "secrets_detected": redaction.secrets_detected,
+                    "findings": [finding.label for finding in redaction.findings],
+                    "sanitized_prompt": redaction.redacted_text,
+                },
+                trace_id=trace_id,
+            )
+        )
         if redaction.pii_detected:
             store.add_event(
                 AuditEvent(
@@ -384,6 +448,15 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
 
         intent = classify_intent(request.message)
         knowledge_citations = retrieve_knowledge(intent, redaction.redacted_text)
+        policy_input = {
+            "actor": actor.model_dump(mode="json"),
+            "intent": intent,
+            "redaction": {
+                "pii_detected": redaction.pii_detected,
+                "secrets_detected": redaction.secrets_detected,
+            },
+            "team": actor.team,
+        }
         try:
             with tracer.start_as_current_span("aegisdesk.policy.chat"):
                 policy = policy_engine.evaluate_chat(actor, intent)
@@ -398,6 +471,26 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             provider_override=model_policy.metadata.get("provider"),
             reason_override=model_policy.reason,
         )
+        if route.provider == "bedrock" and settings.cloud_model_kill_switch:
+            route = route.model_copy(
+                update={
+                    "provider": "local",
+                    "model": "kill-switch-local-fallback",
+                    "reason": "cloud_model_kill_switch_enabled",
+                    "estimated_cost_usd": 0.0,
+                    "external_call": False,
+                }
+            )
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="model.kill_switch_applied",
+                    summary="Cloud model kill switch forced local routing before any external model call.",
+                    metadata={"original_provider": "bedrock", "fallback_model": route.model},
+                    trace_id=trace_id,
+                )
+            )
 
         if policy.decision == "deny":
             store.add_event(
@@ -406,7 +499,13 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     actor=actor,
                     event_type="policy.denied",
                     summary="Request denied by policy.",
-                    metadata={"intent": intent, "reason": policy.reason, "policy_engine": policy_engine.mode},
+                    metadata={
+                        "intent": intent,
+                        "reason": policy.reason,
+                        "policy_engine": policy_engine.mode,
+                        "policy_input": policy_input,
+                        "policy_output": policy.model_dump(mode="json"),
+                    },
                     trace_id=trace_id,
                 )
             )
@@ -417,7 +516,13 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     actor=actor,
                     event_type="policy.allowed" if policy.decision == "allow" else "approval.requested",
                     summary=f"Policy decision: {policy.decision}.",
-                    metadata={"intent": intent, "reason": policy.reason, "policy_engine": policy_engine.mode},
+                    metadata={
+                        "intent": intent,
+                        "reason": policy.reason,
+                        "policy_engine": policy_engine.mode,
+                        "policy_input": policy_input,
+                        "policy_output": policy.model_dump(mode="json"),
+                    },
                     trace_id=trace_id,
                 )
             )
@@ -516,6 +621,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     "external_call": route.external_call,
                     "input_tokens": route.input_tokens,
                     "output_tokens": route.output_tokens,
+                    "estimated_cost_usd": route.estimated_cost_usd,
                 },
                 trace_id=trace_id,
             )
@@ -622,7 +728,22 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         except PolicyUnavailable as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
-        return ChatResponse(
+        answer_sources = build_answer_sources(
+            route=route,
+            policy=policy,
+            tool_calls=tool_calls,
+            incident_context=incident_context,
+            knowledge_citations=knowledge_citations,
+            bedrock_answer_used=bedrock_answer_used,
+        )
+        trusted_source_score = build_trusted_source_score(
+            redaction=redaction,
+            policy=policy,
+            route=route,
+            answer_sources=answer_sources,
+            knowledge_citations=knowledge_citations,
+        )
+        response = ChatResponse(
             request_id=request_id,
             answer=answer,
             model_route=route,
@@ -631,16 +752,114 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             tool_calls=tool_calls,
             incident_context=incident_context,
             knowledge_citations=knowledge_citations,
-            answer_sources=build_answer_sources(
-                route=route,
-                policy=policy,
-                tool_calls=tool_calls,
-                incident_context=incident_context,
-                knowledge_citations=knowledge_citations,
-                bedrock_answer_used=bedrock_answer_used,
-            ),
+            answer_sources=answer_sources,
+            trusted_source_score=trusted_source_score,
             trace_id=trace_id,
         )
+        store.add_event(
+            AuditEvent(
+                request_id=request_id,
+                actor=actor,
+                event_type="response.completed",
+                summary="Response snapshot persisted for trace replay.",
+                metadata={
+                    "snapshot": build_replay_snapshot(
+                        actor=actor,
+                        request_id=request_id,
+                        trace_id=trace_id,
+                        sanitized_prompt=redaction.redacted_text,
+                        policy_input=policy_input,
+                        response=response,
+                    ),
+                    "trusted_source_score": trusted_source_score.model_dump(mode="json"),
+                },
+                trace_id=trace_id,
+            )
+        )
+        return response
+
+
+def build_request_replay(request_id: str, request_events: list[AuditEvent]) -> RequestReplay:
+    ordered_events = sorted(request_events, key=lambda event: (event.timestamp, event.event_id))
+    response_event = next((event for event in reversed(ordered_events) if event.event_type == "response.completed"), None)
+    snapshot = response_event.metadata.get("snapshot") if response_event and isinstance(response_event.metadata, dict) else None
+    if isinstance(snapshot, dict):
+        return RequestReplay(
+            request_id=request_id,
+            trace_id=str(snapshot.get("trace_id") or ordered_events[0].trace_id),
+            actor=snapshot.get("actor") or ordered_events[0].actor,
+            prompt=snapshot.get("prompt"),
+            sanitized_prompt=snapshot.get("sanitized_prompt"),
+            redaction=snapshot.get("redaction"),
+            policy_input=snapshot.get("policy_input") if isinstance(snapshot.get("policy_input"), dict) else {},
+            policy=snapshot.get("policy"),
+            model_route=snapshot.get("model_route"),
+            tool_calls=snapshot.get("tool_calls") if isinstance(snapshot.get("tool_calls"), list) else [],
+            answer_sources=snapshot.get("answer_sources") if isinstance(snapshot.get("answer_sources"), list) else [],
+            knowledge_citations=snapshot.get("knowledge_citations") if isinstance(snapshot.get("knowledge_citations"), list) else [],
+            trusted_source_score=snapshot.get("trusted_source_score"),
+            answer_preview=snapshot.get("answer_preview"),
+            audit_events=ordered_events,
+        )
+
+    request_event = next((event for event in ordered_events if event.event_type == "request.received"), ordered_events[0])
+    redaction_event = next((event for event in ordered_events if event.event_type == "redaction.completed"), None)
+    policy_event = next(
+        (event for event in ordered_events if event.event_type in {"policy.allowed", "policy.denied", "approval.requested"}),
+        None,
+    )
+    route_event = next((event for event in ordered_events if event.event_type == "model.route.selected"), None)
+
+    route = None
+    if route_event:
+        route = {
+            "provider": route_event.metadata.get("provider", "unknown"),
+            "model": route_event.metadata.get("model", "unknown"),
+            "reason": route_event.metadata.get("reason", "unknown"),
+            "estimated_cost_usd": route_event.metadata.get("estimated_cost_usd", 0),
+            "external_call": route_event.metadata.get("external_call", False),
+            "input_tokens": route_event.metadata.get("input_tokens", 0),
+            "output_tokens": route_event.metadata.get("output_tokens", 0),
+        }
+
+    return RequestReplay(
+        request_id=request_id,
+        trace_id=ordered_events[0].trace_id,
+        actor=ordered_events[0].actor,
+        prompt=request_event.metadata.get("prompt_preview") if isinstance(request_event.metadata, dict) else None,
+        sanitized_prompt=redaction_event.metadata.get("sanitized_prompt") if redaction_event else None,
+        policy_input=policy_event.metadata.get("policy_input") if policy_event and isinstance(policy_event.metadata.get("policy_input"), dict) else {},
+        policy=policy_event.metadata.get("policy_output") if policy_event else None,
+        model_route=route,
+        audit_events=ordered_events,
+    )
+
+
+def build_replay_snapshot(
+    *,
+    actor: Actor,
+    request_id: str,
+    trace_id: str,
+    sanitized_prompt: str,
+    policy_input: dict,
+    response: ChatResponse,
+) -> dict:
+    return {
+        "request_id": request_id,
+        "trace_id": trace_id,
+        "actor": actor.model_dump(mode="json"),
+        "prompt": _preview(sanitized_prompt, 500),
+        "sanitized_prompt": sanitized_prompt,
+        "redaction": response.redaction.model_dump(mode="json"),
+        "policy_input": policy_input,
+        "policy": response.policy.model_dump(mode="json"),
+        "model_route": response.model_route.model_dump(mode="json"),
+        "tool_calls": [tool.model_dump(mode="json") for tool in response.tool_calls],
+        "answer_sources": [source.model_dump(mode="json") for source in response.answer_sources],
+        "knowledge_citations": [citation.model_dump(mode="json") for citation in response.knowledge_citations],
+        "trusted_source_score": response.trusted_source_score.model_dump(mode="json"),
+        "answer_preview": _preview(response.answer, 1000),
+    }
 
 
 def reviewer_actor_for_role(role: Role, team: str | None = None) -> Actor:
@@ -757,3 +976,91 @@ def build_answer_sources(
         )
 
     return sources
+
+
+def build_trusted_source_score(
+    *,
+    redaction,
+    policy,
+    route,
+    answer_sources: list[AnswerSource],
+    knowledge_citations,
+) -> TrustedSourceScore:
+    trusted_source_found = any(
+        source.trusted and source.kind in {"knowledge", "operational_context", "cost"} for source in answer_sources
+    )
+    source_freshness = _source_freshness(knowledge_citations)
+    external_model_used = bool(route.external_call and route.provider == "bedrock")
+    sensitive_data_sent_externally = bool(external_model_used and (redaction.pii_detected or redaction.secrets_detected))
+    rationale: list[str] = []
+    score = 35
+
+    if trusted_source_found:
+        score += 25
+        rationale.append("Answer is grounded in internal runbook, policy, operational, or cost data.")
+    else:
+        rationale.append("No trusted internal source was attached to this answer.")
+
+    if source_freshness == "fresh":
+        score += 15
+        rationale.append("Attached knowledge sources were reviewed within the freshness window.")
+    elif source_freshness == "stale":
+        score += 5
+        rationale.append("At least one attached knowledge source is outside the freshness window.")
+    else:
+        rationale.append("No reviewed knowledge source date was available.")
+
+    if policy.decision == "allow":
+        score += 15
+        rationale.append("OPA policy allowed the request.")
+    elif policy.decision == "approval_required":
+        score += 8
+        rationale.append("OPA required human approval before the sensitive action can proceed.")
+    else:
+        rationale.append("OPA denied the requested action.")
+
+    if sensitive_data_sent_externally:
+        rationale.append("Sensitive data was detected on a request that attempted an external model route.")
+    else:
+        score += 10
+        rationale.append("No detected sensitive values were sent to an external model.")
+
+    if external_model_used:
+        rationale.append("Amazon Bedrock was used only after policy and redaction controls completed.")
+    else:
+        rationale.append("The answer did not require an external model call.")
+
+    return TrustedSourceScore(
+        score=min(score, 100),
+        trusted_source_found=trusted_source_found,
+        source_freshness=source_freshness,
+        external_model_used=external_model_used,
+        sensitive_data_sent_externally=sensitive_data_sent_externally,
+        policy_result=policy.decision,
+        rationale=rationale,
+    )
+
+
+def _source_freshness(knowledge_citations) -> str:
+    if not knowledge_citations:
+        return "unknown"
+
+    reviewed_dates = []
+    for citation in knowledge_citations:
+        try:
+            reviewed_at = datetime.fromisoformat(citation.last_reviewed)
+        except ValueError:
+            return "unknown"
+        if reviewed_at.tzinfo is None:
+            reviewed_at = reviewed_at.replace(tzinfo=UTC)
+        reviewed_dates.append(reviewed_at)
+
+    oldest_days = max((datetime.now(UTC) - reviewed_at).days for reviewed_at in reviewed_dates)
+    return "fresh" if oldest_days <= 365 else "stale"
+
+
+def _preview(value: str, limit: int = 240) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 3].rstrip()}..."

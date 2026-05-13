@@ -157,6 +157,8 @@ def test_timing_out_prompt_routes_as_incident_triage():
         "policy",
         "operational_context",
     }
+    assert body["trusted_source_score"]["trusted_source_found"] is True
+    assert body["trusted_source_score"]["sensitive_data_sent_externally"] is False
     assert body["knowledge_citations"][0]["doc_id"] == "KB-CLOUDOPS-001"
     assert "Initial Triage Sequence" == body["knowledge_citations"][0]["section"]
 
@@ -208,13 +210,49 @@ def test_employee_cannot_approve_pending_access_request():
 def test_governance_endpoints_require_admin_role():
     employee_events = client.get("/events", headers=auth_headers(Role.employee))
     employee_metrics = client.get("/metrics/summary", headers=auth_headers(Role.employee))
+    employee_controls = client.get("/controls/abuse", headers=auth_headers(Role.employee))
     manager_approvals = client.get("/approvals", headers=auth_headers(Role.manager))
     manager_events = client.get("/events", headers=auth_headers(Role.manager))
+    manager_controls = client.get("/controls/abuse", headers=auth_headers(Role.manager))
 
     assert employee_events.status_code == 403
     assert employee_metrics.status_code == 403
+    assert employee_controls.status_code == 403
     assert manager_approvals.status_code == 200
     assert manager_events.status_code == 200
+    assert manager_controls.status_code == 200
+    assert manager_controls.json()["role_quotas"]["employee"] == 25
+
+
+def test_oversized_prompt_is_rejected_before_model_routing():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-oversize"),
+        json={"message": "x" * 2001},
+    )
+
+    assert response.status_code == 413
+    assert store.metrics().requests_total == 0
+
+
+def test_request_replay_contains_trace_packet():
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-replay"),
+        json={"message": "The checkout service is timing out. What should I check first?"},
+    )
+    request_id = response.json()["request_id"]
+
+    replay = client.get(f"/requests/{request_id}/replay", headers=auth_headers(Role.manager))
+    body = replay.json()
+
+    assert replay.status_code == 200
+    assert body["request_id"] == request_id
+    assert body["sanitized_prompt"].startswith("The checkout service")
+    assert body["policy_input"]["intent"] == "incident_triage"
+    assert body["model_route"]["provider"] == "local"
+    assert body["trusted_source_score"]["trusted_source_found"] is True
+    assert "response.completed" in {event["event_type"] for event in body["audit_events"]}
 
 
 def test_approval_decisions_are_pending_only():

@@ -48,6 +48,12 @@ type MetricSummary = {
   tool_calls_total: number;
 };
 
+type Actor = {
+  user_id: string;
+  role: Role;
+  team: string;
+};
+
 type ChatResponse = {
   request_id: string;
   answer: string;
@@ -57,16 +63,20 @@ type ChatResponse = {
     reason: string;
     estimated_cost_usd: number;
     external_call: boolean;
+    input_tokens?: number;
+    output_tokens?: number;
   };
   redaction: {
     pii_detected: boolean;
     secrets_detected: boolean;
+    redacted_text?: string;
     findings: { kind: string; label: string; replacement: string }[];
   };
   policy: {
     decision: "allow" | "deny" | "approval_required";
     reason: string;
     policy_name: string;
+    metadata?: Record<string, JsonValue>;
   };
   tool_calls: {
     tool_call_id: string;
@@ -82,7 +92,18 @@ type ChatResponse = {
   incident_context?: IncidentContext | null;
   knowledge_citations: KnowledgeCitation[];
   answer_sources: AnswerSource[];
+  trusted_source_score?: TrustedSourceScore;
   trace_id: string;
+};
+
+type TrustedSourceScore = {
+  score: number;
+  trusted_source_found: boolean;
+  source_freshness: "fresh" | "stale" | "unknown";
+  external_model_used: boolean;
+  sensitive_data_sent_externally: boolean;
+  policy_result: string;
+  rationale: string[];
 };
 
 type AnswerSource = {
@@ -120,15 +141,40 @@ type AuditEvent = {
   event_id: string;
   request_id: string;
   timestamp: string;
-  actor: {
-    user_id: string;
-    role: Role;
-    team: string;
-  };
+  actor: Actor;
   event_type: string;
   summary: string;
   trace_id: string;
   metadata: Record<string, JsonValue>;
+};
+
+type RequestReplay = {
+  request_id: string;
+  trace_id: string;
+  actor?: Actor | null;
+  prompt?: string | null;
+  sanitized_prompt?: string | null;
+  redaction?: ChatResponse["redaction"] | null;
+  policy_input: Record<string, JsonValue>;
+  policy?: ChatResponse["policy"] | null;
+  model_route?: ChatResponse["model_route"] | null;
+  tool_calls: ChatResponse["tool_calls"];
+  answer_sources: AnswerSource[];
+  knowledge_citations: KnowledgeCitation[];
+  trusted_source_score?: TrustedSourceScore | null;
+  answer_preview?: string | null;
+  audit_events: AuditEvent[];
+};
+
+type AbuseControls = {
+  api_gateway_throttling_rate_limit: number;
+  api_gateway_throttling_burst_limit: number;
+  max_request_chars: number;
+  quota_window_seconds: number;
+  role_quotas: Record<string, number>;
+  cloud_model_kill_switch: boolean;
+  bedrock_enabled: boolean;
+  request_body_limit_note: string;
 };
 
 type Approval = {
@@ -261,6 +307,9 @@ export default function Home() {
   const [metrics, setMetrics] = useState<MetricSummary>(initialMetrics);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [abuseControls, setAbuseControls] = useState<AbuseControls | null>(null);
+  const [selectedReplay, setSelectedReplay] = useState<RequestReplay | null>(null);
+  const [isReplayLoading, setIsReplayLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [apiStatus, setApiStatus] = useState<"checking" | "ok" | "offline">("checking");
   const [authToken, setAuthToken] = useState<string | null>(null);
@@ -313,17 +362,19 @@ export default function Home() {
   async function refreshData(selectedRole = activeRole) {
     try {
       const headers = await authHeaders(selectedRole);
-      const [healthRes, metricsRes, eventsRes, approvalsRes] = await Promise.all([
+      const [healthRes, metricsRes, eventsRes, approvalsRes, controlsRes] = await Promise.all([
         fetch(`${API_BASE}/health`),
         fetch(`${API_BASE}/metrics/summary`, { headers }),
         fetch(`${API_BASE}/events`, { headers }),
-        fetch(`${API_BASE}/approvals`, { headers })
+        fetch(`${API_BASE}/approvals`, { headers }),
+        fetch(`${API_BASE}/controls/abuse`, { headers })
       ]);
 
       setApiStatus(healthRes.ok ? "ok" : "offline");
       setMetrics(metricsRes.ok ? await metricsRes.json() : initialMetrics);
       setEvents(eventsRes.ok ? (await eventsRes.json()).events : []);
       setApprovals(approvalsRes.ok ? (await approvalsRes.json()).approvals : []);
+      setAbuseControls(controlsRes.ok ? await controlsRes.json() : null);
     } catch {
       setApiStatus("offline");
     }
@@ -495,6 +546,20 @@ export default function Home() {
     }
 
     return (await response.json()) as ChatResponse;
+  }
+
+  async function loadReplay(requestId: string) {
+    setIsReplayLoading(true);
+    try {
+      const headers = await authHeaders(activeRole);
+      const response = await fetch(`${API_BASE}/requests/${requestId}/replay`, { headers });
+      if (!response.ok) throw new Error("replay_failed");
+      setSelectedReplay((await response.json()) as RequestReplay);
+    } catch {
+      setSelectedReplay(null);
+    } finally {
+      setIsReplayLoading(false);
+    }
   }
 
   async function sendChat(event?: FormEvent) {
@@ -762,6 +827,7 @@ export default function Home() {
                   <div className={`bubble ${item.role}`} key={`${item.role}-${index}`}>
                     <p>{item.text}</p>
                     {item.response && <ResponseMeta response={item.response} />}
+                    {item.response?.trusted_source_score && <TrustedScore score={item.response.trusted_source_score} compact />}
                     {item.response?.answer_sources?.length ? <AnswerSources sources={item.response.answer_sources} /> : null}
                     {item.response?.knowledge_citations?.length ? (
                       <KnowledgeCitations citations={item.response.knowledge_citations} />
@@ -851,6 +917,7 @@ export default function Home() {
             <Metric icon={AlertTriangle} label="Denied" value={metrics.denied_actions} />
             <Metric icon={KeyRound} label="Pending" value={metrics.approvals_pending} />
             <Metric icon={ClipboardList} label="Tools" value={metrics.tool_calls_total} />
+            {abuseControls && <AbuseControlsPanel controls={abuseControls} />}
 
             <section className="panel eventPanel">
               <div className="sectionHeader">
@@ -858,22 +925,30 @@ export default function Home() {
                 <span>{filteredEvents.length} of {events.length} shown</span>
               </div>
               <EventFilters filters={eventFilters} onChange={setEventFilters} />
-              <div className="eventList">
-                {filteredEvents.length === 0 && <div className="emptyRow">No matching audit events.</div>}
-                {filteredEvents.map((event) => (
-                  <div className="eventItem" key={event.event_id}>
-                    <Badge tone={event.event_type.includes("denied") || event.event_type.includes("blocked") ? "bad" : "neutral"}>
-                      {event.event_type}
-                    </Badge>
-                    <div>
-                      <strong>{event.summary}</strong>
-                      <span>
-                        {event.request_id} - {event.actor.user_id} - {event.actor.role} - {event.trace_id}
-                      </span>
-                      <EventMetadata event={event} />
-                    </div>
-                  </div>
-                ))}
+              <div className="eventExplorerLayout">
+                <div className="eventList">
+                  {filteredEvents.length === 0 && <div className="emptyRow">No matching audit events.</div>}
+                  {filteredEvents.map((event) => (
+                    <button
+                      className={selectedReplay?.request_id === event.request_id ? "eventItem selected" : "eventItem"}
+                      key={event.event_id}
+                      onClick={() => loadReplay(event.request_id)}
+                      type="button"
+                    >
+                      <Badge tone={event.event_type.includes("denied") || event.event_type.includes("blocked") ? "bad" : "neutral"}>
+                        {event.event_type}
+                      </Badge>
+                      <div>
+                        <strong>{event.summary}</strong>
+                        <span>
+                          {event.request_id} - {event.actor.user_id} - {event.actor.role} - {event.trace_id}
+                        </span>
+                        <EventMetadata event={event} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <RequestReplayPanel isLoading={isReplayLoading} replay={selectedReplay} />
               </div>
             </section>
           </div>
@@ -981,6 +1056,146 @@ function ResponseMeta({ response }: { response: ChatResponse }) {
   );
 }
 
+function TrustedScore({ score, compact = false }: { score: TrustedSourceScore; compact?: boolean }) {
+  const tone = score.score >= 80 ? "good" : score.score >= 60 ? "warn" : "bad";
+  const facts = [
+    score.trusted_source_found ? "Trusted source found" : "No trusted source",
+    `Freshness: ${score.source_freshness}`,
+    score.external_model_used ? "External model used" : "No external model",
+    score.sensitive_data_sent_externally ? "Sensitive external data" : "No sensitive external data",
+    `Policy: ${score.policy_result}`
+  ];
+
+  return (
+    <div className={compact ? "trustScore compact" : "trustScore"}>
+      <div className="trustScoreHeader">
+        <div>
+          <ShieldCheck size={16} />
+          <strong>Trusted source score</strong>
+        </div>
+        <Badge tone={tone}>{score.score}/100</Badge>
+      </div>
+      <div className="trustFacts">
+        {facts.map((fact) => (
+          <span key={fact}>{fact}</span>
+        ))}
+      </div>
+      {!compact && (
+        <ul>
+          {score.rationale.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AbuseControlsPanel({ controls }: { controls: AbuseControls }) {
+  return (
+    <section className="panel abusePanel">
+      <div className="sectionHeader">
+        <h2>Abuse Controls</h2>
+        <Badge tone={controls.cloud_model_kill_switch ? "bad" : "good"}>
+          {controls.cloud_model_kill_switch ? "kill switch on" : "cloud route enabled"}
+        </Badge>
+      </div>
+      <div className="abuseGrid">
+        <div>
+          <span>API Gateway throttle</span>
+          <strong>{controls.api_gateway_throttling_rate_limit}/sec</strong>
+          <small>Burst {controls.api_gateway_throttling_burst_limit}</small>
+        </div>
+        <div>
+          <span>Request size limit</span>
+          <strong>{controls.max_request_chars.toLocaleString()} chars</strong>
+          <small>Rejected before model routing</small>
+        </div>
+        <div>
+          <span>Role quotas</span>
+          <strong>{Object.entries(controls.role_quotas).map(([role, limit]) => `${role} ${limit}`).join(" / ")}</strong>
+          <small>{formatQuotaWindow(controls.quota_window_seconds)}</small>
+        </div>
+        <div>
+          <span>Bedrock access</span>
+          <strong>{controls.bedrock_enabled ? "Enabled" : "Disabled"}</strong>
+          <small>{controls.request_body_limit_note}</small>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RequestReplayPanel({ replay, isLoading }: { replay: RequestReplay | null; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <aside className="replayPanel">
+        <strong>Loading request replay...</strong>
+      </aside>
+    );
+  }
+
+  if (!replay) {
+    return (
+      <aside className="replayPanel emptyReplay">
+        <strong>Request replay</strong>
+        <span>Click any audit event to inspect the prompt, redaction, policy, route, tool calls, sources, and trace.</span>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="replayPanel">
+      <div className="replayHeader">
+        <div>
+          <strong>Request replay</strong>
+          <span>{replay.request_id}</span>
+        </div>
+        <Badge tone="neutral">{replay.actor?.role ?? "unknown"}</Badge>
+      </div>
+      {replay.trusted_source_score && <TrustedScore score={replay.trusted_source_score} />}
+      <ReplayBlock title="Prompt stored for replay" value={replay.sanitized_prompt ?? replay.prompt ?? "Unavailable"} />
+      <ReplayBlock title="Answer preview" value={replay.answer_preview ?? "Unavailable"} />
+      <div className="replayFacts">
+        <span>Trace ID <strong>{replay.trace_id}</strong></span>
+        <span>Redaction <strong>{describeReplayRedaction(replay)}</strong></span>
+        <span>Model route <strong>{replay.model_route ? `${replay.model_route.provider} / ${replay.model_route.model}` : "unknown"}</strong></span>
+        <span>Tool calls <strong>{replay.tool_calls.length ? replay.tool_calls.map((tool) => tool.name).join(", ") : "none"}</strong></span>
+      </div>
+      <details className="replayDetails" open>
+        <summary>Policy input and output</summary>
+        <pre>{formatJson({ input: replay.policy_input, output: replay.policy })}</pre>
+      </details>
+      <details className="replayDetails">
+        <summary>Answer sources</summary>
+        <pre>{formatJson({ sources: replay.answer_sources, citations: replay.knowledge_citations })}</pre>
+      </details>
+      <details className="replayDetails">
+        <summary>Audit events</summary>
+        <div className="auditMiniList">
+          {replay.audit_events.map((event) => (
+            <div key={event.event_id}>
+              <Badge tone={event.event_type.includes("denied") || event.event_type.includes("blocked") ? "bad" : "neutral"}>
+                {event.event_type}
+              </Badge>
+              <span>{event.summary}</span>
+            </div>
+          ))}
+        </div>
+      </details>
+    </aside>
+  );
+}
+
+function ReplayBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="replayBlock">
+      <span>{title}</span>
+      <p>{value}</p>
+    </div>
+  );
+}
+
 function IncidentEvidence({ context }: { context: IncidentContext }) {
   return (
     <div className="incidentEvidence">
@@ -1058,6 +1273,9 @@ function DecisionTrail({ response }: { response: ChatResponse }) {
     <div className="decisionStack">
       <DecisionItem label="Decision" value={plainDecision} emphasis />
       <DecisionItem label="Answer source" value={sourceSummary} />
+      {response.trusted_source_score && (
+        <DecisionItem label="Trusted source score" value={`${response.trusted_source_score.score}/100 - ${response.trusted_source_score.source_freshness}`} />
+      )}
       <DecisionItem label="Technical policy" value={`${response.policy.policy_name}: ${response.policy.reason}`} />
       <DecisionItem label="Route" value={explainRoute(response)} />
       <DecisionItem label="Redaction" value={redaction} />
@@ -1210,6 +1428,24 @@ function explainRoute(response: ChatResponse) {
     return `Sent to Amazon Bedrock (${response.model_route.model}) under the low-sensitivity route.`;
   }
   return `Used ${response.model_route.model}: ${response.model_route.reason}.`;
+}
+
+function describeReplayRedaction(replay: RequestReplay) {
+  if (!replay.redaction) return "unknown";
+  if (replay.redaction.secrets_detected && replay.redaction.pii_detected) return "secret and PII removed";
+  if (replay.redaction.secrets_detected) return "secret removed";
+  if (replay.redaction.pii_detected) return "PII removed";
+  return "none";
+}
+
+function formatJson(value: unknown) {
+  return JSON.stringify(value, null, 2);
+}
+
+function formatQuotaWindow(seconds: number) {
+  if (seconds >= 86400) return `${Math.round(seconds / 86400)} day window`;
+  if (seconds >= 3600) return `${Math.round(seconds / 3600)} hour window`;
+  return `${seconds} second window`;
 }
 
 function formatTime(value?: string | null) {

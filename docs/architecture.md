@@ -73,8 +73,9 @@ flowchart LR
 7. The model router chooses a local/deterministic route or Amazon Bedrock based on sensitivity, budget, and policy.
 8. For incident triage, the gateway loads read-only incident evidence from a seeded CloudWatch Logs-style source and records the lookup as a governed tool call.
 9. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
-10. The gateway writes audit events for redaction, knowledge retrieval, policy, model route, incident context, tool calls, approvals, estimated cost, and trace IDs.
-11. The frontend shows the answer, trusted citations, and decision metadata to the user, manager, or admin in plain English, with technical policy IDs underneath.
+10. The gateway calculates an answer trust score from trusted source presence, source freshness, external model use, sensitive-data routing, and policy result.
+11. The gateway writes audit events and a sanitized replay snapshot for redaction, policy input/output, model route, incident context, tool calls, approvals, answer sources, estimated cost, and trace IDs.
+12. The frontend shows the answer, trusted citations, decision metadata, trust score, and request replay to the user, manager, or admin in plain English, with technical policy IDs underneath.
 
 ## Deployment Shape
 
@@ -103,10 +104,11 @@ The Docker Compose path is available when Docker is installed:
 The current hosted deployment uses a low-idle-cost AWS shape:
 
 - private S3 bucket and CloudFront distribution for the static frontend
-- FastAPI Lambda zip package behind HTTP API Gateway
+- FastAPI Lambda zip package behind HTTP API Gateway with default route throttling
 - Amazon Cognito user pool, Hosted UI domain, app client, role groups, OAuth code flow with PKCE, and JWKS verification
 - DynamoDB table for durable audit events, approvals, model routes, metrics, quotas, and Cost Explorer cache entries
 - Amazon Bedrock Nova Lite for approved low-sensitivity prompts
+- Runtime guardrails for per-role quotas, prompt size limits, and cloud-model kill switch routing
 - AWS Cost Explorer for manager/admin cost investigations
 - packaged Markdown knowledge base for checkout triage, production access control, and AI/cloud cost governance
 - seeded CloudWatch Logs-style incident context for checkout latency triage
