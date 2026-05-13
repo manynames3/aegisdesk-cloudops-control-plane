@@ -20,3 +20,13 @@ python3 -m venv .venv
 ```
 
 The default transport is stdio, which is the expected mode for local MCP clients.
+
+## Use With Codex
+
+From the repository root:
+
+```bash
+codex mcp add aegisdesk-cloudops -- "$(pwd)/scripts/run-mcp-tools.sh"
+```
+
+Then restart Codex or open a new session. See [Codex MCP Integration](../../docs/integrations/codex-mcp.md) for the smoke test and operating boundary.

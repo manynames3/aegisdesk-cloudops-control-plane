@@ -129,6 +129,7 @@ Architecture docs:
 - [System Architecture](docs/architecture/system-architecture.md)
 - [API Contracts](docs/architecture/api-contracts.md)
 - [Audit Event Model](docs/architecture/audit-event-model.md)
+- [Codex MCP Integration](docs/integrations/codex-mcp.md)
 - [Trusted Knowledge Base](docs/knowledge/README.md)
 - [ADRs](docs/adrs/README.md)
 - [Threat Model](docs/security/threat-model.md)
@@ -240,6 +241,7 @@ Local checks:
 npm run build:web
 npm run test:api
 npm run evals
+npm run smoke:mcp
 opa test policies
 terraform -chdir=infra/terraform fmt -check
 terraform -chdir=infra/terraform validate
