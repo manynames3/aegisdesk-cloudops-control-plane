@@ -21,6 +21,24 @@ The workflow has two jobs:
 - `plan`: assumes the deploy role through OIDC, builds the Lambda package, initializes Terraform, validates, and runs `terraform plan`.
 - `apply`: runs only when the workflow input is exactly `deploy`, uses the `aws-portfolio` GitHub environment, reruns plan, applies Terraform, publishes the static frontend, invalidates CloudFront, and smoke-tests `/health`.
 
+Successful GitHub Actions verification:
+
+| Run | Input | Result |
+| --- | --- | --- |
+| [25779533980](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/25779533980) | `confirm=plan` | OIDC credential exchange, Lambda package build, Terraform init, validate, and plan passed. |
+| [25779565098](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/25779565098) | `confirm=deploy` | Plan and manually gated apply path passed, including Terraform apply, static frontend publish, CloudFront invalidation, and API smoke test. |
+
+Post-deploy endpoint checks:
+
+```text
+GET https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health
+{"status":"ok","service":"aegisdesk-api","mode":"hosted"}
+
+HEAD https://d27myiy7bbj1rz.cloudfront.net/marketing
+HTTP/2 200
+content-type: text/html
+```
+
 ## Lambda Logs
 
 The API Lambda writes structured request logs to CloudWatch Logs.
@@ -98,4 +116,3 @@ aws logs filter-log-events --log-group-name /aws/lambda/aegisdesk-portfolio-api 
 aws budgets describe-budget --account-id 636305658578 --budget-name aegisdesk-portfolio-monthly-guardrail
 aws apigatewayv2 get-stages --api-id c2wcg4cdef
 ```
-
