@@ -348,6 +348,14 @@ resource "aws_iam_role_policy" "github_deploy" {
         Resource = "*"
       },
       {
+        Sid    = "ListAccountOidcProviders"
+        Effect = "Allow"
+        Action = [
+          "iam:ListOpenIDConnectProviders"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "ManageAegisDeskIam"
         Effect = "Allow"
         Action = [
@@ -359,7 +367,6 @@ resource "aws_iam_role_policy" "github_deploy" {
           "iam:GetRolePolicy",
           "iam:ListAttachedRolePolicies",
           "iam:ListInstanceProfilesForRole",
-          "iam:ListOpenIDConnectProviders",
           "iam:ListRolePolicies",
           "iam:ListRoleTags",
           "iam:PassRole",
