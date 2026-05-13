@@ -63,3 +63,15 @@ variable "allowed_cors_origins" {
   type        = list(string)
   default     = ["http://localhost:3000", "http://127.0.0.1:3000"]
 }
+
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the AWS deployment role through GitHub Actions OIDC."
+  type        = string
+  default     = "manynames3/aegisdesk-cloudops-control-plane"
+}
+
+variable "github_deploy_environment" {
+  description = "GitHub environment name used for the manually gated AWS apply job."
+  type        = string
+  default     = "aws-portfolio"
+}

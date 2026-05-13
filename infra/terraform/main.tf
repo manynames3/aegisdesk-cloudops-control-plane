@@ -1,5 +1,9 @@
 data "aws_caller_identity" "current" {}
 
+data "aws_iam_openid_connect_provider" "github_actions" {
+  url = "https://token.actions.githubusercontent.com"
+}
+
 locals {
   name            = "${var.project_name}-${var.environment}"
   account_id      = data.aws_caller_identity.current.account_id
@@ -13,6 +17,11 @@ locals {
     ManagedBy   = "Terraform"
     CostOwner   = "cloudops"
   }
+
+  github_actions_allowed_subjects = [
+    "repo:${var.github_repository}:ref:refs/heads/main",
+    "repo:${var.github_repository}:environment:${var.github_deploy_environment}"
+  ]
 }
 
 resource "random_password" "persona_password_seed" {
@@ -242,6 +251,135 @@ resource "aws_iam_role_policy" "api_lambda" {
           "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0",
           "arn:aws:bedrock:*:${local.account_id}:inference-profile/${var.bedrock_model_id}"
         ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "github_deploy" {
+  name = "${local.name}-github-deploy"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = data.aws_iam_openid_connect_provider.github_actions.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = local.github_actions_allowed_subjects
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "github_deploy" {
+  name = "${local.name}-github-deploy"
+  role = aws_iam_role.github_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "TerraformStateBackend"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
+        ]
+        Resource = "arn:aws:s3:::aegisdesk-terraform-state-${local.account_id}-${var.aws_region}"
+      },
+      {
+        Sid    = "TerraformStateObjects"
+        Effect = "Allow"
+        Action = [
+          "s3:DeleteObject",
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::aegisdesk-terraform-state-${local.account_id}-${var.aws_region}/aegisdesk/${var.environment}/terraform.tfstate",
+          "arn:aws:s3:::aegisdesk-terraform-state-${local.account_id}-${var.aws_region}/aegisdesk/${var.environment}/terraform.tfstate.tflock"
+        ]
+      },
+      {
+        Sid    = "ManageAegisDeskStorage"
+        Effect = "Allow"
+        Action = [
+          "s3:*"
+        ]
+        Resource = [
+          aws_s3_bucket.artifacts.arn,
+          "${aws_s3_bucket.artifacts.arn}/*",
+          aws_s3_bucket.web.arn,
+          "${aws_s3_bucket.web.arn}/*"
+        ]
+      },
+      {
+        Sid    = "ManageAegisDeskRegionalResources"
+        Effect = "Allow"
+        Action = [
+          "apigateway:*",
+          "budgets:*",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "cognito-idp:*",
+          "dynamodb:*",
+          "lambda:*",
+          "logs:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ManageAegisDeskCloudFront"
+        Effect = "Allow"
+        Action = [
+          "cloudfront:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ManageAegisDeskIam"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:DeleteRolePolicy",
+          "iam:GetOpenIDConnectProvider",
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
+          "iam:ListRolePolicies",
+          "iam:ListRoleTags",
+          "iam:PassRole",
+          "iam:PutRolePolicy",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:UpdateAssumeRolePolicy"
+        ]
+        Resource = [
+          aws_iam_role.api_lambda.arn,
+          aws_iam_role.github_deploy.arn,
+          data.aws_iam_openid_connect_provider.github_actions.arn
+        ]
+      },
+      {
+        Sid    = "ReadAccountIdentity"
+        Effect = "Allow"
+        Action = [
+          "sts:GetCallerIdentity"
+        ]
+        Resource = "*"
       }
     ]
   })

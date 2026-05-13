@@ -18,6 +18,10 @@ These screenshots are captured from the app and show the core control-plane work
 
 ![Manager approvals](screenshots/manager-approvals.png)
 
+## Live Operations
+
+- [Live operations evidence](live-operations.md): GitHub OIDC deploy role, Lambda log retention and sample logs, AWS Budget guardrail, and API Gateway throttling.
+
 ## Boundary
 
 The app does not modify cloud resources directly through chat tools. The hosted environment uses low-cost AWS resources provisioned by Terraform, calls Bedrock and Cost Explorer only through policy-gated paths, and includes a configurable budget guardrail.

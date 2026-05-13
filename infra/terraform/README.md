@@ -17,6 +17,7 @@ This directory contains the low-cost AWS deployment path for AegisDesk.
 - S3 public access block, server-side encryption, versioning, and noncurrent version cleanup
 - S3 backend for shared Terraform state
 - AWS Budget capped at the configured threshold
+- GitHub Actions OIDC deploy role for keyless CI/CD
 - Consistent default tags for ownership and cost tracking
 
 ## Why This Shape
@@ -46,6 +47,23 @@ aws s3 sync apps/web/out "s3://$BUCKET" --delete
 aws s3 cp apps/web/out/marketing.html "s3://$BUCKET/marketing" --content-type text/html
 aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 ```
+
+## GitHub Actions Deploy
+
+The AWS deploy workflow uses GitHub Actions OIDC instead of long-lived AWS access keys.
+
+Terraform provisions `aws_iam_role.github_deploy` and outputs `github_deploy_role_arn`. Store that ARN as the repository or environment variable `AWS_DEPLOY_ROLE_ARN`:
+
+```bash
+gh variable set AWS_DEPLOY_ROLE_ARN --body "$(terraform -chdir=infra/terraform output -raw github_deploy_role_arn)"
+```
+
+The workflow has two paths:
+
+- `confirm=plan`: build the Lambda package, initialize Terraform, validate, and run `terraform plan`.
+- `confirm=deploy`: run the plan job, then run a manually gated `aws-portfolio` environment job that applies Terraform, publishes the static frontend, invalidates CloudFront, and smoke-tests the API.
+
+The IAM trust policy allows only this repository on `main` and the `aws-portfolio` deployment environment to assume the role.
 
 ## Cost Guardrails
 

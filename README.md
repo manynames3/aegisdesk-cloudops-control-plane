@@ -109,6 +109,7 @@ Architecture and product docs:
 - [Buyer Personas](docs/product/buyer-personas.md)
 - [CloudOps Use Cases](docs/product/use-cases-for-cloudops.md)
 - [ROI Model](docs/product/roi.md)
+- [Live Operations Evidence](docs/evidence/live-operations.md)
 - [ADRs](docs/adrs/README.md)
 
 ## Current Capabilities

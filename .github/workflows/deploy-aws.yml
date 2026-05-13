@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: Type deploy to run Terraform apply and publish the frontend.
+        description: Type deploy to run Terraform apply and publish the frontend. Any other value runs plan only.
         required: true
         default: plan
 
@@ -14,12 +14,52 @@ env:
   TF_INPUT: false
 
 jobs:
-  deploy:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: aegisdesk-github-plan
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.9"
+          terraform_wrapper: false
+
+      - name: Build Lambda package
+        run: scripts/build-lambda-package.sh
+
+      - name: Terraform init
+        run: terraform -chdir=infra/terraform init
+
+      - name: Terraform validate
+        run: terraform -chdir=infra/terraform validate
+
+      - name: Terraform plan
+        run: terraform -chdir=infra/terraform plan -out=tfplan
+
+  apply:
     if: inputs.confirm == 'deploy'
+    needs: plan
     runs-on: ubuntu-latest
     environment: aws-portfolio
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v6
@@ -38,8 +78,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: aegisdesk-github-apply
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v4

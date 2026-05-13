@@ -52,3 +52,8 @@ output "monthly_budget_name" {
   description = "AWS Budget guardrail resource name."
   value       = aws_budgets_budget.portfolio_guardrail.name
 }
+
+output "github_deploy_role_arn" {
+  description = "IAM role ARN assumed by GitHub Actions through OIDC for AWS plan/apply and frontend publishing."
+  value       = aws_iam_role.github_deploy.arn
+}

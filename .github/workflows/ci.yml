@@ -42,6 +42,7 @@ jobs:
           test -f docs/adrs/007-low-cost-aws-deployment.md
           test -f docs/adrs/008-real-bedrock-dynamodb-mcp.md
           test -f docs/evidence/README.md
+          test -f docs/evidence/live-operations.md
           test -f docs/evidence/screenshots/policy-aware-chat.png
           test -f docs/security/security-overview.md
           test -f docs/security/data-handling.md
