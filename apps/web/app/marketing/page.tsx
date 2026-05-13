@@ -8,11 +8,13 @@ import {
   FileText,
   GitBranch,
   KeyRound,
+  Layers3,
   LockKeyhole,
   MessageSquare,
   Network,
   ShieldCheck,
-  Siren
+  Siren,
+  Sparkles
 } from "lucide-react";
 
 const useCases = [
@@ -61,10 +63,28 @@ const architecture = [
 export default function MarketingPage() {
   return (
     <main className="marketing">
+      <header className="marketingNav">
+        <a className="marketingBrand" href="/">
+          <ShieldCheck size={18} />
+          AegisDesk
+        </a>
+        <nav aria-label="Product navigation">
+          <a href="#use-cases">Use cases</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#security">Security</a>
+          <a href="#integrations">Integrations</a>
+        </nav>
+        <a className="marketingNavCta" href="/">
+          Open control plane
+        </a>
+      </header>
+
       <section className="marketingHero">
-        <div className="marketingHeroOverlay" />
         <div className="marketingHeroContent">
-          <p>AegisDesk</p>
+          <p>
+            <Sparkles size={14} />
+            Self-hosted CloudOps AI control
+          </p>
           <h1>Self-hosted CloudOps AI control plane</h1>
           <span>
             Give employees AI help for incidents, tickets, access requests, and cloud cost questions while enforcing identity, policy,
@@ -79,10 +99,44 @@ export default function MarketingPage() {
               Read product docs
             </a>
           </div>
+          <div className="marketingProofPills" aria-label="Platform capabilities">
+            <span>Cognito identity</span>
+            <span>OPA/Rego policy</span>
+            <span>Bedrock routing</span>
+            <span>DynamoDB audit</span>
+          </div>
         </div>
+        <figure className="marketingProductFrame">
+          <div className="marketingWindowChrome">
+            <span />
+            <span />
+            <span />
+            <strong>Policy-aware CloudOps chat</strong>
+          </div>
+          <img alt="AegisDesk policy-aware CloudOps chat" src="/screenshots/policy-aware-chat.png" />
+        </figure>
       </section>
 
-      <section className="marketingProblem">
+      <section className="marketingSignal">
+        <span>
+          <strong>Identity</strong>
+          Verified user, role, and team claims.
+        </span>
+        <span>
+          <strong>Policy</strong>
+          OPA decides before model or tool execution.
+        </span>
+        <span>
+          <strong>Audit</strong>
+          Request replay, source evidence, and cost records.
+        </span>
+        <span>
+          <strong>Control</strong>
+          External model kill switch and approval gates.
+        </span>
+      </section>
+
+      <section className="marketingProblem" id="problem">
         <div>
           <p>Problem</p>
           <h2>AI is useful in CloudOps, but unmanaged AI creates governance risk.</h2>
@@ -96,8 +150,8 @@ export default function MarketingPage() {
 
       <section className="marketingScreens">
         <div className="marketingSectionHeader">
-          <p>Product Screenshots</p>
-          <h2>Built for operators, approvers, and governance reviewers.</h2>
+          <p>Product surfaces</p>
+          <h2>One control plane for operators, approvers, and governance reviewers.</h2>
         </div>
         <div className="screenshotGrid">
           <figure>
@@ -115,7 +169,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="marketingUseCases">
+      <section className="marketingUseCases" id="use-cases">
         <div className="marketingSectionHeader">
           <p>Use Cases</p>
           <h2>Operational AI with enterprise controls built in.</h2>
@@ -134,7 +188,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="marketingArchitecture">
+      <section className="marketingArchitecture" id="architecture">
         <div className="marketingSectionHeader">
           <p>Architecture</p>
           <h2>A control path between users, models, policies, tools, and audit storage.</h2>
@@ -163,7 +217,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="marketingSecurity">
+      <section className="marketingSecurity" id="security">
         <div className="marketingSectionHeader">
           <p>Security Posture</p>
           <h2>Designed around identity, least privilege, and auditability.</h2>
@@ -188,7 +242,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="marketingIntegrations">
+      <section className="marketingIntegrations" id="integrations">
         <div className="marketingSectionHeader">
           <p>Integrations</p>
           <h2>Connect the control plane to the systems CloudOps teams already use.</h2>
@@ -204,7 +258,10 @@ export default function MarketingPage() {
       </section>
 
       <section className="marketingCta">
-        <Bot size={32} />
+        <div className="marketingCtaIcon">
+          <Bot size={28} />
+          <Layers3 size={28} />
+        </div>
         <div>
           <h2>Use AI for CloudOps without losing control of data, cost, or access.</h2>
           <p>Start with the hosted control plane, then connect your identity provider, ticket system, logs, and model policy.</p>
