@@ -43,6 +43,7 @@ DIST_ID=$(terraform -chdir=infra/terraform output -raw frontend_distribution_id)
 
 NEXT_PUBLIC_API_BASE_URL="$API_URL" npm run build:web
 aws s3 sync apps/web/out "s3://$BUCKET" --delete
+aws s3 cp apps/web/out/marketing.html "s3://$BUCKET/marketing" --content-type text/html
 aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 ```
 

@@ -76,6 +76,7 @@ jobs:
           BUCKET=$(terraform -chdir=infra/terraform output -raw frontend_bucket_name)
           DIST_ID=$(terraform -chdir=infra/terraform output -raw frontend_distribution_id)
           aws s3 sync apps/web/out "s3://$BUCKET" --delete
+          aws s3 cp apps/web/out/marketing.html "s3://$BUCKET/marketing" --content-type text/html
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 
       - name: Smoke test API
