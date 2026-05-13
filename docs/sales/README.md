@@ -4,6 +4,7 @@ This folder contains buyer-facing assets for positioning AegisDesk as a self-hos
 
 - [Product Brief](product-brief.md)
 - [Buyer README](buyer-readme.md)
+- [Landing Page Explanation](../product/landing-page.md)
 - [ROI Calculator](roi-calculator.md)
 - [Architecture Diagram](architecture-diagram.md)
 - [Security Overview](../security/security-overview.md)

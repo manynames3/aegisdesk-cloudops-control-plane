@@ -104,6 +104,7 @@ Architecture and product docs:
 - [Self-Hosted Deployment](docs/deployment/self-hosted.md)
 - [Security Overview](docs/security/security-overview.md)
 - [Data Handling](docs/security/data-handling.md)
+- [Landing Page Explanation](docs/product/landing-page.md)
 - [Product Positioning](docs/product/positioning.md)
 - [Buyer Personas](docs/product/buyer-personas.md)
 - [CloudOps Use Cases](docs/product/use-cases-for-cloudops.md)
