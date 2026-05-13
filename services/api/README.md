@@ -38,11 +38,11 @@ python3 -m venv .venv
 
 Direct local runs default to `AEGISDESK_POLICY_MODE=auto`, which uses OPA when `OPA_URL` is set and falls back to the mirrored Python policy evaluator when OPA is not configured. Docker Compose sets `AEGISDESK_POLICY_MODE=opa`.
 
-Local runs default to SQLite storage, local persona tokens, and deterministic model fallback. The hosted Terraform path sets DynamoDB storage, Cognito/JWKS token verification, OPA subprocess policy evaluation, Bedrock Nova Lite routing, and Cost Explorer summaries with DynamoDB caching.
+Local runs default to SQLite storage, local persona tokens, and local control fallback. The hosted Terraform path sets DynamoDB storage, Cognito/JWKS token verification, OPA subprocess policy evaluation, Bedrock Nova Lite routing, and Cost Explorer summaries with DynamoDB caching.
 
 ## Lambda Package
 
-The hosted portfolio API uses `app/lambda_handler.py` with Mangum to adapt FastAPI to AWS Lambda.
+The hosted API uses `app/lambda_handler.py` with Mangum to adapt FastAPI to AWS Lambda.
 
 From the repository root:
 
@@ -68,6 +68,6 @@ AEGISDESK_DB_PATH=:memory:
 
 ## Current Boundary
 
-The API uses deterministic ticket/access tools and does not modify real cloud resources through chat actions. The hosted path can call Amazon Bedrock for approved low-sensitivity prompts and AWS Cost Explorer for manager/admin cost summaries.
+The API uses local ticket/access adapters and does not modify cloud resources directly through chat actions. The hosted path can call Amazon Bedrock for approved low-sensitivity prompts and AWS Cost Explorer for manager/admin cost summaries.
 
-The `/auth/persona-token` endpoint is a portfolio persona issuer. In hosted mode it uses Cognito Admin APIs to issue Cognito ID tokens verified through Cognito JWKS. Production identity should federate a corporate identity provider such as Entra ID or Okta instead of using reviewer personas.
+The `/auth/persona-token` endpoint is a non-production persona issuer. In hosted mode it uses Cognito Admin APIs to issue Cognito ID tokens verified through Cognito JWKS. Customer production identity should federate a corporate identity provider such as Entra ID or Okta instead of using reviewer personas.

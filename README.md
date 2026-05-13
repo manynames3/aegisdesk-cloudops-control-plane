@@ -1,29 +1,18 @@
 # AegisDesk CloudOps Control Plane
 
-AegisDesk is a portfolio project for a policy-aware AI gateway in cloud operations. The goal is to show how an enterprise can let employees use AI for incident triage, access requests, ticket workflows, and cost investigation while enforcing privacy controls, role-based policy, model routing, approvals, audit logs, and cost visibility.
+AegisDesk is a self-hosted CloudOps AI control plane that gives employees AI help for incidents, tickets, production access requests, and cloud cost questions while enforcing identity, policy, redaction, approval, model routing, and audit trails. It is built as a full-stack reference implementation with a Next.js operator UI, FastAPI gateway, Cognito/JWKS identity, OPA/Rego policy enforcement, Bedrock routing, DynamoDB audit storage, AWS Cost Explorer integration, MCP tools, and Docker/Terraform deployment paths.
 
-This repository includes a runnable and deployed portfolio slice: a Next.js frontend, FastAPI gateway, Amazon Cognito identity, live OPA/Rego policy enforcement, Amazon Bedrock routing with deterministic fallback, MCP tool server, DynamoDB-backed audit and cache state, AWS Cost Explorer integration, approvals, OpenTelemetry instrumentation, CI checks, Docker Compose, and low-cost AWS Terraform.
+Live control plane: [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
 
-## About
-
-Most AI chat projects stop at generating an answer. AegisDesk focuses on the enterprise layer around the answer: who is allowed to ask, what data can leave the environment, which model should handle the request, which tools can be called, what needs approval, what it costs, and how the decision is audited.
-
-The product story is intentionally simple:
-
-> Employees get AI help for cloud operations. The company keeps control over privacy, access, cost, and accountability.
-
-Live deployment: [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
+Marketing page: [https://d27myiy7bbj1rz.cloudfront.net/marketing](https://d27myiy7bbj1rz.cloudfront.net/marketing)
 
 Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health)
 
-## Reviewer Access
+## About
 
-The hosted app supports two reviewer-friendly identity paths:
+Most employee-facing AI tools answer the prompt but leave the company with weak control over data, cost, access, and evidence. AegisDesk puts a governance layer between the user, the model, operational tools, and audit storage:
 
-1. **Cognito Hosted UI sign-in:** In the left sidebar, choose `employee`, `manager`, or `admin` under `Identity`. The app prepares a disposable Cognito reviewer persona and shows the generated username and password in the `Cognito credentials` box. Copy those credentials, click `Open Hosted UI`, and sign in through AWS Cognito. After the callback, the sidebar should show `Cognito Hosted UI`, the signed-in user, role, and team.
-2. **Reviewer shortcut:** Expand `Reviewer shortcut` for a faster walkthrough when you do not need to show the Hosted UI redirect. This still asks the backend for a controlled reviewer token; protected API routes derive identity, role, and team from token claims rather than trusting frontend fields.
-
-The visible Cognito credentials are demo-only portfolio accounts (`aegisdesk-employee`, `aegisdesk-manager`, and `aegisdesk-admin`). They are generated from the hosted environment's persona seed, can be rotated by redeploying that seed, and are not personal credentials.
+> Employees get faster CloudOps support. Platform, security, and FinOps teams keep control over who can ask, what data can leave, which model is used, which tools run, what needs approval, and how every decision is audited.
 
 ## Screenshots
 
@@ -35,178 +24,143 @@ The visible Cognito credentials are demo-only portfolio accounts (`aegisdesk-emp
 
 ![Manager approvals](docs/evidence/screenshots/manager-approvals.png)
 
-## Target Users
+## Reviewer Access
 
-- Cloud operations engineers triaging incidents and support requests
-- Platform engineers building safe internal AI workflows
-- Security and compliance reviewers auditing AI usage
-- Engineering managers approving scoped operational actions
-- FinOps teams tracking cloud and AI spend
+The hosted control plane supports two identity paths:
 
-## Core Use Cases
+1. **Cognito Hosted UI sign-in:** In the left sidebar, choose `employee`, `manager`, or `admin` under `Identity`. The app prepares a non-production Cognito persona and shows the generated username and password in the `Cognito credentials` box. Copy those credentials, click `Open Hosted UI`, and sign in through AWS Cognito. After the callback, the sidebar should show `Cognito Hosted UI`, the signed-in user, role, and team.
+2. **Identity shortcut:** Expand `Identity shortcut` for a faster walkthrough when you do not need to show the Hosted UI redirect. The backend still issues a controlled token and protected API routes derive identity, role, and team from token claims rather than trusting frontend fields.
 
-- **Cloud incident triage:** summarize seeded CloudWatch-style incident logs, detect secrets, search runbooks, and recommend next steps.
-- **Access request governance:** deny unsafe production admin requests and route safer alternatives for approval.
-- **Risk-based clarification:** return safe first-step guidance for vague incidents, but pause tickets, access requests, and cost lookups until required scope, impact, duration, or ownership details are provided.
-- **Cost-aware model routing:** choose local or cloud models based on sensitivity, budget, and route policy.
-- **Source-grounded answers:** retrieve trusted runbook, access policy, and cost governance excerpts before producing an answer.
-- **Ticket automation:** create or check tickets through policy-gated MCP tools.
-- **Governance dashboard:** filter audit events by request, user, policy decision, route, and tool call.
-- **Request replay:** click an audit event to inspect the sanitized prompt, redaction result, policy input/output, model route, tool calls, answer sources, audit events, and trace ID.
-- **Guided walkthrough:** a four-step reviewer path shows redaction, scoped access approval, Bedrock routing, and persisted audit evidence.
+The visible Cognito credentials are non-production reviewer personas (`aegisdesk-employee`, `aegisdesk-manager`, and `aegisdesk-admin`). They are generated from the hosted environment's persona seed, can be rotated by redeploying that seed, and are not personal credentials.
+
+## Product Use Cases
+
+- **Incident triage:** attach read-only incident context, retrieve runbooks, redact secrets, and answer with cited operational guidance.
+- **Ticket workflows:** create governed support tickets through adapter-backed tools.
+- **Production access governance:** deny unsafe admin access, route safer scoped access requests for approval, and record before/after audit events.
+- **Cloud cost review:** use AWS Cost Explorer summaries, DynamoDB caching, role-based access, quotas, and model-routing evidence.
+- **AI governance review:** inspect policy input/output, redaction, model route, answer sources, tool calls, approvals, audit events, and trace IDs.
+- **Agent interoperability:** expose governed CloudOps tools through an MCP server for agent clients such as Codex.
 
 ## Tech Stack
 
-This is the current MVP stack and deployment shape:
-
 | Area | Choice | Purpose |
 | --- | --- | --- |
-| Frontend | Next.js | Employee chat, manager approvals, admin dashboard |
+| Frontend | Next.js | Chat, approvals, governance explorer, request replay, marketing page |
 | API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
-| Auth | Amazon Cognito Hosted UI, ID tokens, and JWKS verification | Visible login path plus backend-derived identity, role, and team claims |
-| Policy | OPA/Rego in Lambda or HTTP, explicit Python fallback | Authorization, model routing, approval, and budget rules |
-| AI routing | Amazon Bedrock Nova Lite, deterministic fallback, Ollama path documented | Shows real provider routing while preserving low-cost local review |
-| Tooling | MCP Python SDK server plus Lambda in-process adapter | Ticket, access request, cost lookup, and runbook tools |
-| Knowledge | Markdown runbooks and governance policies packaged with the API | Source-grounded answers with citations and document ownership |
-| Incident context | Seeded CloudWatch Logs-style source | Read-only operational evidence for incident triage without running log queries that add cost |
-| Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and review |
-| Data | DynamoDB hosted state/cache, SQLite local fallback, Postgres path documented | Audit events, approvals, route history, quota counters, Cost Explorer cache, dashboard summaries |
-| Runtime | direct local run, Docker Compose path, Lambda zip handler | Low-cost reproducible review |
-| Cloud path | AWS Terraform with S3, CloudFront, Lambda, API Gateway, Cognito, DynamoDB, Bedrock IAM, Cost Explorer IAM, CloudWatch, Budget | Hosted portfolio deployment without always-on compute |
-| CI/CD | GitHub Actions | API tests, evals, web build, OPA tests, MCP import, Terraform validate, container builds, manual AWS deploy |
+| Auth | Amazon Cognito Hosted UI, ID tokens, JWKS verification | SSO-compatible identity boundary and role/team claims |
+| Policy | OPA/Rego with explicit local fallback | Authorization, routing, quotas, approvals, and tool policy |
+| AI routing | Amazon Bedrock Nova Lite, local control fallback, Ollama path documented | Approved low-sensitivity cloud route with cost controls |
+| Tools | MCP Python SDK server plus API in-process adapter layer | Ticket, access, cost, incident context, and runbook tools |
+| Knowledge | Markdown runbooks and governance policies | Source-grounded answers with owner and review date |
+| Incident context | Local fixture provider with CloudWatch/Datadog adapter interfaces | Read-only operational evidence without requiring a customer's log source |
+| Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and trace review |
+| Data | DynamoDB hosted state/cache, SQLite local fallback | Audit events, approvals, route history, quota counters, Cost Explorer cache |
+| Runtime | Docker Compose, direct local run, Lambda zip handler | Self-hosted local and AWS deployment paths |
+| Cloud path | AWS Terraform | S3, CloudFront, Lambda, API Gateway, Cognito, DynamoDB, Bedrock IAM, Cost Explorer IAM, CloudWatch, Budget |
+| CI/CD | GitHub Actions | API tests, evals, web build, OPA tests, MCP smoke test, Terraform validate, container builds, manual AWS deploy |
 
 ## Engineering Highlights
 
-- **Backend-enforced identity boundary:** protected API routes derive user, role, and team from Cognito ID token claims instead of trusting frontend role fields.
-- **Visible Cognito login:** the hosted app supports Cognito Hosted UI sign-in with PKCE; reviewer persona shortcuts remain labeled as shortcuts for fast walkthroughs.
-- **Policy outside the model:** OPA/Rego is the runtime policy path for tool use, access requests, routing, quotas, and approvals, with Python fallback only for direct local/test mode.
-- **Real LLM path with cost control:** approved low-sensitivity prompts call Amazon Bedrock Nova Lite; sensitive, denied, or failed routes use deterministic/local fallback.
-- **Real cost governance path:** manager/admin cost investigations call AWS Cost Explorer and cache results in DynamoDB to reduce repeated API calls.
-- **Sensitive-data handling before model calls:** PII and secret detection run in the API before route selection.
-- **Trusted knowledge grounding:** incident, access, and cost answers retrieve internal Markdown runbooks and policies before response generation, then show citations with owner and review date.
-- **Clarify before action:** vague human requests are handled deliberately. The API can answer with safe guidance, but it blocks governed tool calls until the request includes the minimum fields a real operations team would need.
-- **Answer provenance:** chat responses include explicit source metadata so reviewers can see whether an answer came from deterministic control logic, Bedrock, OPA/Rego, internal knowledge, MCP tools, seeded incident context, Cost Explorer, or cache.
-- **Trusted source score:** every response shows whether a trusted source was found, source freshness, external model use, sensitive external data status, and policy result.
-- **Plain-English control explanations:** the UI explains policy and routing decisions in business language first, then shows technical policy IDs for review.
-- **Auditable AI workflow:** each request produces events for redaction, route choice, policy result, incident context, tool call, approval, cost estimate, and trace ID.
-- **Request replay and audit explorer:** governance reviewers can filter persisted events and click into a full request trace packet for review.
-- **Abuse and cost controls:** per-role quotas, prompt size limits, API Gateway throttling, Bedrock fallback, and a cloud-model kill switch are visible in the product and configured through Terraform.
-- **Approval workflow evidence:** approval cards show requester, current status, approver identity, decision timestamp, and admin-only technical audit details.
-- **Durable cloud state:** hosted audit events, approvals, model routes, metrics, and quota counters persist in DynamoDB.
-- **Deployed AWS architecture:** Terraform provisions Cognito, a private S3 static site behind CloudFront, a FastAPI Lambda behind HTTP API Gateway, DynamoDB, Bedrock IAM, Cost Explorer access, least-privilege IAM, CloudWatch logs, short retention, encrypted static assets, lifecycle cleanup, and an AWS Budget guardrail.
-- **Deployment automation:** a manual GitHub Actions deploy workflow builds the Lambda package, runs Terraform, publishes the static frontend, and invalidates CloudFront.
-- **Safe portfolio boundaries:** destructive cloud actions are mocked or approval-only in the MVP, with a production hardening path documented separately.
-- **Cloud role alignment:** the project emphasizes containers, policy-as-code, identity boundaries, observability, FinOps thinking, CI/CD, and deployable architecture.
+- **Backend-enforced identity:** protected routes derive user, role, and team from Cognito/JWKS-verified claims or controlled local persona tokens.
+- **Policy outside the model:** OPA/Rego evaluates chat, tool, routing, quota, and approval rules before actions proceed.
+- **Sensitive-data handling:** PII and secrets are redacted before model routing and before external model calls.
+- **Real model and cost paths:** approved low-risk requests can call Amazon Bedrock Nova Lite; manager/admin cost reviews can call AWS Cost Explorer and cache results in DynamoDB.
+- **Adapter-based integrations:** ticketing, incident context, and access request workflows are behind typed adapters for local fixtures, Jira, ServiceNow, CloudWatch, Datadog, Okta, and IAM Identity Center.
+- **MCP interoperability:** a Python MCP server exposes governed CloudOps tools for agent clients.
+- **Request replay:** governance reviewers can inspect the prompt, sanitized prompt, policy input/output, model route, tool calls, answer sources, citations, audit events, and trace ID.
+- **Trusted source score:** every answer reports whether trusted sources were found, source freshness, external model use, sensitive external data status, and policy result.
+- **Abuse and cost controls:** API Gateway throttling, prompt size limits, per-role quotas, Cost Explorer cache, and cloud-model kill switch are visible in product and Terraform configuration.
+- **Low-cost cloud shape:** serverless AWS deployment uses no always-on compute and includes short log retention plus an AWS Budget guardrail.
 
 ## Architecture
-
-The system is organized as a gateway between users, models, policies, tools, and audit storage.
 
 ```mermaid
 flowchart LR
     User["Employee / Manager / Admin"] --> Web["Next.js UI"]
     Web --> API["FastAPI Gateway"]
-    API --> Redaction["PII and Secret Inspection"]
-    API --> Cognito["Amazon Cognito<br/>ID tokens + JWKS"]
+    API --> Cognito["Cognito / JWKS Identity"]
+    API --> Redaction["PII + Secret Redaction"]
     API --> OPA["OPA / Rego Policy"]
-    API --> Knowledge["Trusted Knowledge Base<br/>Runbooks + policies"]
+    API --> Knowledge["Runbooks + Governance Docs"]
     API --> Router["Model Router"]
-    Router --> Local["Local Route Simulator / Ollama Path"]
-    Router --> Cloud["Amazon Bedrock Nova Lite"]
-    API --> Tools["MCP Tool Server / In-Process Adapter"]
-    Tools --> Ticket["Ticket Tool"]
-    Tools --> Access["Access Request Tool"]
-    Tools --> Cost["AWS Cost Explorer<br/>Cached summary"]
-    Tools --> Logs["Seeded CloudWatch-style<br/>Incident context"]
-    API --> Audit["DynamoDB<br/>Audit + cache state"]
-    API --> Trace["OpenTelemetry / Jaeger"]
-    Audit --> Dashboard["Governance Dashboard"]
+    Router --> Bedrock["Amazon Bedrock Nova Lite"]
+    Router --> Local["Local Control Fallback"]
+    API --> Adapters["Tool Adapter Layer"]
+    Adapters --> Tickets["Jira / ServiceNow / Local Ticket"]
+    Adapters --> Incidents["CloudWatch / Datadog / Local Fixture"]
+    Adapters --> Access["Okta / IAM Identity Center / Local Approval"]
+    API --> Cost["AWS Cost Explorer"]
+    API --> Audit["DynamoDB Audit + Cache"]
+    API --> Trace["OpenTelemetry"]
+    Audit --> Governance["Governance + Request Replay"]
 ```
 
-Architecture docs:
+Architecture and product docs:
 
 - [Architecture Overview](docs/architecture.md)
 - [System Architecture](docs/architecture/system-architecture.md)
-- [API Contracts](docs/architecture/api-contracts.md)
-- [Audit Event Model](docs/architecture/audit-event-model.md)
-- [Codex MCP Integration](docs/integrations/codex-mcp.md)
-- [Trusted Knowledge Base](docs/knowledge/README.md)
+- [Integration Architecture](docs/integrations/README.md)
+- [Self-Hosted Deployment](docs/deployment/self-hosted.md)
+- [Security Overview](docs/security/security-overview.md)
+- [Data Handling](docs/security/data-handling.md)
+- [Product Positioning](docs/product/positioning.md)
+- [Buyer Personas](docs/product/buyer-personas.md)
+- [CloudOps Use Cases](docs/product/use-cases-for-cloudops.md)
+- [ROI Model](docs/product/roi.md)
 - [ADRs](docs/adrs/README.md)
-- [Threat Model](docs/security/threat-model.md)
-- [Governance Model](docs/security/governance-model.md)
 
-## Current Status
+## Current Capabilities
 
-Completed:
-
-- Local Next.js frontend with Chat, Approvals, Governance, and Evaluations views
-- FastAPI gateway with Cognito/JWKS auth, `/chat`, `/events`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
-- Cognito Hosted UI sign-in with backend OAuth code exchange and JWKS-verified ID tokens
-- Redaction, policy decisions, model route metadata, approvals, governed tool calls, and audit events
-- Trusted Markdown knowledge base with checkout runbook, production access policy, and AI/cloud cost governance policy
-- Risk-based clarification gate for vague incident, ticket, access, and cost requests
-- Cognito-backed persona tokens for the hosted portfolio environment
-- Amazon Bedrock Nova Lite route for approved low-sensitivity prompts
-- AWS Cost Explorer summaries for manager/admin cost investigations with DynamoDB caching
-- Read-only incident context from a seeded CloudWatch Logs-style source for checkout latency triage
-- DynamoDB-backed hosted audit/event state with SQLite local fallback
-- Guided walkthrough for recruiter review
-- Plain-English decision trail for policy, routing, approval, and redaction outcomes
-- Audit event explorer with filters for request ID, user, decision, route, and tool
-- Request replay viewer with sanitized prompt, redaction, policy input/output, model route, tool calls, answer sources, audit events, and trace ID
-- Trusted source score per answer with source freshness, external model, sensitive external data, and policy result indicators
-- API Gateway throttling, application request size limit, role quotas, and cloud-model kill switch controls
-- Approval timeline showing pending counts, approver identity, timestamps, and correlated audit events
-- Per-role/team quota counters and quota policy
-- Real MCP server using the Python MCP SDK
-- Admin-protected seed/reset actions for fast reviewer walkthroughs
-- API tests, web build, OPA tests, Terraform validation, and container builds in GitHub Actions
-- Deterministic control evals for redaction, routing, policy denial, approvals, and tool authorization
-- Rego policy files and policy tests for chat, model routing, tool authorization, and approvals
-- OpenTelemetry instrumentation and local Jaeger export path
-- Docker Compose deployment shape with API, web, OPA, Jaeger, and persistent local API data
-- Hosted AWS deployment using Cognito, private S3, CloudFront, API Gateway, Lambda, DynamoDB, Bedrock, Cost Explorer, CloudWatch, IAM, and AWS Budget
-- Screenshots for recruiter review
-- Product framing and target users
-- Recruiter and hiring manager positioning
-- Use cases and reviewer walkthrough script
-- Architecture and API contracts
-- Audit event model
-- Governance and threat model
-- Cost strategy and two-week MVP plan
-- GitHub Actions validation
-- Manual GitHub Actions AWS deploy workflow backed by S3 Terraform state
-
-Next implementation milestone:
-
-- Add a short walkthrough video
-- Add a captured Cognito login screenshot to the reviewer evidence docs
+- Next.js frontend with Chat, Approvals, Governance, Evaluations, request replay, and `/marketing`
+- FastAPI gateway with `/chat`, `/events`, `/events/replay/{request_id}`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
+- Cognito Hosted UI sign-in, OAuth code exchange, and JWKS-verified ID token handling
+- OPA/Rego policy enforcement for chat decisions, model routing, tool authorization, quotas, and approvals
+- Bedrock Nova Lite route for approved low-sensitivity prompts with local control fallback
+- AWS Cost Explorer summaries for manager/admin users with DynamoDB caching
+- DynamoDB-backed hosted state with SQLite local fallback
+- Local fixture incident context with CloudWatch and Datadog adapter interfaces
+- Ticket adapter interfaces for local, Jira, and ServiceNow workflows
+- Access adapter interfaces for local approvals, Okta group requests, and IAM Identity Center
+- MCP server for governed CloudOps tools
+- OpenTelemetry instrumentation and local Jaeger path
+- Docker Compose runtime with API, web, OPA, Jaeger, and persistent local API data
+- AWS Terraform for Cognito, CloudFront, S3, API Gateway, Lambda, DynamoDB, Bedrock IAM, Cost Explorer IAM, CloudWatch, and Budget
+- GitHub Actions validation and manual AWS deploy workflow
 
 ## Repository Structure
 
 ```text
-apps/web/                 Frontend app workspace
-services/api/             Gateway API workspace
+apps/web/                 Frontend app and marketing route
+services/api/             FastAPI gateway, policy, adapters, auth, store, LLM routing
 services/mcp-tools/       MCP tool server workspace
 policies/                 OPA/Rego policy workspace
 evals/                    Safety and policy evaluation workspace
-infra/docker/             Local Docker runtime assets
 infra/terraform/          AWS Terraform deployment path
+infra/docker/             Local Docker runtime assets
 infra/helm/               Optional Kubernetes packaging path
-docs/product/             Product framing, users, use cases, reviewer script
-docs/evidence/            Screenshots and reviewer walkthrough evidence
-docs/knowledge/           Trusted runbooks and internal governance policies used for answer citations
-docs/architecture/        Detailed system docs, API contracts, audit model
+docs/product/             Product positioning, buyers, use cases, ROI
+docs/security/            Security overview, data handling, governance, threat model
+docs/deployment/          Self-hosted install and deployment path
+docs/integrations/        Integration architecture and MCP notes
+docs/sales/               Product brief, ROI calculator, buyer README, video script
+docs/evidence/            Screenshots and walkthrough evidence
+docs/knowledge/           Trusted runbooks and policies used for answer citations
+docs/architecture/        System docs, API contracts, audit model
 docs/adrs/                Architecture decision records
-docs/security/            Governance model and threat model
-docs/delivery/            MVP plan, cost strategy, review checklist
 ```
 
 ## Local Run
 
-The app runs locally and does not require cloud resources or paid model APIs.
+The fastest self-hosted path is Docker Compose:
 
-API:
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:3000`.
+
+Direct API and web run:
 
 ```bash
 cd services/api
@@ -215,27 +169,15 @@ python3 -m venv .venv
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-Web:
-
 ```bash
 cd apps/web
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
-
-Docker Compose path when Docker is available:
-
-```bash
-docker compose up --build
-```
+See [Self-Hosted Deployment](docs/deployment/self-hosted.md) for required environment variables, AWS permissions, expected cost, auth setup, ticketing setup, and how to disable Bedrock.
 
 ## Validation
-
-Current CI verifies required docs, runs API tests, and builds the web app.
-
-Local checks:
 
 ```bash
 npm run build:web
@@ -248,14 +190,4 @@ terraform -chdir=infra/terraform validate
 git diff --check
 ```
 
-## Market Signal
-
-This project is aligned with current cloud and AI infrastructure demand:
-
-- CNCF's 2026 cloud native survey reports Kubernetes as a foundation for production AI workloads, with 82% of container users running Kubernetes in production and 66% of organizations hosting generative AI models using Kubernetes for inference workloads.
-- The FinOps Foundation's 2026 report identifies AI cost management as the top forward-looking FinOps skill and says 98% of respondents now manage AI spend.
-
-Sources:
-
-- https://www.cncf.io/announcements/2026/01/20/kubernetes-established-as-the-de-facto-operating-system-for-ai-as-production-use-hits-82-in-2025-cncf-annual-cloud-native-survey/
-- https://data.finops.org/
+CI runs the main checks plus container builds and Terraform validation.

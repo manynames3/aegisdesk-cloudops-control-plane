@@ -23,7 +23,7 @@ Views:
 - Employee chat
 - Manager approval queue
 - Admin governance dashboard
-- Guided reviewer walkthrough
+- Guided walkthrough
 - Audit event explorer
 
 Responsibilities:
@@ -37,7 +37,7 @@ Responsibilities:
 
 The direct local path can use HMAC-signed bearer tokens for fast tests. The hosted AWS deployment supports Cognito Hosted UI sign-in with OAuth authorization code + PKCE. The API exchanges the code, verifies the resulting Cognito ID token with Cognito JWKS, derives `user_id`, `role`, and `team` from token claims, and ignores role fields sent in request bodies.
 
-The UI also keeps a labeled reviewer shortcut that issues controlled Cognito persona tokens through `/auth/persona-token` for fast walkthroughs. That shortcut is intentionally separate from the visible Hosted UI path.
+The UI also keeps a labeled identity shortcut that issues controlled persona tokens through `/auth/persona-token` for fast walkthroughs. That shortcut is intentionally separate from the visible Hosted UI path.
 
 Production extension:
 
@@ -76,13 +76,13 @@ Policy decisions:
 
 ### Model Router
 
-MVP routing rules:
+Routing rules:
 
 - Public and low-risk requests can use Amazon Bedrock Nova Lite.
 - Sensitive requests route to the local route.
 - Requests with secrets can be blocked or redacted before routing.
 - Budget threshold can force lower-cost routes.
-- If Bedrock is disabled or unavailable, deterministic fallback keeps the app usable.
+- If Bedrock is disabled or unavailable, the local control route keeps the app usable.
 
 Production extension:
 
@@ -94,7 +94,7 @@ Production extension:
 
 ### MCP Tool Layer
 
-MVP tools:
+Tool capabilities:
 
 - Ticket tool
 - Access request tool
@@ -114,7 +114,7 @@ Tool safety pattern:
 
 ### Audit Store
 
-Hosted storage: DynamoDB single-table state for audit events, approvals, route history, quota counters, metrics, and Cost Explorer cache entries. Local fallback: SQLite. Production path: managed Postgres or a stricter immutable audit sink, depending on retention and reporting requirements.
+Hosted storage: DynamoDB single-table state for audit events, approvals, route history, quota counters, metrics, and Cost Explorer cache entries. Local fallback: SQLite. Customer production path may use managed Postgres or a stricter immutable audit sink, depending on retention and reporting requirements.
 
 Events:
 
@@ -134,7 +134,7 @@ The governance view reads these persisted records directly and supports filters 
 
 ### Incident Context
 
-The hosted portfolio uses a read-only seeded CloudWatch Logs-style source for checkout latency triage. The gateway returns the log group, query text, matched entries, and suspected cause, then records `incident.context.loaded` as an audit event. This makes incident triage feel operationally real while avoiding recurring log-query cost or access to a real production workload.
+The hosted environment uses a read-only local fixture provider for checkout latency triage. The gateway returns the log group, query text, matched entries, and suspected cause, then records `incident.context.loaded` as an audit event. Customer environments can replace that provider with CloudWatch Logs or Datadog adapters.
 
 Production extension:
 
@@ -145,7 +145,7 @@ Production extension:
 
 ### Observability
 
-Current MVP: OpenTelemetry FastAPI instrumentation, request spans, structured JSON request logs, trace IDs in audit events, and a local Jaeger OTLP path through Docker Compose.
+Current implementation: OpenTelemetry FastAPI instrumentation, request spans, structured JSON request logs, trace IDs in audit events, and a local Jaeger OTLP path through Docker Compose.
 
 Trace spans:
 
@@ -171,7 +171,7 @@ sequenceDiagram
     participant R as Redaction
     participant OPA as OPA Policy
     participant MR as Model Router
-    participant M as Bedrock or Fallback
+    participant M as Bedrock or Local Route
     participant Logs as Incident Context
     participant Tool as MCP Tool
     participant Audit as Audit Store
@@ -198,7 +198,7 @@ sequenceDiagram
 
 ## Deployment Shape
 
-### Local MVP
+### Local Deployment
 
 - Docker Compose
 - Next.js frontend
@@ -216,11 +216,11 @@ sequenceDiagram
 - DynamoDB table for audit events, approvals, route history, metrics, quotas, and cached cost summaries
 - Bedrock Nova Lite invocation for approved low-sensitivity prompts
 - AWS Cost Explorer read path for manager/admin cost investigations
-- Read-only seeded CloudWatch Logs-style incident context for triage workflows
+- Read-only local fixture incident context for triage workflows, with CloudWatch/Datadog adapter boundaries
 - IAM role scoped to Lambda log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention
 - S3 server-side encryption, public access block, and noncurrent version cleanup
-- AWS Budget guardrail for the portfolio cost threshold
+- AWS Budget guardrail for the configured cost threshold
 - S3 remote Terraform state for manual GitHub Actions deployment
 
 ### Production Hardening Path
@@ -231,13 +231,13 @@ sequenceDiagram
 - OpenTelemetry collector or managed trace sink
 - CI/CD promotion workflow
 
-## Deliberate MVP Boundaries
+## Deliberate Product Boundaries
 
-The MVP should not pretend to modify real cloud resources. Destructive actions are mocked or approval-only.
+The system should not directly modify production resources from a chat request. Destructive actions should remain approval-only and customer-governed.
 
 This is intentional:
 
-- Safer for a portfolio project
+- Safer for customer environments
 - Lower cost
 - Easier to run locally
-- Still demonstrates the enterprise control pattern
+- Preserves the enterprise control pattern

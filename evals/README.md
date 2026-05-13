@@ -1,6 +1,6 @@
 # Evaluations
 
-Deterministic MVP evaluations live in:
+Control-plane evaluations live in:
 
 - `control_cases.json`
 - `run_evals.py`
@@ -20,4 +20,4 @@ Run from the repository root after installing API dependencies:
 services/api/.venv/bin/python evals/run_evals.py
 ```
 
-Promptfoo or similar red-team evaluations can be added after the deterministic control suite stays stable.
+Promptfoo or similar red-team evaluations can be added after the control suite stays stable.

@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from app.auth import create_demo_token, decode_token, jwks_document
+from app.auth import create_persona_token, decode_token, jwks_document
 from app.main import app, store
 from app.models import Actor, Role
 from app.redaction import inspect_and_redact
@@ -12,7 +12,7 @@ client = TestClient(app)
 
 
 def auth_headers(role: Role = Role.employee, team: str = "payments", user_id: str = "u-test") -> dict[str, str]:
-    token = create_demo_token(Actor(user_id=user_id, role=role, team=team))
+    token = create_persona_token(Actor(user_id=user_id, role=role, team=team))
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -44,7 +44,7 @@ def test_redaction_detects_pii_and_secret():
     assert "[REDACTED_CREDENTIAL]" in result.redacted_text
 
 
-def test_demo_tokens_can_use_jwks_rs256_mode(monkeypatch):
+def test_persona_tokens_can_use_jwks_rs256_mode(monkeypatch):
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -63,7 +63,7 @@ def test_demo_tokens_can_use_jwks_rs256_mode(monkeypatch):
     monkeypatch.setenv("AEGISDESK_JWT_ISSUER", "aegisdesk-test-issuer")
 
     actor = Actor(user_id="u-jwks", role=Role.manager, team="platform")
-    token = create_demo_token(actor)
+    token = create_persona_token(actor)
     decoded = decode_token(token)
     jwks = jwks_document()
 
@@ -201,7 +201,7 @@ def test_timing_out_prompt_routes_as_incident_triage():
     assert body["incident_context"]["source"] == "seeded_cloudwatch_logs"
     assert body["tool_calls"][0]["name"] == "incident.context"
     assert {source["kind"] for source in body["answer_sources"]} >= {
-        "deterministic",
+        "local_control",
         "knowledge",
         "policy",
         "operational_context",
@@ -240,9 +240,9 @@ def test_low_sensitivity_prompt_uses_bedrock_route_with_local_fallback_when_disa
     body = response.json()
 
     assert response.status_code == 200
-    assert body["model_route"]["provider"] == "simulated-cloud"
-    assert body["model_route"]["model"] == "bedrock-disabled-deterministic-fallback"
-    assert body["answer_sources"][0]["name"] == "AegisDesk deterministic responder"
+    assert body["model_route"]["provider"] == "local"
+    assert body["model_route"]["model"] == "bedrock-disabled-local-control-fallback"
+    assert body["answer_sources"][0]["name"] == "AegisDesk local control responder"
     assert body["knowledge_citations"][0]["doc_id"] == "GOV-FINOPS-007"
 
 
@@ -350,9 +350,9 @@ def test_approval_decisions_are_pending_only():
     assert second.status_code == 409
 
 
-def test_seed_demo_requires_admin_and_populates_governance_state():
-    forbidden = client.post("/demo/seed", headers=auth_headers(Role.employee))
-    response = client.post("/demo/seed", headers=auth_headers(Role.admin, team="platform", user_id="u-9001"))
+def test_seed_state_requires_admin_and_populates_governance_state():
+    forbidden = client.post("/admin/seed", headers=auth_headers(Role.employee))
+    response = client.post("/admin/seed", headers=auth_headers(Role.admin, team="platform", user_id="u-9001"))
     metrics = response.json()["metrics"]
 
     assert forbidden.status_code == 403

@@ -16,13 +16,13 @@ Generic chatbots are easy to dismiss. A CloudOps control plane demonstrates high
 
 Tradeoff:
 
-The project becomes more complex than a basic chat UI. Scope must stay narrow and reviewer-driven.
+The project becomes more complex than a basic chat UI. Scope must stay narrow and customer-workflow driven.
 
-## ADR-002: Local-First MVP
+## ADR-002: Local-First Runtime
 
 Decision:
 
-The first complete reviewer path should run locally with Docker Compose and Ollama.
+The first complete operator path should run locally with Docker Compose and optional Ollama.
 
 Reason:
 
@@ -30,7 +30,7 @@ This keeps initial cost near zero, makes the app reproducible, and highlights co
 
 Tradeoff:
 
-Local runtime does not prove managed cloud operations by itself. Terraform, Helm, and deployment docs will show the production path.
+Local runtime does not prove managed cloud operations by itself. Terraform, Helm, and deployment docs show the customer deployment path.
 
 ## ADR-003: Use OPA/Rego For Policy
 
@@ -44,13 +44,13 @@ Policy-as-code is more credible for enterprise AI governance. It also maps direc
 
 Tradeoff:
 
-OPA adds complexity. The MVP should use a small number of readable policies and tests.
+OPA adds complexity. The product should use a small number of readable policies and tests.
 
-## ADR-004: Mock Destructive Cloud Actions
+## ADR-004: Keep Destructive Cloud Actions Behind Approval
 
 Decision:
 
-Do not grant real production access or modify real cloud resources in the portfolio environment.
+Do not grant production access or modify cloud resources directly from a chat request.
 
 Reason:
 
@@ -58,7 +58,7 @@ The goal is to prove safe architecture, not create unnecessary risk or cost.
 
 Tradeoff:
 
-Some cloud actions are simulated. The documentation must clearly distinguish mocked actions from production implementation.
+Some actions use local adapters. The documentation must clearly distinguish local adapters from customer production integrations.
 
 ## ADR-005: Show Cost Decisions In The Product UI
 
@@ -72,4 +72,4 @@ AI cost management is now part of cloud governance. Showing route and cost decis
 
 Tradeoff:
 
-MVP cost numbers may be estimates. They should be labeled as estimates and calculated consistently.
+Cost numbers may be estimates. They should be labeled as estimates and calculated consistently.

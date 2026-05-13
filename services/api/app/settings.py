@@ -61,7 +61,7 @@ def get_settings() -> Settings:
     persona_issuer_enabled = _env_bool("AEGISDESK_PERSONA_ISSUER_ENABLED", _env_bool("DEMO_MODE", True))
     return Settings(
         persona_issuer_enabled=persona_issuer_enabled,
-        auth_secret=os.getenv("AEGISDESK_AUTH_SECRET", "local-portfolio-secret-change-me"),
+        auth_secret=os.getenv("AEGISDESK_AUTH_SECRET", "local-control-plane-secret-change-me"),
         auth_mode=os.getenv("AEGISDESK_AUTH_MODE", "hmac").lower(),
         jwks_private_key_pem=os.getenv("AEGISDESK_JWKS_PRIVATE_KEY_PEM"),
         jwks_public_key_pem=os.getenv("AEGISDESK_JWKS_PUBLIC_KEY_PEM"),

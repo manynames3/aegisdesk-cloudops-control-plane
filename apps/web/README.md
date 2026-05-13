@@ -27,9 +27,9 @@ npm run dev
 
 By default the app expects the API at `http://localhost:8000`. Override with `NEXT_PUBLIC_API_BASE_URL`.
 
-The role switcher is a portfolio persona selector. The frontend requests a short-lived bearer token for the selected role; protected API routes still derive identity from token claims instead of trusting role fields in request bodies. In the hosted AWS deployment, those tokens are Cognito ID tokens verified through Cognito JWKS.
+The role switcher is an identity shortcut. The frontend requests a short-lived bearer token for the selected role; protected API routes still derive identity from token claims instead of trusting role fields in request bodies. In the hosted AWS deployment, those tokens are Cognito ID tokens verified through Cognito JWKS.
 
-For the hosted reviewer flow, the sidebar `Identity` panel can prepare a Cognito Hosted UI login for `employee`, `manager`, or `admin`. The API creates or updates a disposable Cognito reviewer persona and returns the generated username and password, which the UI displays before redirecting to Hosted UI. The `Reviewer shortcut` panel is intentionally labeled for fast demos that do not need to show the Cognito redirect.
+For the hosted reviewer flow, the sidebar `Identity` panel can prepare a Cognito Hosted UI login for `employee`, `manager`, or `admin`. The API creates or updates a non-production Cognito reviewer persona and returns the generated username and password, which the UI displays before redirecting to Hosted UI. The `Identity shortcut` panel is intentionally labeled for fast walkthroughs that do not need to show the Cognito redirect.
 
 ## Static Export
 

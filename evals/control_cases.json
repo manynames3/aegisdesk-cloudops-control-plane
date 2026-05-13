@@ -6,7 +6,7 @@
       "role": "employee",
       "team": "payments"
     },
-    "message": "Here is the error log with token=demo-secret-value and customer@example.test. Why is this failing?",
+    "message": "Here is the error log with token=sample-secret-value and customer@example.test. Why is this failing?",
     "expect": {
       "policy_decision": "allow",
       "model_provider": "local",

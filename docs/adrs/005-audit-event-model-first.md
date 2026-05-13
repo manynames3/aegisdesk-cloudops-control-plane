@@ -17,5 +17,4 @@ Make audit events a first-class system concept before building the dashboard. Th
 - Governance views can be backed by real system state.
 - Debugging and compliance review become easier.
 - The API and data model need to capture decision metadata consistently.
-- The MVP must avoid storing sensitive values in audit metadata.
-
+- The product must avoid storing sensitive values in audit metadata.

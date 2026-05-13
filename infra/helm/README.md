@@ -2,7 +2,7 @@
 
 Purpose:
 
-Package AegisDesk for Kubernetes deployment after the local Docker Compose MVP is complete.
+Package AegisDesk for Kubernetes deployment after the local Docker Compose path is stable.
 
 Planned chart components:
 
@@ -13,4 +13,3 @@ Planned chart components:
 - ConfigMaps for non-secret config
 - Secret references for provider keys
 - Ingress
-

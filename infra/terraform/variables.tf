@@ -53,7 +53,7 @@ variable "max_request_chars" {
 }
 
 variable "cloud_model_kill_switch" {
-  description = "When true, force approved cloud model routes back to local deterministic handling."
+  description = "When true, force approved cloud model routes back to local control handling."
   type        = bool
   default     = false
 }

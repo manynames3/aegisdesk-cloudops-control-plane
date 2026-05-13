@@ -35,17 +35,17 @@ The next valuable cloud skill is not just "can build with AI." It is:
 
 > Can build AI systems that are secure, observable, cost-aware, policy-driven, and deployable.
 
-AegisDesk is built to demonstrate that skill set.
+AegisDesk is built to operationalize that pattern.
 
-## Why It Matters To Hiring Teams
+## Why It Matters To Buyers
 
-For recruiters, the project has a simple story:
+For business stakeholders, the product has a simple story:
 
 - It is an internal AI support platform.
 - It helps employees solve cloud and IT problems.
 - It protects the company from privacy, access, and cost risks.
 
-For senior cloud hiring managers, the project has deeper proof:
+For technical stakeholders, the product has deeper proof:
 
 - Real policy enforcement with OPA/Rego
 - Real routing decisions based on data sensitivity and cost

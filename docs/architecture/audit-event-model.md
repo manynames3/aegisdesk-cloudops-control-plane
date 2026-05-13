@@ -47,7 +47,7 @@ The audit event model is central to AegisDesk. The system should be able to expl
 | `clarification.requested` | Request needs additional details before a sensitive tool action can run |
 | `model.route.selected` | Model route was chosen |
 | `model.route.adjusted` | Route was changed by a runtime guardrail such as clarification or kill switch |
-| `model.fallback` | Bedrock was unavailable and deterministic fallback was used |
+| `model.fallback` | Bedrock was unavailable and the local control route was used |
 | `model.kill_switch_applied` | Cloud model kill switch forced local routing |
 | `quota.allowed` | Request was within role/team quota |
 | `quota.denied` | Request exceeded role/team quota |

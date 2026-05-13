@@ -1260,3 +1260,341 @@ button:disabled {
     align-items: stretch;
   }
 }
+
+.marketing {
+  background: #f6f7f9;
+  color: var(--text);
+}
+
+.marketingHero {
+  align-items: end;
+  background: url("/screenshots/policy-aware-chat.png") center / cover;
+  display: grid;
+  min-height: 76vh;
+  padding: 56px;
+  position: relative;
+}
+
+.marketingHeroOverlay {
+  background: rgba(10, 18, 25, 0.64);
+  inset: 0;
+  position: absolute;
+}
+
+.marketingHeroContent {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+  position: relative;
+  z-index: 1;
+}
+
+.marketingHeroContent p,
+.marketingSectionHeader p,
+.marketingProblem > div p {
+  color: #126b68;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.marketingHeroContent p {
+  color: #8ee2d8;
+}
+
+.marketingHeroContent h1 {
+  color: #ffffff;
+  font-size: clamp(42px, 7vw, 76px);
+  line-height: 0.98;
+  margin: 0;
+  max-width: 820px;
+}
+
+.marketingHeroContent span {
+  color: #dbe7ef;
+  font-size: 20px;
+  line-height: 1.45;
+  max-width: 720px;
+}
+
+.marketingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.marketingPrimary,
+.marketingSecondary {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
+.marketingPrimary {
+  background: #0f8f86;
+  color: #ffffff;
+}
+
+.marketingSecondary {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  color: #ffffff;
+}
+
+.marketingProblem,
+.marketingScreens,
+.marketingUseCases,
+.marketingArchitecture,
+.marketingSecurity,
+.marketingIntegrations,
+.marketingCta {
+  padding: 56px;
+}
+
+.marketingProblem {
+  align-items: start;
+  background: #ffffff;
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1fr);
+}
+
+.marketingProblem h2,
+.marketingSectionHeader h2,
+.marketingCta h2 {
+  font-size: 34px;
+  line-height: 1.15;
+  margin: 8px 0 0;
+}
+
+.marketingProblem > p,
+.marketingCta p {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.marketingSectionHeader {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 24px;
+  max-width: 900px;
+}
+
+.marketingScreens,
+.marketingArchitecture,
+.marketingIntegrations {
+  background: #eef2f5;
+}
+
+.screenshotGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.screenshotGrid figure {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  overflow: hidden;
+}
+
+.screenshotGrid img {
+  aspect-ratio: 16 / 10;
+  display: block;
+  object-fit: cover;
+  object-position: left top;
+  width: 100%;
+}
+
+.screenshotGrid figcaption {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 0 14px 14px;
+}
+
+.useCaseGrid,
+.securityGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.useCaseGrid article {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.useCaseGrid svg,
+.securityGrid svg,
+.architectureNotes svg,
+.marketingCta svg {
+  color: var(--accent);
+}
+
+.useCaseGrid h3 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.useCaseGrid p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.architectureFlow {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.architectureFlow div {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  min-height: 112px;
+  padding: 14px;
+}
+
+.architectureFlow span {
+  align-items: center;
+  background: var(--accent);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.architectureFlow strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.architectureNotes {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.architectureNotes span,
+.securityGrid span,
+.integrationList span {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px;
+}
+
+.securityGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.integrationList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.integrationList span {
+  min-height: 42px;
+}
+
+.marketingCta {
+  align-items: center;
+  background: #101820;
+  color: #ffffff;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.marketingCta h2 {
+  color: #ffffff;
+  margin-top: 0;
+}
+
+.marketingCta p {
+  color: #c9d3dd;
+  margin-top: 8px;
+}
+
+@media (max-width: 1100px) {
+  .marketingHero,
+  .marketingProblem,
+  .marketingScreens,
+  .marketingUseCases,
+  .marketingArchitecture,
+  .marketingSecurity,
+  .marketingIntegrations,
+  .marketingCta {
+    padding: 36px;
+  }
+
+  .marketingProblem,
+  .screenshotGrid,
+  .useCaseGrid,
+  .architectureNotes,
+  .securityGrid,
+  .marketingCta {
+    grid-template-columns: 1fr;
+  }
+
+  .architectureFlow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .marketingHero {
+    min-height: 72vh;
+    padding: 28px;
+  }
+
+  .marketingHeroContent h1 {
+    font-size: 42px;
+  }
+
+  .marketingHeroContent span,
+  .marketingProblem > p {
+    font-size: 16px;
+  }
+
+  .marketingProblem h2,
+  .marketingSectionHeader h2,
+  .marketingCta h2 {
+    font-size: 28px;
+  }
+
+  .architectureFlow {
+    grid-template-columns: 1fr;
+  }
+}

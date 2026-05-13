@@ -31,8 +31,9 @@ def maybe_generate_with_bedrock(
     if not settings.enable_bedrock:
         fallback_route = route.model_copy(
             update={
-                "provider": "simulated-cloud",
-                "model": "bedrock-disabled-deterministic-fallback",
+                "provider": "local",
+                "model": "bedrock-disabled-local-control-fallback",
+                "reason": "bedrock_disabled_local_control_fallback",
                 "external_call": False,
                 "estimated_cost_usd": 0.0008,
             }

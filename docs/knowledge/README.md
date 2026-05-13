@@ -1,6 +1,6 @@
 # AegisDesk Knowledge Base
 
-This directory contains the trusted internal knowledge sources used by the AegisDesk portfolio environment.
+This directory contains the trusted internal knowledge sources used by the AegisDesk control plane.
 
 The documents are intentionally small but structured like enterprise operational content:
 

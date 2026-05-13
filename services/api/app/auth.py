@@ -41,7 +41,7 @@ def _sign(message: str, secret: str) -> str:
     return _b64url_encode(signature)
 
 
-def create_demo_token(actor: Actor, expires_in_seconds: int = 3600) -> str:
+def create_persona_token(actor: Actor, expires_in_seconds: int = 3600) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     payload = {

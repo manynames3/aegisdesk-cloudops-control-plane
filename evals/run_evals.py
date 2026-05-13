@@ -16,7 +16,7 @@ os.environ.setdefault("AEGISDESK_POLICY_MODE", "python")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.auth import create_demo_token  # noqa: E402
+from app.auth import create_persona_token  # noqa: E402
 from app.main import app, store  # noqa: E402
 from app.models import Actor, Role  # noqa: E402
 
@@ -33,7 +33,7 @@ def check_case(case: dict[str, Any], client: TestClient) -> list[str]:
     }
     user = case["user"]
     actor = Actor(user_id=user["user_id"], role=Role(user["role"]), team=user["team"])
-    headers = {"Authorization": f"Bearer {create_demo_token(actor)}"}
+    headers = {"Authorization": f"Bearer {create_persona_token(actor)}"}
     response = client.post("/chat", headers=headers, json=payload)
     failures: list[str] = []
 
@@ -56,7 +56,7 @@ def check_case(case: dict[str, Any], client: TestClient) -> list[str]:
 
     if "pending_approvals" in expected:
         admin = Actor(user_id="u-eval-admin", role=Role.admin, team="platform")
-        admin_headers = {"Authorization": f"Bearer {create_demo_token(admin)}"}
+        admin_headers = {"Authorization": f"Bearer {create_persona_token(admin)}"}
         metrics = client.get("/metrics/summary", headers=admin_headers).json()
         assertions["pending_approvals"] = metrics["approvals_pending"]
 

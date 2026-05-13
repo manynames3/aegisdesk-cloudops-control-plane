@@ -1,6 +1,6 @@
 # Threat Model
 
-This threat model is scoped to the portfolio MVP and the documented production path.
+This threat model is scoped to the current self-hosted implementation and the documented customer production path.
 
 ## Assets
 
@@ -54,7 +54,7 @@ Controls:
 - Policy enforced outside the model
 - Tool calls evaluated by gateway, not by model alone
 - System instructions separated from user/tool content
-- Deterministic control evals for policy denial, routing, redaction, and tool authorization
+- Control evals for policy denial, routing, redaction, and tool authorization
 
 ### 4. Cost Abuse
 
@@ -77,7 +77,7 @@ Actions occur without traceability or logs are modified.
 
 Controls:
 
-- Append-style event model in MVP
+- Append-style event model
 - Trace IDs linked to requests
 - Production path: immutable storage or write-once audit sink
 
@@ -89,13 +89,13 @@ Tool layer uses credentials that are broader than required.
 
 Controls:
 
-- MVP uses mocked destructive actions
-- Production path uses scoped IAM roles
+- Destructive actions remain approval-only in the current implementation
+- Customer production path uses scoped IAM roles
 - Short-lived credentials
 - Separate read-only and write-capable tools
 - Approval required for privileged operations
 
-## MVP Non-Goals
+## Current Non-Goals
 
 - Real production access grants
 - Real destructive cloud operations

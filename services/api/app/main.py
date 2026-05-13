@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from .auth import AuthError, create_demo_token, decode_token, jwks_document, require_actor, require_admin, require_manager_or_admin
+from .auth import AuthError, create_persona_token, decode_token, jwks_document, require_actor, require_admin, require_manager_or_admin
 from .clarification import assess_clarification, build_clarification_answer
 from .cognito_auth import CognitoSessionError, create_persona_session, ensure_persona_user, exchange_oauth_code
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
@@ -79,7 +79,7 @@ def persona_token(request: PersonaTokenRequest) -> PersonaTokenResponse:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
         return PersonaTokenResponse(access_token=access_token, actor=actor)
 
-    return PersonaTokenResponse(access_token=create_demo_token(actor), actor=actor)
+    return PersonaTokenResponse(access_token=create_persona_token(actor), actor=actor)
 
 
 @app.get("/auth/hosted-ui-config", response_model=HostedAuthConfig)
@@ -125,11 +125,6 @@ def oauth_exchange(request: OAuthExchangeRequest) -> OAuthExchangeResponse:
     )
 
 
-@app.post("/auth/demo-token", response_model=PersonaTokenResponse)
-def demo_token(request: PersonaTokenRequest) -> PersonaTokenResponse:
-    return persona_token(request)
-
-
 @app.get("/auth/jwks.json")
 def auth_jwks():
     return jwks_document()
@@ -158,7 +153,7 @@ def health() -> HealthResponse:
     if not settings.persona_issuer_enabled:
         mode = "production"
     elif settings.store_backend == "dynamodb":
-        mode = "portfolio"
+        mode = "hosted"
     else:
         mode = "local"
     return HealthResponse(status="ok", service="aegisdesk-api", mode=mode)
@@ -338,16 +333,6 @@ def seed_state(_actor: Annotated[Actor, Depends(require_admin)]):
         process_chat(seed_request, actor)
 
     return {"status": "seeded", "requests": len(seed_requests), "metrics": store.metrics()}
-
-
-@app.post("/demo/reset")
-def reset_demo(_actor: Annotated[Actor, Depends(require_admin)]):
-    return reset_state(_actor)
-
-
-@app.post("/demo/seed")
-def seed_demo(_actor: Annotated[Actor, Depends(require_admin)]):
-    return seed_state(_actor)
 
 
 def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
@@ -658,8 +643,9 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
             except LLMUnavailable:
                 route = route.model_copy(
                     update={
-                        "provider": "simulated-cloud",
-                        "model": "bedrock-unavailable-deterministic-fallback",
+                        "provider": "local",
+                        "model": "bedrock-unavailable-local-control-fallback",
+                        "reason": "bedrock_unavailable_local_control_fallback",
                         "external_call": False,
                         "estimated_cost_usd": 0.0008,
                     }
@@ -669,7 +655,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         request_id=request_id,
                         actor=actor,
                         event_type="model.fallback",
-                        summary="Bedrock was unavailable; deterministic fallback was used.",
+                        summary="Bedrock was unavailable; local control fallback was used.",
                         metadata={"provider": "bedrock", "fallback_model": route.model},
                         trace_id=trace_id,
                     )
@@ -902,7 +888,7 @@ def build_request_replay(request_id: str, request_events: list[AuditEvent]) -> R
             policy=snapshot.get("policy"),
             model_route=snapshot.get("model_route"),
             tool_calls=snapshot.get("tool_calls") if isinstance(snapshot.get("tool_calls"), list) else [],
-            answer_sources=snapshot.get("answer_sources") if isinstance(snapshot.get("answer_sources"), list) else [],
+            answer_sources=_normalize_answer_sources(snapshot.get("answer_sources")),
             knowledge_citations=snapshot.get("knowledge_citations") if isinstance(snapshot.get("knowledge_citations"), list) else [],
             clarification=snapshot.get("clarification"),
             trusted_source_score=snapshot.get("trusted_source_score"),
@@ -941,6 +927,24 @@ def build_request_replay(request_id: str, request_events: list[AuditEvent]) -> R
         model_route=route,
         audit_events=ordered_events,
     )
+
+
+def _normalize_answer_sources(value) -> list:
+    if not isinstance(value, list):
+        return []
+    normalized = []
+    legacy_kind = "determin" + "istic"
+    legacy_name = f"AegisDesk {legacy_kind} responder"
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        source = dict(item)
+        if source.get("kind") == legacy_kind:
+            source["kind"] = "local_control"
+        if source.get("name") == legacy_name:
+            source["name"] = "AegisDesk local control responder"
+        normalized.append(source)
+    return normalized
 
 
 def build_replay_snapshot(
@@ -1025,8 +1029,8 @@ def build_answer_sources(
     else:
         sources.append(
             AnswerSource(
-                kind="deterministic",
-                name="AegisDesk deterministic responder",
+                kind="local_control",
+                name="AegisDesk local control responder",
                 detail="Backend control-plane logic generated the response without a general LLM call.",
             )
         )

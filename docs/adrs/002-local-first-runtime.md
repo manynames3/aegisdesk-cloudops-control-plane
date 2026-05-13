@@ -1,4 +1,4 @@
-# ADR-002: Use A Local-First MVP Runtime
+# ADR-002: Use A Local-First Runtime
 
 ## Status
 
@@ -16,5 +16,5 @@ Make Docker Compose and local model routing the first runnable target. Use Ollam
 
 - The app can run at low or zero cost.
 - The project is easier to reproduce from a clean checkout.
-- Cloud deployment artifacts remain a production path rather than a blocker for the first reviewer path.
+- Cloud deployment artifacts remain available without blocking local installation.
 - Local runtime does not replace the need to document cloud deployment, IAM, secrets, and observability hardening.

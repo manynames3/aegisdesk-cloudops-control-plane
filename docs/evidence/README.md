@@ -1,6 +1,6 @@
-# Portfolio Evidence
+# Product Evidence
 
-These screenshots are captured from the app and are intended for recruiter and hiring-manager scanning. The hosted deployment is available at [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net).
+These screenshots are captured from the app and show the core control-plane workflows. The hosted deployment is available at [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net).
 
 ## Walkthrough
 
@@ -20,4 +20,4 @@ These screenshots are captured from the app and are intended for recruiter and h
 
 ## Boundary
 
-The app does not modify real cloud resources through chat tools. The hosted portfolio environment uses low-cost AWS resources provisioned by Terraform, calls Bedrock and Cost Explorer only through policy-gated paths, and includes a $1 monthly budget guardrail.
+The app does not modify cloud resources directly through chat tools. The hosted environment uses low-cost AWS resources provisioned by Terraform, calls Bedrock and Cost Explorer only through policy-gated paths, and includes a configurable budget guardrail.

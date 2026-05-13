@@ -16,12 +16,12 @@ This directory contains the low-cost AWS deployment path for AegisDesk.
 - CloudWatch log group with seven-day retention
 - S3 public access block, server-side encryption, versioning, and noncurrent version cleanup
 - S3 backend for shared Terraform state
-- AWS Budget capped at the portfolio threshold
+- AWS Budget capped at the configured threshold
 - Consistent default tags for ownership and cost tracking
 
 ## Why This Shape
 
-This avoids EKS, NAT gateways, RDS, ECS/Fargate, and always-on compute. The goal is to prove AWS architecture and infrastructure-as-code judgment while keeping idle cost low for a portfolio project.
+This avoids EKS, NAT gateways, RDS, ECS/Fargate, and always-on compute. The goal is to provide a credible AWS architecture while keeping idle cost low for self-hosted evaluation.
 
 ## Build and Deploy
 
@@ -54,7 +54,7 @@ Additional runtime guardrails are controlled through Terraform variables:
 
 - `api_throttling_rate_limit` and `api_throttling_burst_limit` configure HTTP API Gateway throttles.
 - `max_request_chars` rejects oversized prompts before policy or model routing.
-- `cloud_model_kill_switch` forces approved Bedrock routes back to local deterministic handling when cost or abuse risk is elevated.
+- `cloud_model_kill_switch` forces approved Bedrock routes back to local control handling when cost or abuse risk is elevated.
 
 ## State Boundary
 

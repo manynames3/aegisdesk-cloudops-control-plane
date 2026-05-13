@@ -20,24 +20,35 @@ jobs:
           test -f docs/product/why-this-exists.md
           test -f docs/product/target-users.md
           test -f docs/product/use-cases.md
+          test -f docs/product/positioning.md
+          test -f docs/product/buyer-personas.md
+          test -f docs/product/use-cases-for-cloudops.md
+          test -f docs/product/roi.md
           test -f docs/product/enterprise-value.md
           test -f docs/product/frontend-spec.md
           test -f docs/architecture.md
           test -f docs/architecture/system-architecture.md
           test -f docs/architecture/api-contracts.md
           test -f docs/architecture/audit-event-model.md
+          test -f docs/deployment/self-hosted.md
+          test -f docs/integrations/README.md
           test -f docs/integrations/codex-mcp.md
           test -f docs/adrs/README.md
           test -f docs/adrs/001-cloudops-control-plane.md
-          test -f docs/adrs/002-local-first-mvp.md
+          test -f docs/adrs/002-local-first-runtime.md
           test -f docs/adrs/003-policy-outside-the-model.md
+          test -f docs/adrs/004-destructive-action-boundary.md
           test -f docs/adrs/006-cognito-persona-auth-boundary.md
           test -f docs/adrs/007-low-cost-aws-deployment.md
           test -f docs/adrs/008-real-bedrock-dynamodb-mcp.md
           test -f docs/evidence/README.md
           test -f docs/evidence/screenshots/policy-aware-chat.png
+          test -f docs/security/security-overview.md
+          test -f docs/security/data-handling.md
           test -f docs/security/threat-model.md
-          test -f docs/delivery/two-week-mvp-plan.md
+          test -f docs/sales/product-brief.md
+          test -f docs/sales/walkthrough-video-script.md
+          test -f docs/sales/why-not-chatgpt-or-claude.md
           test -f compose.yaml
           test -f policies/chat_policy.rego
           test -f policies/model_routing.rego

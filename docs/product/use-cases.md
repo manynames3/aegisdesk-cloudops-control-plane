@@ -1,6 +1,6 @@
 # Use Cases
 
-These are the use cases the MVP should demonstrate clearly in the UI. Each use case is chosen because it is easy for recruiters to understand and meaningful enough for a senior cloud hiring manager to evaluate.
+These are the product use cases the UI should communicate clearly. Each use case is chosen because it is easy for a non-technical stakeholder to understand and meaningful enough for a senior cloud reviewer to evaluate.
 
 ## Use Case 1: Cloud Incident Triage
 
@@ -143,11 +143,11 @@ An admin clicks:
 - Executive reporting
 - Clear proof that controls are measurable
 
-## Use Case 7: Recruiter Walkthrough
+## Use Case 7: Guided Product Walkthrough
 
 ### Scenario
 
-A non-technical reviewer wants to understand the project quickly without reading the code.
+A non-technical reviewer wants to understand the control plane quickly without reading the code.
 
 ### System Behavior
 
@@ -160,6 +160,6 @@ A non-technical reviewer wants to understand the project quickly without reading
 
 ### Enterprise Value
 
-- Makes the control-plane story understandable to recruiters.
-- Gives hiring managers a repeatable path to inspect the technical depth.
+- Makes the control-plane story understandable to business and technical reviewers.
+- Gives cloud leaders a repeatable path to inspect the technical depth.
 - Demonstrates product thinking around trust, governance, and reviewability.

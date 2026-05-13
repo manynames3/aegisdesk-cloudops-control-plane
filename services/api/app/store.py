@@ -171,7 +171,7 @@ class DemoStore:
 
     def metrics(self) -> MetricsSummary:
         local_model_requests = sum(1 for route in self.model_routes if route.provider == "local")
-        cloud_model_requests = sum(1 for route in self.model_routes if route.provider in {"simulated-cloud", "bedrock"})
+        cloud_model_requests = sum(1 for route in self.model_routes if route.provider == "bedrock")
         redactions_total = sum(1 for event in self.events if event.event_type in {"pii.detected", "secret.detected"})
         denied_actions = sum(1 for event in self.events if event.event_type in {"policy.denied", "tool.blocked"})
         tool_calls_total = sum(1 for event in self.events if event.event_type == "tool.called")
@@ -327,7 +327,7 @@ class DynamoStore:
 
     def metrics(self) -> MetricsSummary:
         local_model_requests = sum(1 for route in self.model_routes if route.provider == "local")
-        cloud_model_requests = sum(1 for route in self.model_routes if route.provider in {"simulated-cloud", "bedrock"})
+        cloud_model_requests = sum(1 for route in self.model_routes if route.provider == "bedrock")
         redactions_total = sum(1 for event in self.events if event.event_type in {"pii.detected", "secret.detected"})
         denied_actions = sum(1 for event in self.events if event.event_type in {"policy.denied", "tool.blocked", "quota.denied"})
         tool_calls_total = sum(1 for event in self.events if event.event_type == "tool.called")

@@ -90,7 +90,7 @@ def _query_cost_explorer(settings: Settings, period_days: int) -> dict[str, Any]
 def _fallback_summary(reason: str, period_days: int) -> dict[str, Any]:
     return {
         "period": f"last_{period_days}_days",
-        "source": "deterministic_fallback",
+        "source": "local_fallback",
         "reason": reason,
         "cache_hit": False,
         "cache_ttl_seconds": 0,

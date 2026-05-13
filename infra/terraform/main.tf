@@ -11,7 +11,7 @@ locals {
     Project     = "AegisDesk"
     Environment = var.environment
     ManagedBy   = "Terraform"
-    CostOwner   = "portfolio"
+    CostOwner   = "cloudops"
   }
 }
 
@@ -409,7 +409,7 @@ resource "aws_cloudfront_origin_access_control" "web" {
 resource "aws_cloudfront_distribution" "web" {
   enabled             = true
   default_root_object = "index.html"
-  comment             = "AegisDesk portfolio static frontend"
+  comment             = "AegisDesk static frontend"
   price_class         = "PriceClass_100"
 
   origin {

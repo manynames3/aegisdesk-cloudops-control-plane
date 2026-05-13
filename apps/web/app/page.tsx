@@ -118,7 +118,7 @@ type TrustedSourceScore = {
 };
 
 type AnswerSource = {
-  kind: "deterministic" | "model" | "knowledge" | "operational_context" | "tool" | "policy" | "cost" | "clarification";
+  kind: "local_control" | "model" | "knowledge" | "operational_context" | "tool" | "policy" | "cost" | "clarification";
   name: string;
   detail: string;
   trusted: boolean;
@@ -756,7 +756,7 @@ export default function Home() {
                 </div>
               )}
               <details className="shortcutPanel">
-                <summary>Reviewer shortcut</summary>
+                <summary>Identity shortcut</summary>
                 <div className="segmented">
                   {(["employee", "manager", "admin"] as Role[]).map((option) => (
                     <button
@@ -784,7 +784,7 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p>Live AWS deployment</p>
+            <p>Self-hosted control plane</p>
             <h1>{tabTitle(tab)}</h1>
           </div>
           <div className="topActions">
@@ -973,7 +973,7 @@ export default function Home() {
           <section className="panel evalPanel">
             <div className="sectionHeader">
               <h2>Control Checks</h2>
-              <span>deterministic MVP</span>
+              <span>policy and safety suite</span>
             </div>
             <EvalRow label="Secret-like values are redacted before routing" status="ready" />
             <EvalRow label="Production admin access is denied" status="ready" />
@@ -1420,9 +1420,8 @@ function EventFilters({
       </select>
       <select onChange={(event) => onChange({ ...filters, route: event.target.value })} value={filters.route}>
         <option value="any">Any route</option>
-        <option value="local">Local</option>
+        <option value="local">Local control</option>
         <option value="bedrock">Bedrock</option>
-        <option value="simulated-cloud">Fallback</option>
       </select>
       <label>
         <ClipboardList size={15} />
@@ -1480,9 +1479,6 @@ function explainDecision(response: ChatResponse) {
   }
   if (response.model_route.provider === "bedrock") {
     return "Allowed to use Amazon Bedrock because policy found no sensitive data in the request.";
-  }
-  if (response.model_route.provider === "simulated-cloud") {
-    return "Allowed through the cloud route, with deterministic fallback available when Bedrock is unavailable.";
   }
   return response.policy.decision === "allow" ? "Allowed by role and policy." : "Policy requires review before this action can proceed.";
 }

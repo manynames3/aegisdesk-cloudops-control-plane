@@ -44,8 +44,8 @@ def _route_for_provider(provider: str, reason: str) -> ModelRoute:
         )
 
     return ModelRoute(
-        provider="simulated-cloud",
-        model="cost-optimized-small-model",
+        provider="local",
+        model="local-control-fallback",
         reason=reason,
         estimated_cost_usd=0.0008,
         external_call=False,

@@ -50,7 +50,7 @@ The launcher creates `services/mcp-tools/.venv` on first run and writes setup lo
 
 | Tool | Purpose |
 | --- | --- |
-| `create_ticket` | Create a deterministic support ticket payload for governed CloudOps workflows |
+| `create_ticket` | Create a controlled support ticket payload for governed CloudOps workflows |
 | `request_temporary_read_only_access` | Create a temporary read-only access approval request payload |
 | `lookup_cost_summary` | Return a cost summary payload for cost-governance workflows |
 | `search_runbook` | Search the local runbook fixture used for incident triage |

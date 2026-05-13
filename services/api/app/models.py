@@ -91,7 +91,7 @@ class KnowledgeCitation(BaseModel):
 
 class AnswerSource(BaseModel):
     kind: Literal[
-        "deterministic",
+        "local_control",
         "model",
         "knowledge",
         "operational_context",
@@ -181,10 +181,6 @@ class PersonaTokenResponse(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
     actor: Actor
-
-
-DemoTokenRequest = PersonaTokenRequest
-DemoTokenResponse = PersonaTokenResponse
 
 
 class HostedAuthConfig(BaseModel):

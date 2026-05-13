@@ -19,4 +19,4 @@ Docker is not required for the direct local development path. Use Docker Compose
 docker compose up --build
 ```
 
-The current FastAPI implementation uses deterministic local behavior and does not require a paid model provider.
+The current FastAPI implementation uses local control behavior and does not require a paid model provider.

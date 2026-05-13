@@ -68,4 +68,4 @@ When explaining a cost spike, the answer should identify:
 4. cache status
 5. recommended governance action
 
-The model should not invent billing figures. If Cost Explorer is unavailable, the system should label deterministic fallback data clearly.
+The model should not invent billing figures. If Cost Explorer is unavailable, the system should label local fallback data clearly.

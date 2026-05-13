@@ -1,6 +1,6 @@
 # API Contracts
 
-These contracts describe the current portfolio shape. Protected endpoints require `Authorization: Bearer <token>`. The hosted deployment uses Cognito ID tokens verified through Cognito JWKS.
+These contracts describe the current control-plane API. Protected endpoints require `Authorization: Bearer <token>`. The hosted deployment uses Cognito ID tokens verified through Cognito JWKS.
 
 ## POST /auth/persona-token
 
@@ -27,7 +27,7 @@ Response:
 }
 ```
 
-This endpoint creates reviewer personas for the hosted portfolio environment. In AWS it uses Cognito Admin APIs to issue Cognito ID tokens; direct local runs can use a local token issuer for fast testing.
+This endpoint creates non-production reviewer personas for the hosted environment. In AWS it uses Cognito Admin APIs to issue Cognito ID tokens; direct local runs can use a local token issuer for fast testing.
 
 ## GET /auth/hosted-ui-config
 
@@ -37,7 +37,7 @@ Returns the Cognito Hosted UI OAuth endpoints and public app client ID used by t
 
 Creates or updates a controlled reviewer persona in Cognito, returns reviewer credentials, and returns Hosted UI config. The frontend uses this to send a reviewer to Cognito Hosted UI instead of silently switching roles in the browser.
 
-The returned credentials are disposable portfolio personas. The frontend shows them in the sidebar so a reviewer can sign into Cognito without a separate secret handoff.
+The returned credentials are non-production personas. The frontend shows them in the sidebar so a reviewer can sign into Cognito without a separate secret handoff.
 
 ## POST /auth/oauth/exchange
 
@@ -116,8 +116,8 @@ Response:
   ],
   "answer_sources": [
     {
-      "kind": "deterministic",
-      "name": "AegisDesk deterministic responder",
+      "kind": "local_control",
+      "name": "AegisDesk local control responder",
       "detail": "Backend control-plane logic generated the response without a general LLM call.",
       "trusted": true
     },
@@ -165,7 +165,7 @@ Response:
 }
 ```
 
-`knowledge_citations` identifies the trusted internal document excerpt used to ground the response. `answer_sources` exists so reviewers can tell whether an answer came from deterministic backend logic, Amazon Bedrock, OPA/Rego policy, an internal runbook or policy, an MCP tool, seeded CloudWatch-style incident context, AWS Cost Explorer, or a cached cost summary.
+`knowledge_citations` identifies the trusted internal document excerpt used to ground the response. `answer_sources` exists so reviewers can tell whether an answer came from backend control logic, Amazon Bedrock, OPA/Rego policy, an internal runbook or policy, an MCP tool, incident context, AWS Cost Explorer, or a cached cost summary.
 
 `clarification` shows whether the gateway had enough business and operational context to take action. For example, a vague incident can return safe partial guidance, but ticket creation, access approval, and cost lookup tool calls are paused until the request includes required fields such as service, severity, impact, resource, duration, reason, or time window.
 
@@ -173,7 +173,7 @@ Response:
 
 ## Tool Calls Through /chat
 
-The public API does not expose separate public tool endpoints. Tool actions are selected by intent inside `/chat`, authorized by OPA, and returned as structured `tool_calls`. The same deterministic tool set is also exposed by `services/mcp-tools` as a real MCP server for local agent clients.
+The public API does not expose separate public tool endpoints. Tool actions are selected by intent inside `/chat`, authorized by OPA, and returned as structured `tool_calls`. The same governed tool set is also exposed by `services/mcp-tools` as a real MCP server for local agent clients.
 
 Example tool call response:
 
@@ -197,7 +197,7 @@ Example tool call response:
 
 Manager/admin cost investigations call AWS Cost Explorer when enabled and cache the summary in DynamoDB. Employee cost investigations return `approval_required`.
 
-Incident triage responses include `incident_context` when the request supplies a known incident ID. The hosted portfolio uses a seeded CloudWatch Logs-style source to show the CloudWatch shape without running paid log queries.
+Incident triage responses include `incident_context` when the request supplies a known incident ID. The hosted environment uses a local fixture source to show the CloudWatch shape without running paid log queries.
 
 ## GET /events
 
@@ -221,7 +221,7 @@ Response:
       },
       "metadata": {
         "provider": "local",
-        "model": "deterministic-control-plane",
+        "model": "local-control-fallback",
         "reason": "sensitive_content_local_only"
       },
       "trace_id": "trace-123"

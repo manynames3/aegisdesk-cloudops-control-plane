@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-LLMs can explain policy, but they should not be the source of authority for access, routing, approvals, or tool execution. Enterprise AI workflows need deterministic controls that can be tested and audited.
+LLMs can explain policy, but they should not be the source of authority for access, routing, approvals, or tool execution. Enterprise AI workflows need explicit controls that can be tested and audited.
 
 ## Decision
 
@@ -17,5 +17,4 @@ Use OPA/Rego as the policy engine for model routing, tool authorization, approva
 - Policy decisions are testable and auditable.
 - The system can deny unsafe actions even if the model suggests them.
 - Rego adds implementation complexity.
-- The MVP should keep policies small, readable, and covered by tests.
-
+- The product should keep policies small, readable, and covered by tests.
