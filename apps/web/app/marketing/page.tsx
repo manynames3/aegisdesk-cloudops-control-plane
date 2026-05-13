@@ -271,6 +271,8 @@ export default function MarketingPage() {
           <MessageSquare size={18} />
         </a>
       </section>
+
+      <footer className="marketingFooter">©2026 SUPREME AI VENTURES LLC</footer>
     </main>
   );
 }

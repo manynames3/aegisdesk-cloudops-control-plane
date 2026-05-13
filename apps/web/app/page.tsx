@@ -982,6 +982,8 @@ export default function Home() {
             <EvalRow label="Cost summary requires manager or admin role" status="ready" />
           </section>
         )}
+
+        <footer className="appFooter">©2026 SUPREME AI VENTURES LLC</footer>
       </section>
     </main>
   );
