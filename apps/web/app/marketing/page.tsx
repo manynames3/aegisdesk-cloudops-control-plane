@@ -12,52 +12,43 @@ import {
   LockKeyhole,
   MessageSquare,
   Network,
+  SearchCheck,
   ShieldCheck,
   Siren,
-  Sparkles
+  Sparkles,
+  UsersRound
 } from "lucide-react";
 
 const useCases = [
   {
     icon: Siren,
-    title: "Incident Triage",
-    text: "Employees ask for help on live service issues while the control plane attaches runbooks, operational context, redacts secrets, and records the decision trail."
+    title: "During an incident",
+    text: "Operators ask what to check next, receive runbook-backed guidance, and see whether logs, policy, model routing, or internal knowledge shaped the answer."
   },
   {
     icon: KeyRound,
-    title: "Production Access",
-    text: "Unsafe admin requests are denied, safer scoped requests move through approval, and every before/after decision is written to audit history."
+    title: "When access is needed",
+    text: "Employees request scoped production access from the same workspace. Unsafe admin access is denied, safer temporary access moves to a manager approval queue."
   },
   {
     icon: BadgeDollarSign,
-    title: "Cloud Cost Review",
-    text: "Managers inspect AWS spend through Cost Explorer, cached summaries, policy gates, model routing evidence, and team-level quota controls."
+    title: "When spend spikes",
+    text: "Managers review AWS cost summaries with role-based access, cached Cost Explorer data, model-use evidence, and quota controls to reduce duplicate spend."
   }
 ];
 
-const integrations = [
-  "AWS Bedrock",
-  "AWS Cost Explorer",
-  "CloudWatch Logs",
-  "Datadog",
-  "Jira",
-  "ServiceNow",
-  "Cognito",
-  "Okta",
-  "Microsoft Entra ID",
-  "Slack",
-  "Microsoft Teams",
-  "MCP agent clients"
-];
+const activeIntegrations = ["AWS Bedrock", "AWS Cost Explorer", "Amazon Cognito", "DynamoDB audit", "OPA/Rego policy"];
+
+const adapterIntegrations = ["CloudWatch Logs", "Datadog", "Jira", "ServiceNow", "Okta", "Microsoft Entra ID", "Slack", "Microsoft Teams", "MCP agent clients"];
 
 const architecture = [
-  "SSO identity",
-  "API gateway",
-  "Redaction",
-  "OPA policy",
-  "Model routing",
-  "Tool adapters",
-  "DynamoDB audit"
+  "Verify identity",
+  "Redact sensitive data",
+  "Check policy",
+  "Route the model",
+  "Control tools",
+  "Capture approval",
+  "Write audit trail"
 ];
 
 export default function MarketingPage() {
@@ -70,12 +61,13 @@ export default function MarketingPage() {
         </a>
         <nav aria-label="Product navigation">
           <a href="#use-cases">Use cases</a>
-          <a href="#architecture">Architecture</a>
+          <a href="#why">Why AegisDesk</a>
+          <a href="#workflow">Workflow</a>
           <a href="#security">Security</a>
           <a href="#integrations">Integrations</a>
         </nav>
         <a className="marketingNavCta" href="/">
-          Open control plane
+          Open AegisDesk
         </a>
       </header>
 
@@ -83,27 +75,27 @@ export default function MarketingPage() {
         <div className="marketingHeroContent">
           <p>
             <Sparkles size={14} />
-            Self-hosted CloudOps AI control
+            AI support for CloudOps teams
           </p>
-          <h1>Self-hosted CloudOps AI control plane</h1>
+          <h1>AI help for CloudOps, with company controls built in.</h1>
           <span>
-            Give employees AI help for incidents, tickets, access requests, and cloud cost questions while enforcing identity, policy,
-            redaction, approval, model routing, and audit trails.
+            AegisDesk gives employees one place to ask about incidents, tickets, access, and cloud cost while your policies decide what
+            can be answered, approved, routed to a model, or recorded for audit.
           </span>
           <div className="marketingActions">
             <a className="marketingPrimary" href="/">
-              Open control plane
+              Open AegisDesk
               <ArrowRight size={18} />
             </a>
             <a className="marketingSecondary" href="https://github.com/manynames3/aegisdesk-cloudops-control-plane/tree/main/docs">
-              Read product docs
+              Read self-hosting docs
             </a>
           </div>
           <div className="marketingProofPills" aria-label="Platform capabilities">
-            <span>Cognito identity</span>
-            <span>OPA/Rego policy</span>
-            <span>Bedrock routing</span>
-            <span>DynamoDB audit</span>
+            <span>Ask operational questions</span>
+            <span>Redact sensitive data</span>
+            <span>Route approved requests</span>
+            <span>Audit every action</span>
           </div>
         </div>
         <figure className="marketingProductFrame">
@@ -119,39 +111,39 @@ export default function MarketingPage() {
 
       <section className="marketingSignal">
         <span>
-          <strong>Identity</strong>
-          Verified user, role, and team claims.
+          <strong>Operators</strong>
+          Get guided incident and access help.
         </span>
         <span>
-          <strong>Policy</strong>
-          OPA decides before model or tool execution.
+          <strong>Managers</strong>
+          Approve scoped requests with evidence.
         </span>
         <span>
-          <strong>Audit</strong>
-          Request replay, source evidence, and cost records.
+          <strong>Security</strong>
+          Keep redaction, policy, and audit visible.
         </span>
         <span>
-          <strong>Control</strong>
-          External model kill switch and approval gates.
+          <strong>FinOps</strong>
+          Review cloud spend with model-use context.
         </span>
       </section>
 
       <section className="marketingProblem" id="problem">
         <div>
           <p>Problem</p>
-          <h2>AI is useful in CloudOps, but unmanaged AI creates governance risk.</h2>
+          <h2>Your teams already want AI during operational work. The hard part is control.</h2>
         </div>
         <p>
-          Teams need faster answers during incidents and cost reviews, but companies also need proof of who asked, what data was
-          redacted, which policy allowed the request, which model answered, which tools were called, and where the audit record lives.
-          AegisDesk puts that control layer in front of employee-facing AI workflows.
+          A public chatbot cannot know who the employee is, which production actions they are allowed to request, what should be
+          redacted, when manager approval is required, or which audit record a security reviewer will need later. AegisDesk adds that
+          governed workflow around the AI experience.
         </p>
       </section>
 
       <section className="marketingScreens">
         <div className="marketingSectionHeader">
           <p>Product surfaces</p>
-          <h2>One control plane for operators, approvers, and governance reviewers.</h2>
+          <h2>The workspace for operators, approvers, governance reviewers, and control owners.</h2>
         </div>
         <div className="screenshotGrid">
           <figure>
@@ -162,13 +154,17 @@ export default function MarketingPage() {
             <img alt="Governance dashboard and audit explorer" src="/screenshots/governance-dashboard.png" />
             <figcaption>Governance reviewers filter audit events and inspect request replay details.</figcaption>
           </figure>
+          <figure>
+            <img alt="Policy and safety evaluations" src="/screenshots/evaluations.png" />
+            <figcaption>Control owners verify that redaction, access denial, approvals, ticket gating, and cost checks are working.</figcaption>
+          </figure>
         </div>
       </section>
 
       <section className="marketingUseCases" id="use-cases">
         <div className="marketingSectionHeader">
           <p>Use Cases</p>
-          <h2>Operational AI with enterprise controls built in.</h2>
+          <h2>Give employees useful answers without bypassing how the company operates.</h2>
         </div>
         <div className="useCaseGrid">
           {useCases.map((useCase) => {
@@ -184,10 +180,34 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="marketingArchitecture" id="architecture">
+      <section className="marketingWhy" id="why">
         <div className="marketingSectionHeader">
-          <p>Architecture</p>
-          <h2>A control path between users, models, policies, tools, and audit storage.</h2>
+          <p>Why AegisDesk</p>
+          <h2>Not another open chat box. A governed workflow around the answer.</h2>
+        </div>
+        <div className="whyGrid">
+          <article>
+            <MessageSquare size={22} />
+            <h3>Unmanaged AI answers the prompt.</h3>
+            <p>It usually cannot verify the employee, apply internal policy, open an approval, cite company runbooks, or preserve a replayable audit trail.</p>
+          </article>
+          <article>
+            <ShieldCheck size={22} />
+            <h3>AegisDesk controls the request.</h3>
+            <p>Identity, redaction, policy, source evidence, approvals, model route, tool calls, and audit events are handled before and after the model response.</p>
+          </article>
+          <article>
+            <UsersRound size={22} />
+            <h3>Teams keep their workflow.</h3>
+            <p>Operators get practical help, managers approve only scoped actions, and reviewers can inspect exactly why each decision was made.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="marketingArchitecture" id="workflow">
+        <div className="marketingSectionHeader">
+          <p>Workflow</p>
+          <h2>Every request moves through the same control path.</h2>
         </div>
         <div className="architectureFlow" aria-label="Architecture flow">
           {architecture.map((item, index) => (
@@ -204,19 +224,19 @@ export default function MarketingPage() {
           </span>
           <span>
             <Network size={18} />
-            Adapter interfaces isolate ticketing, incident context, access, and agent clients.
+            Connect ticketing, incident context, access, and agent clients through adapter interfaces.
           </span>
           <span>
             <GitBranch size={18} />
-            OPA/Rego policy stays outside the model response.
+            Keep policy decisions outside the model response.
           </span>
         </div>
       </section>
 
       <section className="marketingSecurity" id="security">
         <div className="marketingSectionHeader">
-          <p>Security Posture</p>
-          <h2>Designed around identity, least privilege, and auditability.</h2>
+          <p>Security</p>
+          <h2>The controls companies need before AI becomes part of daily operations.</h2>
         </div>
         <div className="securityGrid">
           <span>
@@ -241,15 +261,31 @@ export default function MarketingPage() {
       <section className="marketingIntegrations" id="integrations">
         <div className="marketingSectionHeader">
           <p>Integrations</p>
-          <h2>Connect the control plane to the systems CloudOps teams already use.</h2>
+          <h2>Connect AegisDesk to the systems CloudOps teams already use.</h2>
         </div>
-        <div className="integrationList">
-          {integrations.map((integration) => (
-            <span key={integration}>
-              <CheckCircle2 size={16} />
-              {integration}
-            </span>
-          ))}
+        <div className="integrationGroups">
+          <div>
+            <h3>Available in the hosted build</h3>
+            <div className="integrationList">
+              {activeIntegrations.map((integration) => (
+                <span key={integration}>
+                  <CheckCircle2 size={16} />
+                  {integration}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3>Adapter-ready for customer environments</h3>
+            <div className="integrationList">
+              {adapterIntegrations.map((integration) => (
+                <span key={integration}>
+                  <SearchCheck size={16} />
+                  {integration}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -259,11 +295,11 @@ export default function MarketingPage() {
           <Layers3 size={28} />
         </div>
         <div>
-          <h2>Use AI for CloudOps without losing control of data, cost, or access.</h2>
-          <p>Start with the hosted control plane, then connect your identity provider, ticket system, logs, and model policy.</p>
+          <h2>Use AI in CloudOps without losing control of data, cost, access, or auditability.</h2>
+          <p>Start with the hosted control plane, then connect your identity provider, ticketing system, logs, approvals, and model policy.</p>
         </div>
         <a className="marketingPrimary" href="/">
-          Launch app
+          Open AegisDesk
           <MessageSquare size={18} />
         </a>
       </section>

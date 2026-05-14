@@ -18,6 +18,8 @@ These screenshots are captured from the app and show the core control-plane work
 
 ![Manager approvals](screenshots/manager-approvals.png)
 
+![Control evaluations](screenshots/evaluations.png)
+
 ## Live Operations
 
 - [Live operations evidence](live-operations.md): GitHub OIDC deploy role, Lambda log retention and sample logs, AWS Budget guardrail, and API Gateway throttling.

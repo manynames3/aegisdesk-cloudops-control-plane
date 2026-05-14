@@ -1328,6 +1328,7 @@ button:disabled {
 .marketingBrand svg,
 .marketingHeroContent p svg,
 .useCaseGrid svg,
+.whyGrid svg,
 .securityGrid svg,
 .architectureNotes svg,
 .integrationList svg,
@@ -1492,6 +1493,7 @@ button:disabled {
 .marketingProblem,
 .marketingScreens,
 .marketingUseCases,
+.marketingWhy,
 .marketingArchitecture,
 .marketingSecurity,
 .marketingIntegrations,
@@ -1591,6 +1593,7 @@ button:disabled {
 
 .screenshotGrid figure,
 .useCaseGrid article,
+.whyGrid article,
 .architectureFlow div,
 .architectureNotes span,
 .securityGrid span,
@@ -1623,24 +1626,29 @@ button:disabled {
 }
 
 .useCaseGrid,
+.whyGrid,
 .securityGrid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.useCaseGrid article {
+.useCaseGrid article,
+.whyGrid article {
   display: grid;
   gap: 12px;
   padding: 24px;
 }
 
-.useCaseGrid h3 {
+.useCaseGrid h3,
+.whyGrid h3,
+.integrationGroups h3 {
   font-size: 21px;
   margin: 0;
 }
 
-.useCaseGrid p {
+.useCaseGrid p,
+.whyGrid p {
   color: var(--marketing-muted);
   line-height: 1.55;
   margin: 0;
@@ -1704,6 +1712,20 @@ button:disabled {
   gap: 10px;
 }
 
+.integrationGroups {
+  display: grid;
+  gap: 22px;
+}
+
+.integrationGroups > div {
+  display: grid;
+  gap: 12px;
+}
+
+.integrationGroups h3 {
+  font-size: 18px;
+}
+
 .integrationList span {
   min-height: 42px;
 }
@@ -1757,6 +1779,7 @@ button:disabled {
   .marketingProblem,
   .screenshotGrid,
   .useCaseGrid,
+  .whyGrid,
   .architectureNotes,
   .securityGrid,
   .marketingCta {
@@ -1798,6 +1821,7 @@ button:disabled {
   .marketingProblem,
   .marketingScreens,
   .marketingUseCases,
+  .marketingWhy,
   .marketingArchitecture,
   .marketingSecurity,
   .marketingIntegrations,

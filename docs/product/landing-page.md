@@ -6,7 +6,7 @@ Live page: [https://d27myiy7bbj1rz.cloudfront.net/marketing](https://d27myiy7bbj
 
 ## Purpose
 
-The landing page is designed for a buyer or technical reviewer who needs to understand the product before opening the control plane. It explains the business problem, shows the working UI, and connects the product value to identity, policy, redaction, model routing, approval workflows, integrations, and audit trails.
+The landing page is designed for CloudOps, platform, security, and FinOps stakeholders who need to understand the product before opening the control plane. It explains the business problem, shows the working UI, and connects the product value to identity, policy, redaction, model routing, approval workflows, integrations, and audit trails.
 
 The page is intentionally separate from the app UI. The app is where operators submit CloudOps requests and reviewers inspect governance evidence. The landing page is where stakeholders quickly understand why the product exists and what kind of control plane it provides.
 
@@ -16,7 +16,7 @@ The page is intentionally separate from the app UI. The app is where operators s
 - **Security and governance reviewers** checking whether AI requests are controlled before models or tools run.
 - **FinOps stakeholders** looking for cost-aware model routing and cloud spend controls.
 - **ITSM owners** evaluating how AI requests can connect to ticketing and approval systems.
-- **Technical reviewers** validating that the product has a coherent architecture rather than a standalone chatbot.
+- **Operations managers** who need an employee-facing AI workflow that still fits existing approval and governance processes.
 
 ## Message
 
@@ -34,9 +34,10 @@ This keeps the page focused on the control layer around employee-facing AI. The 
 | Product screenshot | Shows the actual control plane above the fold so the page is product-led. |
 | Capability pills | Highlights the four credibility anchors: Cognito identity, OPA/Rego policy, Bedrock routing, and DynamoDB audit. |
 | Problem | Explains why unmanaged AI is risky in CloudOps workflows. |
-| Product surfaces | Shows chat, governance, and approval views. |
+| Product surfaces | Shows approvals, governance, and control evaluation views. |
 | Use cases | Covers incident triage, production access, and cloud cost review. |
-| Architecture | Explains the request path from identity through audit storage. |
+| Why AegisDesk | Explains why a governed workflow is different from an unmanaged AI chat box. |
+| Workflow | Explains the request path from identity through audit storage. |
 | Security posture | Summarizes identity, redaction, model controls, and request replay. |
 | Integrations | Lists systems the control plane can connect to through adapters or implemented paths. |
 | Final CTA | Directs reviewers into the working control plane. |
@@ -95,7 +96,7 @@ Before publishing landing page changes:
 
 ## Review Path
 
-A concise reviewer path is:
+A concise product walkthrough path is:
 
 1. Open the [landing page](https://d27myiy7bbj1rz.cloudfront.net/marketing).
 2. Confirm the value proposition and architecture sections.
@@ -104,4 +105,3 @@ A concise reviewer path is:
 5. Run the incident, secret, access, and cost prompts.
 6. Open `Governance` and inspect request replay.
 7. Open `Approvals` as manager to review scoped access flow.
-

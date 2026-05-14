@@ -33,6 +33,8 @@ Most employee-facing AI tools answer the prompt but leave the company with weak 
 
 ![Manager approvals](docs/evidence/screenshots/manager-approvals.png)
 
+![Control evaluations](docs/evidence/screenshots/evaluations.png)
+
 ## Reviewer Access
 
 The hosted control plane supports two identity paths:
