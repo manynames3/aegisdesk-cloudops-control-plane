@@ -1,5 +1,14 @@
 # AegisDesk CloudOps Control Plane
 
+## TLDR
+
+AegisDesk is a working, self-hosted CloudOps AI control plane for governed employee support. It combines a Next.js product UI, FastAPI gateway, Cognito/JWKS auth, OPA/Rego policy, Bedrock routing, DynamoDB audit storage, AWS Cost Explorer, MCP tools, Docker Compose, Terraform, and GitHub Actions OIDC deployment. The live AWS deployment shows the core enterprise story: employees can ask for incident, ticket, access, and cost help while the system enforces identity, redaction, approval gates, model routing, quotas, and audit trails.
+
+- **Live app:** [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
+- **Product page:** [https://d27myiy7bbj1rz.cloudfront.net/marketing](https://d27myiy7bbj1rz.cloudfront.net/marketing)
+- **Best reviewer path:** use the guided walkthrough to see secret redaction, denied production access, manager approval, Bedrock routing, DynamoDB audit events, and request replay.
+- **Technical credibility:** real AWS infrastructure, keyless GitHub OIDC deploy, Cognito identity, runtime policy enforcement, live API, CI/CD, cost guardrails, and documented operations evidence.
+
 AegisDesk is a self-hosted CloudOps AI control plane that gives employees AI help for incidents, tickets, production access requests, and cloud cost questions while enforcing identity, policy, redaction, approval, model routing, and audit trails. It is built as a full-stack reference implementation with a Next.js operator UI, FastAPI gateway, Cognito/JWKS identity, OPA/Rego policy enforcement, Bedrock routing, DynamoDB audit storage, AWS Cost Explorer integration, MCP tools, and Docker/Terraform deployment paths.
 
 Live control plane: [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
