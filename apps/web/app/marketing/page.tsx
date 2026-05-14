@@ -155,16 +155,12 @@ export default function MarketingPage() {
         </div>
         <div className="screenshotGrid">
           <figure>
-            <img alt="Policy-aware CloudOps chat" src="/screenshots/policy-aware-chat.png" />
-            <figcaption>Chat responses show policy decisions, model routing, answer sources, and trusted citations.</figcaption>
+            <img alt="Manager approval workflow" src="/screenshots/manager-approvals.png" />
+            <figcaption>Managers review scoped access requests with requester, status, approver, and timestamp evidence.</figcaption>
           </figure>
           <figure>
             <img alt="Governance dashboard and audit explorer" src="/screenshots/governance-dashboard.png" />
             <figcaption>Governance reviewers filter audit events and inspect request replay details.</figcaption>
-          </figure>
-          <figure>
-            <img alt="Manager approval workflow" src="/screenshots/manager-approvals.png" />
-            <figcaption>Managers review scoped access requests with requester, status, approver, and timestamp evidence.</figcaption>
           </figure>
         </div>
       </section>
