@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AegisDesk CloudOps Control Plane",
-  description: "Policy-aware AI gateway for CloudOps workflows."
+  description: "AI help for CloudOps teams with identity, redaction, approvals, model routing, and audit trails."
 };
 
 export default function RootLayout({
