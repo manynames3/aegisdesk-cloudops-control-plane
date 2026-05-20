@@ -1,21 +1,29 @@
 # AegisDesk CloudOps Control Plane
 
-## TLDR
+[![CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml)
 
-AegisDesk is a working, self-hosted CloudOps AI control plane for governed employee support. It combines a Next.js product UI, FastAPI gateway, Cognito/JWKS auth, OPA/Rego policy, Bedrock routing, DynamoDB audit storage, AWS Cost Explorer, MCP tools, Docker Compose, Terraform, and GitHub Actions OIDC deployment. The live AWS deployment shows the core enterprise story: employees can ask for incident, ticket, access, and cost help while the system enforces identity, redaction, approval gates, model routing, quotas, and audit trails.
+AegisDesk is a working self-hosted CloudOps AI control plane. It gives employees AI help for incidents, tickets, production access requests, and cloud cost questions while the backend enforces identity, redaction, OPA/Rego policy, approval gates, model routing, quotas, and audit trails.
 
-- **Live app:** [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
-- **Product page:** [https://d27myiy7bbj1rz.cloudfront.net/marketing](https://d27myiy7bbj1rz.cloudfront.net/marketing)
-- **Best evaluation path:** use the guided walkthrough to see secret redaction, denied production access, manager approval, Bedrock routing, DynamoDB audit events, and request replay.
-- **Technical credibility:** real AWS infrastructure, keyless GitHub OIDC deploy, Cognito identity, runtime policy enforcement, live API, CI/CD, cost guardrails, and documented operations evidence.
+## Quick Links
 
-AegisDesk is a self-hosted CloudOps AI control plane that gives employees AI help for incidents, tickets, production access requests, and cloud cost questions while enforcing identity, policy, redaction, approval, model routing, and audit trails. It is built as a full-stack reference implementation with a Next.js operator UI, FastAPI gateway, Cognito/JWKS identity, OPA/Rego policy enforcement, Bedrock routing, DynamoDB audit storage, AWS Cost Explorer integration, MCP tools, and Docker/Terraform deployment paths.
+| Link | Purpose |
+| --- | --- |
+| [Live control plane](https://d27myiy7bbj1rz.cloudfront.net) | Try the working product UI |
+| [Product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) | Buyer-facing explanation and screenshots |
+| [Live API health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health) | Verify the deployed FastAPI gateway |
+| [Documentation map](docs/README.md) | Find architecture, deployment, security, product, and sales docs |
+| [Live operations evidence](docs/evidence/live-operations.md) | AWS deploy, logs, budget, and throttling evidence |
+| [Self-hosted install](docs/deployment/self-hosted.md) | Run locally or deploy into AWS |
 
-Live control plane: [https://d27myiy7bbj1rz.cloudfront.net](https://d27myiy7bbj1rz.cloudfront.net)
+## What It Proves
 
-Marketing page: [https://d27myiy7bbj1rz.cloudfront.net/marketing](https://d27myiy7bbj1rz.cloudfront.net/marketing)
+This repo is built to demonstrate production-style CloudOps AI architecture, not just a chat UI:
 
-Live API health: [https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health)
+- **Cloud architecture:** S3, CloudFront, Lambda, API Gateway, Cognito, DynamoDB, Bedrock, Cost Explorer, CloudWatch, Budget, and Terraform.
+- **Governance controls:** OPA/Rego policy, role/team claims, quotas, approval workflows, request replay, and audit export.
+- **Enterprise integration shape:** CloudWatch incident context, Jira and ServiceNow ticket adapters, MCP server, and adapter boundaries for Datadog, Okta, Entra, and IAM Identity Center.
+- **Cost awareness:** local fallback, Bedrock kill switch, Cost Explorer cache, request limits, API throttling, and a low-idle-cost serverless deployment.
+- **Delivery maturity:** GitHub Actions CI, Playwright smoke tests, API tests, OPA tests, MCP smoke test, Terraform validation, and manual-gated AWS deploy.
 
 ## About
 
@@ -34,7 +42,8 @@ The likely buyer is a platform engineering or security leader who needs a self-h
 1. Open the [live control plane](https://d27myiy7bbj1rz.cloudfront.net).
 2. Use **Walkthrough** to run the four-step evaluation: redact a sensitive log, route scoped access for approval, approve as a manager, and inspect the governance trail.
 3. Open **Governance** and click an audit event to review the request replay packet: prompt, sanitized prompt, policy input/output, model route, tool calls, sources, audit events, and trace ID.
-4. Open the [product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) for the buyer-facing explanation.
+4. Export the audit trail as JSON or CSV to show evidence that the workflow is reviewable outside the app.
+5. Open the [product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) for the buyer-facing explanation.
 
 ## Screenshots
 
@@ -148,6 +157,7 @@ flowchart LR
 
 Architecture and product docs:
 
+- [Documentation Map](docs/README.md)
 - [Architecture Overview](docs/architecture.md)
 - [System Architecture](docs/architecture/system-architecture.md)
 - [Integration Architecture](docs/integrations/README.md)

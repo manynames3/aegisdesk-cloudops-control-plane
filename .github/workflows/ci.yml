@@ -17,6 +17,7 @@ jobs:
       - name: Verify required documentation exists
         run: |
           test -f README.md
+          test -f docs/README.md
           test -f docs/product/why-this-exists.md
           test -f docs/product/target-users.md
           test -f docs/product/use-cases.md
@@ -41,6 +42,9 @@ jobs:
           test -f docs/adrs/006-cognito-persona-auth-boundary.md
           test -f docs/adrs/007-low-cost-aws-deployment.md
           test -f docs/adrs/008-real-bedrock-dynamodb-mcp.md
+          test -f docs/adrs/009-cognito-opa-cost-explorer.md
+          test -f docs/adrs/010-seeded-incident-context.md
+          test -f docs/adrs/011-bounded-cloudwatch-and-audit-retention.md
           test -f docs/evidence/README.md
           test -f docs/evidence/live-operations.md
           test -f docs/evidence/screenshots/policy-aware-chat.png
