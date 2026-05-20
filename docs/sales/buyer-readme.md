@@ -28,9 +28,19 @@ AegisDesk is not a general AI chat surface. It is a governed workflow system for
 
 ## How Would We Start?
 
-1. Run Docker Compose locally.
-2. Connect SSO.
+1. Run Docker Compose locally or deploy the AWS Terraform path.
+2. Connect SSO or Cognito Hosted UI.
 3. Configure OPA policies for roles, teams, data classes, and model routes.
-4. Connect one ticketing adapter and one incident context adapter.
-5. Enable Bedrock for approved low-risk requests.
+4. Connect one operational workflow first: ticketing, incident context, access approval, or cost review.
+5. Enable Bedrock only for approved low-risk requests.
 6. Review audit replay with security and platform stakeholders.
+
+## Recommended Paid Pilot
+
+A focused pilot should prove one workflow, not every possible integration.
+
+- **Duration:** 30-60 days
+- **Best first workflow:** incident triage with Jira ticketing or CloudWatch-backed incident context
+- **Success criteria:** users can ask for help, sensitive values are redacted, policy decisions are visible, approved requests can use Bedrock, and every answer has a replayable audit packet
+- **Commercial shape:** paid implementation pilot followed by a self-hosted annual license and integration support
+- **What to avoid early:** broad multi-cloud rollout, destructive production actions, and custom automation before the governance workflow is trusted

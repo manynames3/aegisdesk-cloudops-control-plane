@@ -113,7 +113,7 @@ The current hosted deployment uses a low-idle-cost AWS shape:
 - risk-based clarification before governed tool execution
 - AWS Cost Explorer for manager/admin cost investigations
 - packaged Markdown knowledge base for checkout triage, production access control, and AI/cloud cost governance
-- local fixture incident context for checkout latency triage, with CloudWatch/Datadog adapter boundaries
+- local fixture incident context for first-run evaluation, plus a bounded CloudWatch Logs adapter for customer incident evidence
 - IAM execution role scoped to CloudWatch log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
 - CloudWatch log group with seven-day retention
 - AWS Budget guardrail set to the configured threshold

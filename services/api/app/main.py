@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+import csv
+import io
 import re
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import AuthError, create_persona_token, decode_token, jwks_document, require_actor, require_admin, require_manager_or_admin
 from .clarification import assess_clarification, build_clarification_answer
 from .cognito_auth import CognitoSessionError, create_persona_session, ensure_persona_user, exchange_oauth_code
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
-from .incident_context import lookup_incident_context
 from .knowledge_base import format_knowledge_context, retrieve_knowledge, summarize_knowledge_guidance
 from .llm import LLMUnavailable, maybe_generate_with_bedrock
 from .model_router import select_model_route
@@ -43,7 +44,7 @@ from .policy_engine import PolicyEngine, PolicyUnavailable
 from .redaction import inspect_and_redact
 from .settings import get_settings
 from .store import actor_from, create_store
-from .tools import create_ticket, lookup_cost_summary, lookup_incident_context_tool, request_read_only_access
+from .tools import create_ticket, lookup_cost_summary, lookup_incident_context, lookup_incident_context_tool, request_read_only_access
 
 settings = get_settings()
 
@@ -183,11 +184,13 @@ def chat(request: ChatRequest, actor: Annotated[Actor, Depends(require_actor)]) 
 
 @app.get("/events", response_model=EventList)
 def events(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> EventList:
+    store.prune_audit_events(settings.audit_retention_days)
     return EventList(events=list(reversed(store.events))[:100])
 
 
 @app.get("/requests/{request_id}/replay", response_model=RequestReplay)
 def request_replay(request_id: str, _actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> RequestReplay:
+    store.prune_audit_events(settings.audit_retention_days)
     request_events = [event for event in store.events if event.request_id == request_id]
     if not request_events:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="request_not_found")
@@ -197,6 +200,114 @@ def request_replay(request_id: str, _actor: Annotated[Actor, Depends(require_man
 @app.get("/metrics/summary")
 def metrics(_actor: Annotated[Actor, Depends(require_admin)]):
     return store.metrics()
+
+
+@app.get("/setup/status")
+def setup_status():
+    policy_ready = policy_engine.ready()
+    jira_configured = all(
+        [
+            settings.jira_base_url,
+            settings.jira_email,
+            settings.jira_api_token,
+            settings.jira_project_key,
+        ]
+    )
+    servicenow_configured = all(
+        [
+            settings.servicenow_instance_url,
+            settings.servicenow_username,
+            settings.servicenow_password,
+        ]
+    )
+    return {
+        "mode": "production" if not settings.persona_issuer_enabled else "evaluation",
+        "auth": {
+            "mode": settings.auth_mode,
+            "persona_issuer_enabled": settings.persona_issuer_enabled,
+            "cognito_configured": bool(settings.cognito_client_id and settings.cognito_hosted_ui_domain),
+            "jwks_configured": bool(settings.jwks_public_key_pem or settings.cognito_user_pool_id),
+        },
+        "policy": {
+            "mode": policy_engine.mode,
+            "ready": bool(policy_ready.get("ready")),
+            "engine": policy_ready.get("engine"),
+        },
+        "models": {
+            "bedrock_enabled": settings.enable_bedrock,
+            "bedrock_model_id": settings.bedrock_model_id,
+            "cloud_model_kill_switch": settings.cloud_model_kill_switch,
+        },
+        "data": {
+            "store_backend": settings.store_backend,
+            "dynamodb_configured": bool(settings.dynamodb_table),
+            "store_ready": store.ready(),
+            "audit_retention_days": settings.audit_retention_days,
+            "audit_export_max_events": settings.audit_export_max_events,
+        },
+        "integrations": {
+            "ticket_adapter": settings.ticket_adapter,
+            "jira_configured": jira_configured,
+            "servicenow_configured": servicenow_configured,
+            "cost_explorer_enabled": settings.enable_cost_explorer,
+            "cost_explorer_scope": settings.cost_explorer_scope,
+            "incident_context_adapter": settings.incident_context_adapter,
+            "cloudwatch_configured": bool(settings.cloudwatch_log_group),
+            "cloudwatch_log_group": settings.cloudwatch_log_group,
+            "cloudwatch_query_limit": settings.cloudwatch_query_limit,
+            "cloudwatch_query_lookback_minutes": settings.cloudwatch_query_lookback_minutes,
+            "access_request_adapter": "local_approval",
+        },
+    }
+
+
+@app.get("/audit/export")
+def audit_export(
+    actor: Annotated[Actor, Depends(require_manager_or_admin)],
+    format: str = "json",
+):
+    pruned_count = store.prune_audit_events(settings.audit_retention_days)
+    events = list(reversed(store.events))[: settings.audit_export_max_events]
+    export_metadata = {
+        "exported_by": actor.user_id,
+        "event_count": len(events),
+        "pruned_expired_events": pruned_count,
+        "retention_days": settings.audit_retention_days,
+        "max_events": settings.audit_export_max_events,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+
+    if format.lower() == "csv":
+        buffer = io.StringIO()
+        writer = csv.DictWriter(
+            buffer,
+            fieldnames=["timestamp", "event_id", "request_id", "actor", "role", "team", "event_type", "summary", "trace_id"],
+        )
+        writer.writeheader()
+        for event in events:
+            writer.writerow(
+                {
+                    "timestamp": event.timestamp.isoformat(),
+                    "event_id": event.event_id,
+                    "request_id": event.request_id,
+                    "actor": event.actor.user_id,
+                    "role": event.actor.role.value,
+                    "team": event.actor.team,
+                    "event_type": event.event_type,
+                    "summary": event.summary,
+                    "trace_id": event.trace_id,
+                }
+            )
+        return Response(
+            content=buffer.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="aegisdesk-audit-export.csv"'},
+        )
+
+    return {
+        "metadata": export_metadata,
+        "events": [event.model_dump(mode="json") for event in events],
+    }
 
 
 @app.get("/controls/abuse", response_model=AbuseControls)
@@ -599,9 +710,11 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     request_id=request_id,
                     actor=actor,
                     event_type="incident.context.loaded",
-                    summary="Read-only incident context loaded from seeded CloudWatch-style logs.",
+                    summary=f"Read-only incident context loaded from {incident_context.source.replace('_', ' ')}.",
                     metadata={
                         "tool": tool_call.name,
+                        "status": tool_call.status,
+                        "adapter": tool_call.policy.metadata.get("adapter"),
                         "source": incident_context.source,
                         "incident_id": incident_context.incident_id,
                         "log_group": incident_context.log_group,
@@ -695,7 +808,15 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                         actor=actor,
                         event_type=event_type,
                         summary=f"{tool_call.name} {tool_call.status}.",
-                        metadata={"tool": tool_call.name, "policy_reason": tool_call.policy.reason},
+                        metadata={
+                            "tool": tool_call.name,
+                            "policy_reason": tool_call.policy.reason,
+                            "adapter": tool_call.result.get("adapter"),
+                            "system": tool_call.result.get("system"),
+                            "ticket_id": tool_call.result.get("ticket_id"),
+                            "external_url": tool_call.result.get("external_url"),
+                            "error": tool_call.result.get("error"),
+                        },
                         trace_id=trace_id,
                     )
                 )
@@ -703,6 +824,14 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     bedrock_answer_used = False
                     answer = (
                         f"Ticket {tool_call.result['ticket_id']} was created for {actor.team} with medium severity."
+                        f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
+                    )
+                else:
+                    bedrock_answer_used = False
+                    adapter = str(tool_call.result.get("adapter") or "ticket adapter")
+                    answer = (
+                        f"Ticket creation did not complete through {adapter}. "
+                        "The request, policy decision, and failure details were captured in the audit trail."
                         f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
                     )
 
@@ -1000,6 +1129,16 @@ def build_answer(intent: str, redacted_text: str, decision: str) -> str:
 
 
 def enrich_incident_answer(answer: str, incident_context) -> str:
+    if incident_context.source == "incident_context_unavailable":
+        return (
+            f"{answer} Incident context could not be loaded: {incident_context.suspected_cause} "
+            "No log entries were used as evidence for this answer."
+        )
+    if not incident_context.entries:
+        return (
+            f"{answer} {incident_context.suspected_cause} "
+            f"Query source: {incident_context.log_group}."
+        )
     return (
         f"{answer} Incident context points to {incident_context.suspected_cause} "
         f"I found {len(incident_context.entries)} relevant log entries in {incident_context.log_group}."
@@ -1065,14 +1204,21 @@ def build_answer_sources(
         )
 
     if incident_context:
+        if incident_context.source == "cloudwatch_logs":
+            incident_source_name = "CloudWatch Logs incident context"
+        elif incident_context.source == "incident_context_unavailable":
+            incident_source_name = "Incident context unavailable"
+        else:
+            incident_source_name = "Seeded CloudWatch-style incident logs"
         sources.append(
             AnswerSource(
                 kind="operational_context",
-                name="Seeded CloudWatch-style incident logs",
+                name=incident_source_name,
                 detail=(
                     f"{incident_context.incident_id}; {len(incident_context.entries)} entries "
                     f"from {incident_context.log_group}."
                 ),
+                trusted=incident_context.source != "incident_context_unavailable" and len(incident_context.entries) > 0,
             )
         )
 

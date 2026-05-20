@@ -197,7 +197,7 @@ Example tool call response:
 
 Manager/admin cost investigations call AWS Cost Explorer when enabled and cache the summary in DynamoDB. Employee cost investigations return `approval_required`.
 
-Incident triage responses include `incident_context` when the request supplies a known incident ID. The hosted environment uses a local fixture source to show the CloudWatch shape without running paid log queries.
+Incident triage responses include `incident_context` when the request supplies a known incident ID. The source can be `seeded_cloudwatch_logs`, `cloudwatch_logs`, or `incident_context_unavailable`. The local fixture source supports first-run evaluation; the CloudWatch adapter uses bounded Logs Insights queries when configured.
 
 ## GET /events
 

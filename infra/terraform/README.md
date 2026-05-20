@@ -74,6 +74,8 @@ Additional runtime guardrails are controlled through Terraform variables:
 - `api_throttling_rate_limit` and `api_throttling_burst_limit` configure HTTP API Gateway throttles.
 - `max_request_chars` rejects oversized prompts before policy or model routing.
 - `cloud_model_kill_switch` forces approved Bedrock routes back to local control handling when cost or abuse risk is elevated.
+- `incident_context_adapter`, `incident_cloudwatch_log_group`, and `incident_query_limit` control whether incident triage uses local fixture evidence or bounded CloudWatch Logs Insights queries.
+- `audit_retention_days` and `audit_export_max_events` bound short-term audit evidence storage and exports. DynamoDB TTL is enabled on the `expires_at` attribute.
 
 ## State Boundary
 

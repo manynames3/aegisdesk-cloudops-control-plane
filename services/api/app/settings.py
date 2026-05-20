@@ -54,6 +54,28 @@ class Settings:
     cost_explorer_scope: str
     cost_explorer_tag_key: str
     cost_explorer_tag_value: str
+    ticket_adapter: str
+    jira_base_url: str | None
+    jira_email: str | None
+    jira_api_token: str | None
+    jira_project_key: str | None
+    jira_issue_type: str
+    jira_timeout_seconds: float
+    servicenow_instance_url: str | None
+    servicenow_username: str | None
+    servicenow_password: str | None
+    servicenow_assignment_group: str | None
+    servicenow_table: str
+    servicenow_timeout_seconds: float
+    incident_context_adapter: str
+    cloudwatch_log_group: str | None
+    cloudwatch_logs_region: str
+    cloudwatch_query_lookback_minutes: int
+    cloudwatch_query_limit: int
+    cloudwatch_query_poll_attempts: int
+    cloudwatch_query_poll_interval_seconds: float
+    audit_retention_days: int
+    audit_export_max_events: int
     cors_origins: list[str]
 
 
@@ -100,6 +122,31 @@ def get_settings() -> Settings:
         cost_explorer_scope=os.getenv("AEGISDESK_COST_EXPLORER_SCOPE", "tagged").lower(),
         cost_explorer_tag_key=os.getenv("AEGISDESK_COST_EXPLORER_TAG_KEY", "Project"),
         cost_explorer_tag_value=os.getenv("AEGISDESK_COST_EXPLORER_TAG_VALUE", "AegisDesk"),
+        ticket_adapter=os.getenv("AEGISDESK_TICKET_ADAPTER", "local").lower(),
+        jira_base_url=os.getenv("AEGISDESK_JIRA_BASE_URL"),
+        jira_email=os.getenv("AEGISDESK_JIRA_EMAIL"),
+        jira_api_token=os.getenv("AEGISDESK_JIRA_API_TOKEN"),
+        jira_project_key=os.getenv("AEGISDESK_JIRA_PROJECT_KEY"),
+        jira_issue_type=os.getenv("AEGISDESK_JIRA_ISSUE_TYPE", "Task"),
+        jira_timeout_seconds=float(os.getenv("AEGISDESK_JIRA_TIMEOUT_SECONDS", "8")),
+        servicenow_instance_url=os.getenv("AEGISDESK_SERVICENOW_INSTANCE_URL"),
+        servicenow_username=os.getenv("AEGISDESK_SERVICENOW_USERNAME"),
+        servicenow_password=os.getenv("AEGISDESK_SERVICENOW_PASSWORD"),
+        servicenow_assignment_group=os.getenv("AEGISDESK_SERVICENOW_ASSIGNMENT_GROUP"),
+        servicenow_table=os.getenv("AEGISDESK_SERVICENOW_TABLE", "incident"),
+        servicenow_timeout_seconds=float(os.getenv("AEGISDESK_SERVICENOW_TIMEOUT_SECONDS", "8")),
+        incident_context_adapter=os.getenv("AEGISDESK_INCIDENT_CONTEXT_ADAPTER", "local_fixture").lower(),
+        cloudwatch_log_group=os.getenv("AEGISDESK_CLOUDWATCH_LOG_GROUP"),
+        cloudwatch_logs_region=os.getenv(
+            "AEGISDESK_CLOUDWATCH_LOGS_REGION",
+            os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1")),
+        ),
+        cloudwatch_query_lookback_minutes=int(os.getenv("AEGISDESK_CLOUDWATCH_QUERY_LOOKBACK_MINUTES", "60")),
+        cloudwatch_query_limit=int(os.getenv("AEGISDESK_CLOUDWATCH_QUERY_LIMIT", "20")),
+        cloudwatch_query_poll_attempts=int(os.getenv("AEGISDESK_CLOUDWATCH_QUERY_POLL_ATTEMPTS", "6")),
+        cloudwatch_query_poll_interval_seconds=float(os.getenv("AEGISDESK_CLOUDWATCH_QUERY_POLL_INTERVAL_SECONDS", "0.5")),
+        audit_retention_days=int(os.getenv("AEGISDESK_AUDIT_RETENTION_DAYS", "30")),
+        audit_export_max_events=int(os.getenv("AEGISDESK_AUDIT_EXPORT_MAX_EVENTS", "500")),
         cors_origins=[
             origin.strip()
             for origin in os.getenv(

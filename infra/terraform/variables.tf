@@ -58,6 +58,48 @@ variable "cloud_model_kill_switch" {
   default     = false
 }
 
+variable "incident_context_adapter" {
+  description = "Incident evidence provider. Use local_fixture for sample data or cloudwatch for CloudWatch Logs Insights."
+  type        = string
+  default     = "local_fixture"
+}
+
+variable "incident_cloudwatch_log_group" {
+  description = "CloudWatch log group queried by the incident context adapter when incident_context_adapter is cloudwatch."
+  type        = string
+  default     = ""
+}
+
+variable "incident_cloudwatch_log_group_arn" {
+  description = "IAM resource ARN for the CloudWatch log group queried by AegisDesk. Keep scoped for customer deployments."
+  type        = string
+  default     = "*"
+}
+
+variable "incident_query_lookback_minutes" {
+  description = "CloudWatch Logs Insights lookback window for incident context queries."
+  type        = number
+  default     = 60
+}
+
+variable "incident_query_limit" {
+  description = "Maximum CloudWatch log rows returned for incident context."
+  type        = number
+  default     = 20
+}
+
+variable "audit_retention_days" {
+  description = "Retention window for audit events in the application and DynamoDB TTL."
+  type        = number
+  default     = 30
+}
+
+variable "audit_export_max_events" {
+  description = "Maximum audit events returned in one export."
+  type        = number
+  default     = 500
+}
+
 variable "allowed_cors_origins" {
   description = "Allowed browser origins for the API Gateway CORS policy."
   type        = list(string)

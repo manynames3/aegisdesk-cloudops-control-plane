@@ -29,7 +29,7 @@ Only sanitized request text and selected trusted context are sent to Bedrock whe
 
 ### Are prompts retained?
 
-Prompts are retained in the audit store so governance reviewers can inspect request replay. Retention should be configured by deployment environment. For stricter environments, store only sanitized prompts or reduce retention through the storage layer.
+Prompts are retained in the audit store so governance reviewers can inspect request replay. The short-term retention window is controlled by `AEGISDESK_AUDIT_RETENTION_DAYS`. SQLite prunes expired audit events before evidence reads and exports; hosted DynamoDB records include `expires_at` for TTL. For stricter environments, store only sanitized prompts or add an immutable archive with a separate legal-hold policy.
 
 ### Can external models be disabled?
 
@@ -37,7 +37,7 @@ Yes. Set `AEGISDESK_CLOUD_MODEL_KILL_SWITCH=true` or leave `AEGISDESK_ENABLE_BED
 
 ### How are audit logs exported?
 
-Hosted deployments store audit events in DynamoDB and emit structured logs to CloudWatch. Customers can export DynamoDB records to S3, stream changes through DynamoDB Streams, or forward CloudWatch logs to a SIEM.
+Hosted deployments store audit events in DynamoDB and emit structured logs to CloudWatch. Manager/admin users can export short-term JSON or CSV evidence from `/audit/export`. Customers can export DynamoDB records to S3, stream changes through DynamoDB Streams, or forward CloudWatch logs to a SIEM.
 
 ### How are secrets redacted?
 

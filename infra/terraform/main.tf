@@ -123,6 +123,11 @@ resource "aws_dynamodb_table" "state" {
   server_side_encryption {
     enabled = true
   }
+
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
 }
 
 resource "aws_s3_bucket" "artifacts" {
@@ -239,6 +244,16 @@ resource "aws_iam_role_policy" "api_lambda" {
         Effect   = "Allow"
         Action   = "ce:GetCostAndUsage"
         Resource = "*"
+      },
+      {
+        Sid    = "ReadIncidentLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:GetQueryResults",
+          "logs:StartQuery",
+          "logs:StopQuery"
+        ]
+        Resource = var.incident_cloudwatch_log_group_arn
       },
       {
         Sid    = "InvokeApprovedBedrockModel"
@@ -407,36 +422,43 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      AEGISDESK_AUTH_MODE                = "cognito"
-      AEGISDESK_PERSONA_ISSUER_ENABLED   = "true"
-      AEGISDESK_DB_PATH                  = "/tmp/aegisdesk.db"
-      AEGISDESK_COGNITO_CLIENT_ID        = aws_cognito_user_pool_client.web.id
-      AEGISDESK_COGNITO_HOSTED_UI_DOMAIN = "https://${aws_cognito_user_pool_domain.main.domain}.auth.${var.aws_region}.amazoncognito.com"
-      AEGISDESK_COGNITO_REGION           = var.aws_region
-      AEGISDESK_COGNITO_USER_POOL_ID     = aws_cognito_user_pool.main.id
-      AEGISDESK_JWT_AUDIENCE             = aws_cognito_user_pool_client.web.id
-      AEGISDESK_JWT_ISSUER               = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
-      AEGISDESK_PERSONA_PASSWORD_SEED    = random_password.persona_password_seed.result
-      AEGISDESK_POLICY_MODE              = "opa"
-      AEGISDESK_OPA_EXECUTABLE           = "/var/task/bin/opa"
-      AEGISDESK_OPA_POLICY_PATH          = "/var/task/policies"
-      AEGISDESK_OPA_TIMEOUT_SECONDS      = "3"
-      AEGISDESK_STORE_BACKEND            = "dynamodb"
-      AEGISDESK_DYNAMODB_TABLE           = aws_dynamodb_table.state.name
-      AEGISDESK_ENABLE_BEDROCK           = "true"
-      AEGISDESK_BEDROCK_MODEL_ID         = var.bedrock_model_id
-      AEGISDESK_BEDROCK_MAX_TOKENS       = "180"
-      AEGISDESK_API_THROTTLE_RATE_LIMIT  = tostring(var.api_throttling_rate_limit)
-      AEGISDESK_API_THROTTLE_BURST_LIMIT = tostring(var.api_throttling_burst_limit)
-      AEGISDESK_MAX_REQUEST_CHARS        = tostring(var.max_request_chars)
-      AEGISDESK_CLOUD_MODEL_KILL_SWITCH  = tostring(var.cloud_model_kill_switch)
-      AEGISDESK_ENABLE_COST_EXPLORER     = "true"
-      AEGISDESK_COST_CACHE_TTL_SECONDS   = "21600"
-      AEGISDESK_COST_EXPLORER_SCOPE      = "tagged"
-      AEGISDESK_COST_EXPLORER_TAG_KEY    = "Project"
-      AEGISDESK_COST_EXPLORER_TAG_VALUE  = "AegisDesk"
-      AEGISDESK_CORS_ORIGINS             = join(",", concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"]))
-      OTEL_SERVICE_NAME                  = "aegisdesk-api"
+      AEGISDESK_AUTH_MODE                         = "cognito"
+      AEGISDESK_PERSONA_ISSUER_ENABLED            = "true"
+      AEGISDESK_DB_PATH                           = "/tmp/aegisdesk.db"
+      AEGISDESK_COGNITO_CLIENT_ID                 = aws_cognito_user_pool_client.web.id
+      AEGISDESK_COGNITO_HOSTED_UI_DOMAIN          = "https://${aws_cognito_user_pool_domain.main.domain}.auth.${var.aws_region}.amazoncognito.com"
+      AEGISDESK_COGNITO_REGION                    = var.aws_region
+      AEGISDESK_COGNITO_USER_POOL_ID              = aws_cognito_user_pool.main.id
+      AEGISDESK_JWT_AUDIENCE                      = aws_cognito_user_pool_client.web.id
+      AEGISDESK_JWT_ISSUER                        = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+      AEGISDESK_PERSONA_PASSWORD_SEED             = random_password.persona_password_seed.result
+      AEGISDESK_POLICY_MODE                       = "opa"
+      AEGISDESK_OPA_EXECUTABLE                    = "/var/task/bin/opa"
+      AEGISDESK_OPA_POLICY_PATH                   = "/var/task/policies"
+      AEGISDESK_OPA_TIMEOUT_SECONDS               = "3"
+      AEGISDESK_STORE_BACKEND                     = "dynamodb"
+      AEGISDESK_DYNAMODB_TABLE                    = aws_dynamodb_table.state.name
+      AEGISDESK_ENABLE_BEDROCK                    = "true"
+      AEGISDESK_BEDROCK_MODEL_ID                  = var.bedrock_model_id
+      AEGISDESK_BEDROCK_MAX_TOKENS                = "180"
+      AEGISDESK_API_THROTTLE_RATE_LIMIT           = tostring(var.api_throttling_rate_limit)
+      AEGISDESK_API_THROTTLE_BURST_LIMIT          = tostring(var.api_throttling_burst_limit)
+      AEGISDESK_MAX_REQUEST_CHARS                 = tostring(var.max_request_chars)
+      AEGISDESK_CLOUD_MODEL_KILL_SWITCH           = tostring(var.cloud_model_kill_switch)
+      AEGISDESK_ENABLE_COST_EXPLORER              = "true"
+      AEGISDESK_COST_CACHE_TTL_SECONDS            = "21600"
+      AEGISDESK_COST_EXPLORER_SCOPE               = "tagged"
+      AEGISDESK_COST_EXPLORER_TAG_KEY             = "Project"
+      AEGISDESK_COST_EXPLORER_TAG_VALUE           = "AegisDesk"
+      AEGISDESK_INCIDENT_CONTEXT_ADAPTER          = var.incident_context_adapter
+      AEGISDESK_CLOUDWATCH_LOG_GROUP              = var.incident_cloudwatch_log_group
+      AEGISDESK_CLOUDWATCH_LOGS_REGION            = var.aws_region
+      AEGISDESK_CLOUDWATCH_QUERY_LOOKBACK_MINUTES = tostring(var.incident_query_lookback_minutes)
+      AEGISDESK_CLOUDWATCH_QUERY_LIMIT            = tostring(var.incident_query_limit)
+      AEGISDESK_AUDIT_RETENTION_DAYS              = tostring(var.audit_retention_days)
+      AEGISDESK_AUDIT_EXPORT_MAX_EVENTS           = tostring(var.audit_export_max_events)
+      AEGISDESK_CORS_ORIGINS                      = join(",", concat(var.allowed_cors_origins, ["https://${aws_cloudfront_distribution.web.domain_name}"]))
+      OTEL_SERVICE_NAME                           = "aegisdesk-api"
     }
   }
 

@@ -50,12 +50,25 @@ Redaction runs before model routing. Findings are returned in the response and s
 
 ## Audit Export
 
-Recommended export paths:
+Available export path:
+
+- `GET /audit/export` returns manager/admin-scoped JSON evidence for the current audit window
+- `GET /audit/export?format=csv` returns manager/admin-scoped CSV evidence for security review
+
+Recommended production archive paths:
 
 - DynamoDB export to S3 for long-term archive
 - DynamoDB Streams to a security data lake
 - CloudWatch log subscription to SIEM
-- API endpoint export for governance reviewers
+
+Configure the short-term product window with:
+
+```bash
+AEGISDESK_AUDIT_RETENTION_DAYS=30
+AEGISDESK_AUDIT_EXPORT_MAX_EVENTS=500
+```
+
+Retention is enforced in the local SQLite store when audit events are read or exported. Hosted DynamoDB records include an `expires_at` attribute for DynamoDB TTL, and export/replay paths prune expired audit records before returning evidence.
 
 ## External Model Disablement
 

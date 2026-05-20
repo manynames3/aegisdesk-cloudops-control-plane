@@ -4,7 +4,7 @@ import os
 import sqlite3
 import threading
 from decimal import Decimal
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -121,6 +121,15 @@ class DemoStore:
                 """,
                 (event.event_id, event.request_id, event.event_type, event.timestamp.isoformat(), payload),
             )
+
+    def prune_audit_events(self, retention_days: int) -> int:
+        cutoff = datetime.now(UTC) - timedelta(days=max(1, retention_days))
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "DELETE FROM audit_events WHERE timestamp < ?",
+                (cutoff.isoformat(),),
+            )
+        return cursor.rowcount
 
     def add_route(self, route: ModelRoute) -> None:
         with self._lock, self._conn:
@@ -269,6 +278,8 @@ class DynamoStore:
         return [ModelRoute.model_validate_json(payload) for payload in self._query_payloads("ROUTE")]
 
     def add_event(self, event: AuditEvent) -> None:
+        settings = get_settings()
+        expires_at = int((event.timestamp + timedelta(days=max(1, settings.audit_retention_days))).timestamp())
         self._table.put_item(
             Item={
                 "pk": "AUDIT",
@@ -276,9 +287,18 @@ class DynamoStore:
                 "entity": "audit_event",
                 "request_id": event.request_id,
                 "event_type": event.event_type,
+                "expires_at": Decimal(expires_at),
                 "payload": event.model_dump_json(),
             }
         )
+
+    def prune_audit_events(self, retention_days: int) -> int:
+        cutoff = datetime.now(UTC) - timedelta(days=max(1, retention_days))
+        expired_events = [event for event in self.events if event.timestamp < cutoff]
+        with self._table.batch_writer() as batch:
+            for event in expired_events:
+                batch.delete_item(Key={"pk": "AUDIT", "sk": f"{event.timestamp.isoformat()}#{event.event_id}"})
+        return len(expired_events)
 
     def add_route(self, route: ModelRoute) -> None:
         self._table.put_item(

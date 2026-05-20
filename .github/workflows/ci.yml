@@ -142,6 +142,30 @@ jobs:
         working-directory: apps/web
         run: npm run build
 
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install API dependencies
+        working-directory: services/api
+        run: pip install -r requirements.txt
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Run web smoke tests
+        run: npm run test:e2e
+
   containers:
     runs-on: ubuntu-latest
     steps:

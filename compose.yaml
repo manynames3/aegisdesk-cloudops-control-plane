@@ -13,6 +13,10 @@ services:
       OPA_URL: "http://opa:8181"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4318/v1/traces"
       OTEL_SERVICE_NAME: "aegisdesk-api"
+      AEGISDESK_TICKET_ADAPTER: "local"
+      AEGISDESK_INCIDENT_CONTEXT_ADAPTER: "local_fixture"
+      AEGISDESK_AUDIT_RETENTION_DAYS: "30"
+      AEGISDESK_AUDIT_EXPORT_MAX_EVENTS: "500"
     volumes:
       - api-data:/app/data
     depends_on:
@@ -25,10 +29,14 @@ services:
       context: ./apps/web
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_AEGISDESK_MODE: evaluation
+        NEXT_PUBLIC_SHOW_EVALUATION_TOOLS: "true"
     ports:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_AEGISDESK_MODE: evaluation
+      NEXT_PUBLIC_SHOW_EVALUATION_TOOLS: "true"
     depends_on:
       - api
     restart: unless-stopped

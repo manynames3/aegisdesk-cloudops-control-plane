@@ -51,6 +51,21 @@ const architecture = [
   "Write audit trail"
 ];
 
+const pilotSteps = [
+  {
+    title: "Connect one identity source",
+    text: "Start with Cognito or a JWKS-compatible provider so policy decisions use real role and team claims."
+  },
+  {
+    title: "Connect one operational workflow",
+    text: "Begin with incident triage, ticket creation, access approval, or cost review instead of trying to govern every workflow at once."
+  },
+  {
+    title: "Prove audit-ready evidence",
+    text: "Review the prompt, redaction, policy decision, model route, sources, tool calls, approval state, and trace ID for every request."
+  }
+];
+
 export default function MarketingPage() {
   return (
     <main className="marketing">
@@ -89,6 +104,9 @@ export default function MarketingPage() {
             </a>
             <a className="marketingSecondary" href="https://github.com/manynames3/aegisdesk-cloudops-control-plane/tree/main/docs">
               Read self-hosting docs
+            </a>
+            <a className="marketingSecondary" href="https://github.com/manynames3/aegisdesk-cloudops-control-plane/blob/main/docs/sales/product-brief.md">
+              Evaluate a pilot
             </a>
           </div>
           <div className="marketingProofPills" aria-label="Platform capabilities">
@@ -286,6 +304,35 @@ export default function MarketingPage() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="marketingPilot" id="pilot">
+        <div className="marketingSectionHeader">
+          <p>Implementation path</p>
+          <h2>Start with a focused self-hosted pilot, not a broad platform rollout.</h2>
+        </div>
+        <div className="pilotGrid">
+          {pilotSteps.map((step, index) => (
+            <article key={step.title}>
+              <span>{index + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </article>
+          ))}
+        </div>
+        <div className="pilotCta">
+          <div>
+            <strong>Best first pilot</strong>
+            <p>
+              AWS CloudOps team with SSO, Bedrock, DynamoDB audit, OPA policy, and one real workflow such as Jira tickets or
+              CloudWatch-backed incident triage.
+            </p>
+          </div>
+          <a className="marketingPrimary" href="https://github.com/manynames3/aegisdesk-cloudops-control-plane/blob/main/docs/sales/buyer-readme.md">
+            View buyer packet
+            <FileText size={18} />
+          </a>
         </div>
       </section>
 

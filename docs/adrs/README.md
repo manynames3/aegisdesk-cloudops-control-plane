@@ -14,3 +14,4 @@ This directory records the major architecture decisions for AegisDesk.
 | [ADR-008](008-real-bedrock-dynamodb-mcp.md) | Accepted | Add real Bedrock, DynamoDB, MCP, and quota paths |
 | [ADR-009](009-cognito-opa-cost-explorer.md) | Accepted | Pair Cognito identity, live OPA/Rego, and Cost Explorer governance |
 | [ADR-010](010-seeded-incident-context.md) | Accepted | Use seeded CloudWatch-style incident context before real log queries |
+| [ADR-011](011-bounded-cloudwatch-and-audit-retention.md) | Accepted | Add bounded CloudWatch evidence and enforce audit retention |

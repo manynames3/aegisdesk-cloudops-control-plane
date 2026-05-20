@@ -134,7 +134,8 @@ button:disabled {
 
 .signedIdentity,
 .credentialBox,
-.shortcutPanel {
+.shortcutPanel,
+.productionIdentity {
   background: #17232e;
   border: 1px solid #304253;
   border-radius: 8px;
@@ -144,7 +145,8 @@ button:disabled {
 }
 
 .signedIdentity strong,
-.credentialBox strong {
+.credentialBox strong,
+.productionIdentity strong {
   color: #ffffff;
   font-size: 13px;
 }
@@ -153,7 +155,9 @@ button:disabled {
 .credentialBox span,
 .credentialBox code,
 .authNotice,
-.shortcutPanel summary {
+.shortcutPanel summary,
+.identityHint,
+.productionIdentity small {
   color: #a7b4c2;
   font-size: 12px;
 }
@@ -173,7 +177,8 @@ button:disabled {
 
 .hostedButtons button,
 .signedIdentity button,
-.credentialBox button {
+.credentialBox button,
+.productionIdentity button {
   align-items: center;
   background: #22303d;
   border: 1px solid #304253;
@@ -377,6 +382,101 @@ button:disabled {
   margin-top: 4px;
 }
 
+.firstRun {
+  align-items: stretch;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  margin-bottom: 18px;
+  padding: 18px;
+}
+
+.firstRunIntro {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+}
+
+.firstRunIntro h2,
+.firstRunIntro p {
+  margin: 0;
+}
+
+.firstRunIntro h2 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.firstRunIntro p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.firstRunActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.primaryAction,
+.secondaryLink {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.primaryAction {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #ffffff;
+}
+
+.secondaryLink {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.firstRunCards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.firstRunCards button {
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  text-align: left;
+}
+
+.firstRunCards button:hover {
+  border-color: var(--accent);
+}
+
+.firstRunCards svg {
+  color: var(--accent);
+}
+
+.firstRunCards strong {
+  font-size: 14px;
+}
+
+.firstRunCards span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .chatGrid {
   display: grid;
   gap: 18px;
@@ -443,6 +543,11 @@ button:disabled {
   align-self: flex-start;
   background: #f4f6f8;
   border: 1px solid var(--line);
+}
+
+.bubble.assistant.error {
+  background: var(--bad-bg);
+  border-color: #f5b5ad;
 }
 
 .composer {
@@ -809,6 +914,84 @@ button:disabled {
 .abusePanel {
   grid-column: 1 / -1;
   overflow: hidden;
+}
+
+.setupPanel,
+.auditExportPanel {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.setupGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding: 16px 18px;
+}
+
+.setupGrid > div {
+  background: var(--panel-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  min-height: 108px;
+  padding: 12px;
+}
+
+.setupGrid span,
+.auditExportPanel p,
+.auditExportPanel small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.setupGrid strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.auditExportPanel {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.auditExportPanel > div:first-child {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+}
+
+.auditExportPanel svg {
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.auditExportPanel h2,
+.auditExportPanel p {
+  margin: 0;
+}
+
+.auditExportPanel h2 {
+  font-size: 18px;
+}
+
+.auditExportPanel p {
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.auditExportPanel small {
+  display: block;
+  margin-top: 6px;
+}
+
+.exportActions {
+  display: flex;
+  gap: 8px;
 }
 
 .abuseGrid {
@@ -1211,6 +1394,11 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .firstRun,
+  .firstRunCards {
+    grid-template-columns: 1fr;
+  }
+
   .governanceGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1218,6 +1406,7 @@ button:disabled {
   .walkthroughSteps,
   .eventFilters,
   .abuseGrid,
+  .setupGrid,
   .eventExplorerLayout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1261,9 +1450,15 @@ button:disabled {
   .eventItem,
   .eventFilters,
   .abuseGrid,
+  .setupGrid,
   .logEntry,
   .walkthroughSteps {
     grid-template-columns: 1fr;
+  }
+
+  .auditExportPanel {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .walkthroughHeader {
@@ -1497,6 +1692,7 @@ button:disabled {
 .marketingArchitecture,
 .marketingSecurity,
 .marketingIntegrations,
+.marketingPilot,
 .marketingCta {
   margin: 0 auto;
   max-width: 1180px;
@@ -1730,6 +1926,69 @@ button:disabled {
   min-height: 42px;
 }
 
+.marketingPilot {
+  display: grid;
+  gap: 24px;
+}
+
+.pilotGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pilotGrid article,
+.pilotCta {
+  background: #ffffff;
+  border: 1px solid var(--marketing-line);
+  border-radius: 8px;
+}
+
+.pilotGrid article {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+}
+
+.pilotGrid article > span {
+  align-items: center;
+  background: #eef7f5;
+  border-radius: 999px;
+  color: var(--marketing-teal);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.pilotGrid h3,
+.pilotCta strong {
+  font-size: 20px;
+  margin: 0;
+}
+
+.pilotGrid p,
+.pilotCta p {
+  color: var(--marketing-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.pilotCta {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 24px;
+}
+
+.pilotCta > div {
+  display: grid;
+  gap: 8px;
+}
+
 .marketingCta {
   align-items: center;
   display: grid;
@@ -1782,6 +2041,8 @@ button:disabled {
   .whyGrid,
   .architectureNotes,
   .securityGrid,
+  .pilotGrid,
+  .pilotCta,
   .marketingCta {
     grid-template-columns: 1fr;
   }
@@ -1825,6 +2086,7 @@ button:disabled {
   .marketingArchitecture,
   .marketingSecurity,
   .marketingIntegrations,
+  .marketingPilot,
   .marketingCta {
     padding-bottom: 64px;
     padding-top: 64px;

@@ -72,7 +72,7 @@ class IncidentLogEntry(BaseModel):
 
 class IncidentContext(BaseModel):
     incident_id: str
-    source: Literal["seeded_cloudwatch_logs"]
+    source: Literal["seeded_cloudwatch_logs", "cloudwatch_logs", "incident_context_unavailable"]
     log_group: str
     query: str
     entries: list[IncidentLogEntry] = Field(default_factory=list)

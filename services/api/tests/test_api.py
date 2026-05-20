@@ -1,11 +1,15 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from app.adapters import CloudWatchIncidentAdapter, JiraTicketAdapter, ServiceNowTicketAdapter, UnavailableTicketAdapter
 from app.auth import create_persona_token, decode_token, jwks_document
 from app.main import app, store
-from app.models import Actor, Role
+from app.models import Actor, AuditEvent, PolicyDecision, Role
 from app.redaction import inspect_and_redact
+from app.store import DemoStore
 
 
 client = TestClient(app)
@@ -294,6 +298,220 @@ def test_governance_endpoints_require_admin_role():
     assert manager_events.status_code == 200
     assert manager_controls.status_code == 200
     assert manager_controls.json()["role_quotas"]["employee"] == 25
+
+
+def test_setup_status_is_public_and_redacts_secret_configuration():
+    response = client.get("/setup/status")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["mode"] in {"evaluation", "production"}
+    assert body["auth"]["mode"] in {"hmac", "jwks", "cognito"}
+    assert "jira_api_token" not in response.text
+    assert "servicenow_password" not in response.text
+    assert "auth_secret" not in response.text
+    assert body["data"]["audit_retention_days"] >= 1
+    assert "cloudwatch_configured" in body["integrations"]
+
+
+def test_audit_export_requires_manager_or_admin_and_returns_json_and_csv():
+    chat_response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-export"),
+        json={"message": "The checkout service is timing out. What should I check first?"},
+    )
+    request_id = chat_response.json()["request_id"]
+
+    forbidden = client.get("/audit/export", headers=auth_headers(Role.employee))
+    json_export = client.get("/audit/export", headers=auth_headers(Role.manager))
+    csv_export = client.get("/audit/export?format=csv", headers=auth_headers(Role.admin))
+
+    assert forbidden.status_code == 403
+    assert json_export.status_code == 200
+    assert json_export.json()["metadata"]["event_count"] >= 1
+    assert any(event["request_id"] == request_id for event in json_export.json()["events"])
+    assert csv_export.status_code == 200
+    assert "text/csv" in csv_export.headers["content-type"]
+    assert "request_id" in csv_export.text
+
+
+def test_jira_ticket_adapter_creates_real_issue_payload():
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"key": "OPS-123"}
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def post(self, url, json, auth):
+            self.calls.append({"url": url, "json": json, "auth": auth})
+            return FakeResponse()
+
+    fake_client = FakeClient()
+    adapter = JiraTicketAdapter(
+        base_url="https://example.atlassian.net",
+        email="ops@example.com",
+        api_token="secret-token",
+        project_key="OPS",
+        issue_type="Task",
+        client=fake_client,
+    )
+    policy = PolicyDecision(decision="allow", reason="ticket_creation_allowed", policy_name="tool_policy")
+
+    tool_call = adapter.create_ticket(policy, "Checkout latency", "payments", "medium")
+
+    assert tool_call.status == "allowed"
+    assert tool_call.result["ticket_id"] == "OPS-123"
+    assert tool_call.result["system"] == "jira"
+    assert fake_client.calls[0]["url"] == "https://example.atlassian.net/rest/api/3/issue"
+    assert fake_client.calls[0]["auth"] == ("ops@example.com", "secret-token")
+    assert fake_client.calls[0]["json"]["fields"]["project"]["key"] == "OPS"
+
+
+def test_servicenow_ticket_adapter_creates_real_incident_payload():
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"result": {"number": "INC0012345", "sys_id": "abc123", "state": "1"}}
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def post(self, url, json, auth):
+            self.calls.append({"url": url, "json": json, "auth": auth})
+            return FakeResponse()
+
+    fake_client = FakeClient()
+    adapter = ServiceNowTicketAdapter(
+        instance_url="https://example.service-now.com",
+        username="ops.integration",
+        password="secret-password",
+        assignment_group="cloudops",
+        table="incident",
+        client=fake_client,
+    )
+    policy = PolicyDecision(decision="allow", reason="ticket_creation_allowed", policy_name="tool_policy")
+
+    tool_call = adapter.create_ticket(policy, "Checkout latency", "payments", "sev-2")
+
+    assert tool_call.status == "allowed"
+    assert tool_call.result["ticket_id"] == "INC0012345"
+    assert tool_call.result["system"] == "servicenow"
+    assert tool_call.result["sys_id"] == "abc123"
+    assert fake_client.calls[0]["url"] == "https://example.service-now.com/api/now/table/incident"
+    assert fake_client.calls[0]["auth"] == ("ops.integration", "secret-password")
+    assert fake_client.calls[0]["json"]["assignment_group"] == "cloudops"
+    assert fake_client.calls[0]["json"]["impact"] == "2"
+    assert fake_client.calls[0]["json"]["urgency"] == "2"
+
+
+def test_unavailable_ticket_adapter_fails_closed_without_fake_ticket():
+    policy = PolicyDecision(decision="allow", reason="ticket_creation_allowed", policy_name="tool_policy")
+    adapter = UnavailableTicketAdapter(reason="jira_adapter_missing_required_configuration", system="jira")
+
+    tool_call = adapter.create_ticket(policy, "Checkout latency", "payments", "medium")
+
+    assert tool_call.status == "blocked"
+    assert "ticket_id" not in tool_call.result
+    assert tool_call.result["error"] == "jira_adapter_missing_required_configuration"
+
+
+def test_cloudwatch_incident_adapter_queries_bounded_logs():
+    class FakeLogsClient:
+        def __init__(self):
+            self.start_query_call = None
+
+        def start_query(self, **kwargs):
+            self.start_query_call = kwargs
+            return {"queryId": "query-123"}
+
+        def get_query_results(self, queryId):
+            return {
+                "status": "Complete",
+                "results": [
+                    [
+                        {"field": "@timestamp", "value": "2026-05-12T21:15:31Z"},
+                        {"field": "level", "value": "ERROR"},
+                        {"field": "service", "value": "checkout-api"},
+                        {"field": "@message", "value": "INC-1042 database connection pool exhausted"},
+                    ]
+                ],
+            }
+
+    fake_client = FakeLogsClient()
+    adapter = CloudWatchIncidentAdapter(
+        log_group="/aws/lambda/checkout",
+        region="us-east-1",
+        lookback_minutes=15,
+        query_limit=5,
+        poll_interval_seconds=0,
+        client=fake_client,
+    )
+
+    context = adapter.lookup_context("INC-1042", "checkout is timing out")
+    tool_call = adapter.to_tool_call(context)
+
+    assert context.source == "cloudwatch_logs"
+    assert context.entries[0].service == "checkout-api"
+    assert "INC-1042" in fake_client.start_query_call["queryString"]
+    assert fake_client.start_query_call["limit"] == 5
+    assert tool_call.status == "allowed"
+    assert tool_call.policy.metadata["adapter"] == "cloudwatch_incident_adapter"
+
+
+def test_cloudwatch_incident_adapter_fails_closed_without_fixture_fallback():
+    class MisconfiguredLogsClient:
+        def start_query(self, **kwargs):
+            return {}
+
+    adapter = CloudWatchIncidentAdapter(
+        log_group="/aws/lambda/checkout",
+        region="us-east-1",
+        poll_interval_seconds=0,
+        client=MisconfiguredLogsClient(),
+    )
+
+    context = adapter.lookup_context("INC-404", "checkout is timing out")
+    tool_call = adapter.to_tool_call(context)
+
+    assert context.source == "incident_context_unavailable"
+    assert context.entries == []
+    assert tool_call.status == "blocked"
+    assert "fixture" not in tool_call.policy.reason
+
+
+def test_sqlite_store_prunes_audit_events_by_retention(tmp_path):
+    test_store = DemoStore(str(tmp_path / "aegisdesk.db"))
+    actor = Actor(user_id="u-retention", role=Role.manager, team="platform")
+    old_event = AuditEvent(
+        request_id="req-old",
+        actor=actor,
+        event_type="request.received",
+        summary="Old event",
+        trace_id="trace-old",
+        timestamp=datetime.now(UTC) - timedelta(days=10),
+    )
+    recent_event = AuditEvent(
+        request_id="req-recent",
+        actor=actor,
+        event_type="request.received",
+        summary="Recent event",
+        trace_id="trace-recent",
+        timestamp=datetime.now(UTC),
+    )
+
+    test_store.add_event(old_event)
+    test_store.add_event(recent_event)
+
+    assert test_store.prune_audit_events(retention_days=1) == 1
+    assert [event.request_id for event in test_store.events] == ["req-recent"]
 
 
 def test_oversized_prompt_is_rejected_before_model_routing():

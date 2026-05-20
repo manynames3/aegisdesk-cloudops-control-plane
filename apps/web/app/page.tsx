@@ -10,6 +10,7 @@ import {
   Copy,
   Database,
   DollarSign,
+  FileDown,
   KeyRound,
   ListFilter,
   LogIn,
@@ -27,6 +28,8 @@ import type { LucideIcon } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const PRODUCT_MODE = process.env.NEXT_PUBLIC_AEGISDESK_MODE ?? "evaluation";
+const SHOW_EVALUATION_TOOLS = process.env.NEXT_PUBLIC_SHOW_EVALUATION_TOOLS !== "false" && PRODUCT_MODE !== "production";
 const AUTH_TOKEN_KEY = "aegisdesk.cognito.idToken";
 const AUTH_ACTOR_KEY = "aegisdesk.cognito.actor";
 const PKCE_VERIFIER_KEY = "aegisdesk.pkce.verifier";
@@ -136,7 +139,7 @@ type KnowledgeCitation = {
 
 type IncidentContext = {
   incident_id: string;
-  source: "seeded_cloudwatch_logs";
+  source: "seeded_cloudwatch_logs" | "cloudwatch_logs" | "incident_context_unavailable";
   log_group: string;
   query: string;
   suspected_cause: string;
@@ -187,6 +190,46 @@ type AbuseControls = {
   cloud_model_kill_switch: boolean;
   bedrock_enabled: boolean;
   request_body_limit_note: string;
+};
+
+type SetupStatus = {
+  mode: "production" | "evaluation";
+  auth: {
+    mode: string;
+    persona_issuer_enabled: boolean;
+    cognito_configured: boolean;
+    jwks_configured: boolean;
+  };
+  policy: {
+    mode: string;
+    ready: boolean;
+    engine?: string;
+  };
+  models: {
+    bedrock_enabled: boolean;
+    bedrock_model_id: string;
+    cloud_model_kill_switch: boolean;
+  };
+  data: {
+    store_backend: string;
+    dynamodb_configured: boolean;
+    store_ready: boolean;
+    audit_retention_days: number;
+    audit_export_max_events: number;
+  };
+  integrations: {
+    ticket_adapter: string;
+    jira_configured: boolean;
+    servicenow_configured: boolean;
+    cost_explorer_enabled: boolean;
+    cost_explorer_scope: string;
+    incident_context_adapter: string;
+    cloudwatch_configured: boolean;
+    cloudwatch_log_group?: string | null;
+    cloudwatch_query_limit?: number;
+    cloudwatch_query_lookback_minutes?: number;
+    access_request_adapter: string;
+  };
 };
 
 type Approval = {
@@ -243,6 +286,12 @@ type Message = {
   role: "user" | "assistant";
   text: string;
   response?: ChatResponse;
+  tone?: "normal" | "error";
+};
+
+type ApiFailure = Error & {
+  status?: number;
+  detail?: string;
 };
 
 const prompts = [
@@ -320,6 +369,7 @@ export default function Home() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [abuseControls, setAbuseControls] = useState<AbuseControls | null>(null);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [selectedReplay, setSelectedReplay] = useState<RequestReplay | null>(null);
   const [isReplayLoading, setIsReplayLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -328,6 +378,7 @@ export default function Home() {
   const [authActor, setAuthActor] = useState<AuthActor | null>(null);
   const [hostedLogin, setHostedLogin] = useState<HostedLogin | null>(null);
   const [authNotice, setAuthNotice] = useState("");
+  const [exportNotice, setExportNotice] = useState("");
   const [isPreparingLogin, setIsPreparingLogin] = useState(false);
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const [walkthroughStep, setWalkthroughStep] = useState(0);
@@ -351,6 +402,13 @@ export default function Home() {
       };
     }
 
+    if (!SHOW_EVALUATION_TOOLS) {
+      const error = new Error("Company SSO required.") as ApiFailure;
+      error.status = 401;
+      error.detail = "company_sso_required";
+      throw error;
+    }
+
     const response = await fetch(`${API_BASE}/auth/persona-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -361,7 +419,7 @@ export default function Home() {
     });
 
     if (!response.ok) {
-      throw new Error("persona_token_failed");
+      throw await apiFailureFromResponse(response, "Could not prepare evaluation access.");
     }
 
     const token = (await response.json()) as PersonaTokenResponse;
@@ -373,16 +431,27 @@ export default function Home() {
 
   async function refreshData(selectedRole = activeRole) {
     try {
+      const healthRes = await fetch(`${API_BASE}/health`);
+      const setupRes = await fetch(`${API_BASE}/setup/status`);
+      setApiStatus(healthRes.ok ? "ok" : "offline");
+      setSetupStatus(setupRes.ok ? await setupRes.json() : null);
+
+      if (!SHOW_EVALUATION_TOOLS && !authToken) {
+        setMetrics(initialMetrics);
+        setEvents([]);
+        setApprovals([]);
+        setAbuseControls(null);
+        return;
+      }
+
       const headers = await authHeaders(selectedRole);
-      const [healthRes, metricsRes, eventsRes, approvalsRes, controlsRes] = await Promise.all([
-        fetch(`${API_BASE}/health`),
+      const [metricsRes, eventsRes, approvalsRes, controlsRes] = await Promise.all([
         fetch(`${API_BASE}/metrics/summary`, { headers }),
         fetch(`${API_BASE}/events`, { headers }),
         fetch(`${API_BASE}/approvals`, { headers }),
         fetch(`${API_BASE}/controls/abuse`, { headers })
       ]);
 
-      setApiStatus(healthRes.ok ? "ok" : "offline");
       setMetrics(metricsRes.ok ? await metricsRes.json() : initialMetrics);
       setEvents(eventsRes.ok ? (await eventsRes.json()).events : []);
       setApprovals(approvalsRes.ok ? (await approvalsRes.json()).approvals : []);
@@ -429,7 +498,7 @@ export default function Home() {
           body: JSON.stringify({ code, code_verifier: verifier, redirect_uri: redirectUri })
         });
 
-        if (!response.ok) throw new Error("oauth_exchange_failed");
+        if (!response.ok) throw await apiFailureFromResponse(response, "Cognito code exchange failed.");
 
         const body = (await response.json()) as OAuthExchangeResponse;
         localStorage.setItem(AUTH_TOKEN_KEY, body.id_token);
@@ -441,8 +510,8 @@ export default function Home() {
         setAuthActor(body.actor);
         setRole(body.actor.role);
         setAuthNotice("Signed in through Cognito Hosted UI. Backend API calls now use the Cognito ID token.");
-      } catch {
-        setAuthNotice("Cognito code exchange failed. Start sign-in again.");
+      } catch (error) {
+        setAuthNotice(formatApiFailure(error));
       } finally {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -481,7 +550,7 @@ export default function Home() {
         })
       });
 
-      if (!response.ok) throw new Error("hosted_login_failed");
+      if (!response.ok) throw await apiFailureFromResponse(response, "Could not prepare Cognito Hosted UI sign-in.");
 
       const body = (await response.json()) as Omit<HostedLogin, "authorizationUrl">;
       const params = new URLSearchParams({
@@ -500,9 +569,43 @@ export default function Home() {
       sessionStorage.setItem(PKCE_REDIRECT_KEY, redirectUri);
       setHostedLogin({ ...body, authorizationUrl: `${body.config.authorization_endpoint}?${params.toString()}` });
       setRole(selectedRole);
-      setAuthNotice("Reviewer credentials are ready. Open Cognito Hosted UI and sign in there.");
-    } catch {
-      setAuthNotice("Could not prepare Cognito Hosted UI sign-in.");
+      setAuthNotice("Temporary evaluation credentials are ready. Open Cognito Hosted UI and sign in there.");
+    } catch (error) {
+      setAuthNotice(formatApiFailure(error));
+    } finally {
+      setIsPreparingLogin(false);
+    }
+  }
+
+  async function startCompanySignIn() {
+    setIsPreparingLogin(true);
+    setAuthNotice("");
+    try {
+      const verifier = randomBase64Url(64);
+      const state = randomBase64Url(32);
+      const challenge = await pkceChallenge(verifier);
+      const redirectUri = window.location.origin;
+      const response = await fetch(`${API_BASE}/auth/hosted-ui-config`);
+
+      if (!response.ok) throw await apiFailureFromResponse(response, "Company SSO is unavailable.");
+
+      const config = (await response.json()) as HostedAuthConfig;
+      const params = new URLSearchParams({
+        client_id: config.client_id,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: config.scopes.join(" "),
+        state
+      });
+
+      sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+      sessionStorage.setItem(PKCE_STATE_KEY, state);
+      sessionStorage.setItem(PKCE_REDIRECT_KEY, redirectUri);
+      window.location.assign(`${config.authorization_endpoint}?${params.toString()}`);
+    } catch (error) {
+      setAuthNotice(formatApiFailure(error));
     } finally {
       setIsPreparingLogin(false);
     }
@@ -554,7 +657,7 @@ export default function Home() {
     });
 
     if (!response.ok) {
-      throw new Error("chat_failed");
+      throw await apiFailureFromResponse(response, "Chat request failed.");
     }
 
     return (await response.json()) as ChatResponse;
@@ -565,7 +668,7 @@ export default function Home() {
     try {
       const headers = await authHeaders(activeRole);
       const response = await fetch(`${API_BASE}/requests/${requestId}/replay`, { headers });
-      if (!response.ok) throw new Error("replay_failed");
+      if (!response.ok) throw await apiFailureFromResponse(response, "Request replay is unavailable.");
       setSelectedReplay((await response.json()) as RequestReplay);
     } catch {
       setSelectedReplay(null);
@@ -586,15 +689,18 @@ export default function Home() {
       const body = await submitMessage(trimmed);
       setMessages((current) => [...current, { role: "assistant", text: body.answer, response: body }]);
       await refreshData();
-    } catch {
+    } catch (error) {
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
-          text: `API request failed. Verify the gateway is reachable at ${API_BASE} and retry.`
+          tone: "error",
+          text: formatApiFailure(error)
         }
       ]);
-      setApiStatus("offline");
+      if (!isHttpApiFailure(error)) {
+        setApiStatus("offline");
+      }
     } finally {
       setIsSending(false);
     }
@@ -607,6 +713,28 @@ export default function Home() {
       headers
     });
     await refreshData(selectedRole);
+  }
+
+  async function exportAudit(format: "json" | "csv") {
+    setExportNotice("");
+    try {
+      const headers = await authHeaders(activeRole);
+      const response = await fetch(`${API_BASE}/audit/export?format=${format}`, { headers });
+      if (!response.ok) throw await apiFailureFromResponse(response, "Audit export failed.");
+
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = `aegisdesk-audit-export.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+      setExportNotice(`Audit ${format.toUpperCase()} export generated from the current governed event window.`);
+    } catch (error) {
+      setExportNotice(formatApiFailure(error));
+    }
   }
 
   async function resetState() {
@@ -719,7 +847,7 @@ export default function Home() {
         </nav>
 
         <div className="identityPanel">
-          <span>Identity</span>
+          <span>Access</span>
           {authActor ? (
             <div className="signedIdentity">
               <strong>Cognito Hosted UI</strong>
@@ -730,8 +858,9 @@ export default function Home() {
                 Sign out
               </button>
             </div>
-          ) : (
+          ) : SHOW_EVALUATION_TOOLS ? (
             <>
+              <small className="identityHint">Use temporary evaluation personas to review the operator, manager, and admin workflows.</small>
               <div className="hostedButtons">
                 {(["employee", "manager", "admin"] as Role[]).map((option) => (
                   <button disabled={isPreparingLogin} key={option} onClick={() => prepareHostedLogin(option)} type="button">
@@ -742,7 +871,7 @@ export default function Home() {
               </div>
               {hostedLogin && (
                 <div className="credentialBox">
-                  <strong>Cognito credentials</strong>
+                  <strong>Temporary sign-in details</strong>
                   <span>{hostedLogin.username}</span>
                   <code>{hostedLogin.password}</code>
                   <button onClick={() => navigator.clipboard.writeText(`${hostedLogin.username}\n${hostedLogin.password}`)} type="button">
@@ -756,7 +885,7 @@ export default function Home() {
                 </div>
               )}
               <details className="shortcutPanel">
-                <summary>Identity shortcut</summary>
+                <summary>Evaluation shortcut</summary>
                 <div className="segmented">
                   {(["employee", "manager", "admin"] as Role[]).map((option) => (
                     <button
@@ -771,6 +900,15 @@ export default function Home() {
                 </div>
               </details>
             </>
+          ) : (
+            <div className="productionIdentity">
+              <strong>Company SSO required</strong>
+              <small>Configure Cognito or another JWKS-compatible identity provider for production use.</small>
+              <button disabled={isPreparingLogin} onClick={startCompanySignIn} type="button">
+                <LogIn size={15} />
+                Sign in with SSO
+              </button>
+            </div>
           )}
           {authNotice && <small className="authNotice">{authNotice}</small>}
         </div>
@@ -784,27 +922,33 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p>Self-hosted control plane</p>
+            <p>{PRODUCT_MODE === "production" ? "Production workspace" : "Self-hosted evaluation workspace"}</p>
             <h1>{tabTitle(tab)}</h1>
           </div>
           <div className="topActions">
-            <button className="secondary" onClick={() => setWalkthroughOpen((current) => !current)} type="button">
-              <Play size={16} />
-              Walkthrough
-            </button>
+            {SHOW_EVALUATION_TOOLS && (
+              <button className="secondary" onClick={() => setWalkthroughOpen((current) => !current)} type="button">
+                <Play size={16} />
+                Walkthrough
+              </button>
+            )}
             <button className="iconButton" onClick={() => refreshData()} title="Refresh" type="button">
               <RefreshCw size={18} />
             </button>
-            <button className="secondary" disabled={!canManageState} onClick={seedState} title="Admin identity required" type="button">
-              Seed
-            </button>
-            <button className="secondary" disabled={!canManageState} onClick={resetState} title="Admin identity required" type="button">
-              Reset
-            </button>
+            {SHOW_EVALUATION_TOOLS && (
+              <>
+                <button className="secondary" disabled={!canManageState} onClick={seedState} title="Admin identity required" type="button">
+                  Seed data
+                </button>
+                <button className="secondary" disabled={!canManageState} onClick={resetState} title="Admin identity required" type="button">
+                  Reset
+                </button>
+              </>
+            )}
           </div>
         </header>
 
-        {walkthroughOpen && (
+        {SHOW_EVALUATION_TOOLS && walkthroughOpen && (
           <GuidedWalkthrough
             activeStep={walkthroughStep}
             isRunning={isSending}
@@ -814,7 +958,16 @@ export default function Home() {
         )}
 
         {tab === "chat" && (
-          <div className="chatGrid">
+          <>
+            {messages.length === 0 && !walkthroughOpen && (
+              <FirstRunPanel
+                requiresSignIn={!SHOW_EVALUATION_TOOLS && !authToken}
+                onOpenWalkthrough={() => setWalkthroughOpen(true)}
+                onSelectPrompt={(prompt) => setMessage(prompt)}
+                onSignIn={startCompanySignIn}
+              />
+            )}
+            <div className="chatGrid">
             <section className="panel chatPanel">
               <div className="promptBar">
                 {prompts.map((prompt) => {
@@ -836,7 +989,7 @@ export default function Home() {
                   </div>
                 )}
                 {messages.map((item, index) => (
-                  <div className={`bubble ${item.role}`} key={`${item.role}-${index}`}>
+                  <div className={`bubble ${item.role} ${item.tone === "error" ? "error" : ""}`} key={`${item.role}-${index}`}>
                     <p>{item.text}</p>
                     {item.response && <ResponseMeta response={item.response} />}
                     {item.response?.clarification && item.response.clarification.status !== "complete" && (
@@ -854,9 +1007,9 @@ export default function Home() {
 
               <form className="composer" onSubmit={sendChat}>
                 <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={3} />
-                <button disabled={isSending} type="submit">
+                <button disabled={isSending || (!SHOW_EVALUATION_TOOLS && !authToken)} type="submit">
                   <MessageSquare size={18} />
-                  Send
+                  {!SHOW_EVALUATION_TOOLS && !authToken ? "Sign in first" : "Send"}
                 </button>
               </form>
             </section>
@@ -865,7 +1018,8 @@ export default function Home() {
               <h2>Decision Trail</h2>
               {latestResponse ? <DecisionTrail response={latestResponse} /> : <span className="muted">No request yet.</span>}
             </aside>
-          </div>
+            </div>
+          </>
         )}
 
         {tab === "approvals" && (
@@ -932,7 +1086,14 @@ export default function Home() {
             <Metric icon={AlertTriangle} label="Denied" value={metrics.denied_actions} />
             <Metric icon={KeyRound} label="Pending" value={metrics.approvals_pending} />
             <Metric icon={ClipboardList} label="Tools" value={metrics.tool_calls_total} />
+            {setupStatus && <SetupStatusPanel status={setupStatus} />}
             {abuseControls && <AbuseControlsPanel controls={abuseControls} />}
+            <AuditExportPanel
+              disabled={!canApprove}
+              notice={exportNotice}
+              onExport={exportAudit}
+              setupStatus={setupStatus}
+            />
 
             <section className="panel eventPanel">
               <div className="sectionHeader">
@@ -1056,6 +1217,69 @@ function GuidedWalkthrough({
   );
 }
 
+function FirstRunPanel({
+  requiresSignIn,
+  onOpenWalkthrough,
+  onSelectPrompt,
+  onSignIn
+}: {
+  requiresSignIn: boolean;
+  onOpenWalkthrough: () => void;
+  onSelectPrompt: (prompt: string) => void;
+  onSignIn: () => void;
+}) {
+  return (
+    <section className="firstRun panel">
+      <div className="firstRunIntro">
+        <Badge tone="neutral">{PRODUCT_MODE === "production" ? "production" : "evaluation"}</Badge>
+        <h2>Start with one governed CloudOps request.</h2>
+        <p>
+          AegisDesk shows how an employee request moves through identity, redaction, OPA policy, source lookup, model routing,
+          approvals, and audit replay before the answer becomes trusted operational evidence.
+        </p>
+        <div className="firstRunActions">
+          {requiresSignIn ? (
+            <button className="primaryAction" onClick={onSignIn} type="button">
+              <LogIn size={17} />
+              Sign in with SSO
+            </button>
+          ) : SHOW_EVALUATION_TOOLS ? (
+            <button className="primaryAction" onClick={onOpenWalkthrough} type="button">
+              <Play size={17} />
+              Run guided walkthrough
+            </button>
+          ) : (
+            <button className="primaryAction" onClick={() => onSelectPrompt(prompts[0].text)} type="button">
+              <Activity size={17} />
+              Start incident triage
+            </button>
+          )}
+          <a className="secondaryLink" href="/marketing">
+            View product page
+          </a>
+        </div>
+      </div>
+      <div className="firstRunCards">
+        <button onClick={() => onSelectPrompt(prompts[0].text)} type="button">
+          <Activity size={18} />
+          <strong>Incident triage</strong>
+          <span>Use runbooks and incident context without exposing sensitive values.</span>
+        </button>
+        <button onClick={() => onSelectPrompt(prompts[3].text)} type="button">
+          <KeyRound size={18} />
+          <strong>Scoped access</strong>
+          <span>Route temporary production access to a manager approval queue.</span>
+        </button>
+        <button onClick={() => onSelectPrompt(prompts[4].text)} type="button">
+          <DollarSign size={18} />
+          <strong>Cost review</strong>
+          <span>Gate Cost Explorer summaries by role, quota, and audit policy.</span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ResponseMeta({ response }: { response: ChatResponse }) {
   return (
     <div className="metaGrid">
@@ -1132,6 +1356,123 @@ function ClarificationPanel({ clarification }: { clarification: ClarificationRes
         ))}
       </ol>
     </div>
+  );
+}
+
+function SetupStatusPanel({ status }: { status: SetupStatus }) {
+  const checks = [
+    {
+      label: "Identity",
+      value: status.auth.cognito_configured || status.auth.jwks_configured ? "Configured" : "Evaluation only",
+      ready: status.auth.cognito_configured || status.auth.jwks_configured || status.auth.persona_issuer_enabled
+    },
+    {
+      label: "Policy",
+      value: status.policy.ready ? `${status.policy.mode} ready` : "Not ready",
+      ready: status.policy.ready
+    },
+    {
+      label: "Audit store",
+      value: `${status.data.store_backend}${status.data.store_ready ? " ready" : " unavailable"}`,
+      ready: status.data.store_ready
+    },
+    {
+      label: "Ticketing",
+      value:
+        status.integrations.ticket_adapter === "local"
+          ? "Local adapter"
+          : status.integrations.ticket_adapter === "jira"
+            ? status.integrations.jira_configured
+              ? "Jira configured"
+              : "Jira needs setup"
+            : status.integrations.ticket_adapter === "servicenow"
+              ? status.integrations.servicenow_configured
+                ? "ServiceNow configured"
+                : "ServiceNow needs setup"
+            : `Unsupported: ${status.integrations.ticket_adapter}`,
+      ready:
+        status.integrations.ticket_adapter === "local" ||
+        (status.integrations.ticket_adapter === "jira" && status.integrations.jira_configured) ||
+        (status.integrations.ticket_adapter === "servicenow" && status.integrations.servicenow_configured)
+    },
+    {
+      label: "Model route",
+      value: status.models.bedrock_enabled && !status.models.cloud_model_kill_switch ? "Bedrock enabled" : "Local-safe route",
+      ready: true
+    },
+    {
+      label: "Cost",
+      value: status.integrations.cost_explorer_enabled ? "Cost Explorer enabled" : "Disabled",
+      ready: true
+    },
+    {
+      label: "Incident logs",
+      value:
+        status.integrations.incident_context_adapter === "local_fixture"
+          ? "Local fixture source"
+          : status.integrations.incident_context_adapter === "cloudwatch"
+          ? status.integrations.cloudwatch_configured
+            ? "CloudWatch configured"
+            : "CloudWatch needs log group"
+          : `Unsupported: ${status.integrations.incident_context_adapter}`,
+      ready:
+        status.integrations.incident_context_adapter === "local_fixture" ||
+        (status.integrations.incident_context_adapter === "cloudwatch" && status.integrations.cloudwatch_configured)
+    }
+  ];
+
+  return (
+    <section className="panel setupPanel">
+      <div className="sectionHeader">
+        <h2>Readiness</h2>
+        <Badge tone={status.mode === "production" ? "good" : "neutral"}>{status.mode}</Badge>
+      </div>
+      <div className="setupGrid">
+        {checks.map((check) => (
+          <div key={check.label}>
+            <Badge tone={check.ready ? "good" : "warn"}>{check.ready ? "ready" : "needs setup"}</Badge>
+            <span>{check.label}</span>
+            <strong>{check.value}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AuditExportPanel({
+  disabled,
+  notice,
+  onExport,
+  setupStatus
+}: {
+  disabled: boolean;
+  notice: string;
+  onExport: (format: "json" | "csv") => void;
+  setupStatus: SetupStatus | null;
+}) {
+  return (
+    <section className="panel auditExportPanel">
+      <div>
+        <FileDown size={20} />
+        <div>
+          <h2>Audit Export</h2>
+          <p>
+            Export replayable evidence for security review. Retention window:{" "}
+            {setupStatus ? `${setupStatus.data.audit_retention_days} days` : "configured by API"}.
+          </p>
+          {notice && <small>{notice}</small>}
+        </div>
+      </div>
+      <div className="exportActions">
+        <button className="secondary" disabled={disabled} onClick={() => onExport("json")} type="button">
+          JSON
+        </button>
+        <button className="secondary" disabled={disabled} onClick={() => onExport("csv")} type="button">
+          CSV
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1247,15 +1588,23 @@ function ReplayBlock({ title, value }: { title: string; value: string }) {
 }
 
 function IncidentEvidence({ context }: { context: IncidentContext }) {
+  const sourceLabel =
+    context.source === "cloudwatch_logs"
+      ? "CloudWatch Logs"
+      : context.source === "incident_context_unavailable"
+        ? "Incident context unavailable"
+        : "Seeded CloudWatch-style logs";
+
   return (
     <div className="incidentEvidence">
       <div>
         <Server size={16} />
         <strong>{context.incident_id}</strong>
-        <span>{context.log_group}</span>
+        <span>{sourceLabel} · {context.log_group}</span>
       </div>
       <p>{context.suspected_cause}</p>
       <div className="logEntries">
+        {context.entries.length === 0 && <div className="emptyRow">No log entries returned for this request.</div>}
         {context.entries.slice(0, 3).map((entry) => (
           <div className="logEntry" key={`${entry.timestamp}-${entry.service}`}>
             <Badge tone={entry.level === "ERROR" ? "bad" : entry.level === "WARN" ? "warn" : "neutral"}>{entry.level}</Badge>
@@ -1446,6 +1795,61 @@ function EventMetadata({ event }: { event: AuditEvent }) {
 
   if (!values.length) return null;
   return <small className="eventMeta">{values.join(" - ")}</small>;
+}
+
+async function apiFailureFromResponse(response: Response, fallback: string): Promise<ApiFailure> {
+  let detail = "";
+  try {
+    const body = (await response.json()) as { detail?: string | { msg?: string }[] };
+    if (typeof body.detail === "string") {
+      detail = body.detail;
+    } else if (Array.isArray(body.detail)) {
+      detail = body.detail.map((item) => item.msg).filter(Boolean).join("; ");
+    }
+  } catch {
+    detail = "";
+  }
+
+  const error = new Error(fallback) as ApiFailure;
+  error.status = response.status;
+  error.detail = detail;
+  return error;
+}
+
+function isHttpApiFailure(error: unknown): error is ApiFailure {
+  return error instanceof Error && typeof (error as ApiFailure).status === "number";
+}
+
+function formatApiFailure(error: unknown) {
+  if (!isHttpApiFailure(error)) {
+    return `AegisDesk could not reach the API at ${API_BASE}. Start the FastAPI service or check the deployed API health endpoint, then retry.`;
+  }
+
+  const status = error.status ?? 0;
+
+  if (status === 401 || status === 403) {
+    if (error.detail === "company_sso_required") {
+      return "Sign in with company SSO before using protected CloudOps workflows.";
+    }
+    return "Your session is not authorized for this action. Sign in again or use a role with the required policy permission.";
+  }
+  if (status === 404 && error.detail === "persona_token_issuer_disabled") {
+    return "Evaluation personas are disabled in this environment. Use company SSO or enable evaluation access for a review build.";
+  }
+  if (status === 503 && error.detail === "missing_cognito_hosted_ui_configuration") {
+    return "Company SSO is not configured yet. Set the Cognito client ID and Hosted UI domain, then redeploy.";
+  }
+  if (status === 413 || error.detail?.includes("request_too_large")) {
+    return "This request is too large for the configured safety limit. Remove extra log lines or attach only the relevant excerpt.";
+  }
+  if (status === 429 || error.detail?.includes("quota")) {
+    return "This role has reached its request quota. Wait for the quota window to reset or ask an admin to adjust limits.";
+  }
+  if (status >= 500) {
+    return `AegisDesk API returned ${status}. Check service health, AWS credentials, OPA availability, and trace logs before retrying.`;
+  }
+
+  return error.detail ? `${error.message} ${error.detail}` : error.message;
 }
 
 function contextForPrompt(text: string): Record<string, string> {

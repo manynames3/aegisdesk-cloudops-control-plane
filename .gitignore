@@ -32,6 +32,8 @@ tfplan*
 logs/
 tmp/
 coverage/
+playwright-report/
+test-results/
 .next/
 apps/web/out/
 data/

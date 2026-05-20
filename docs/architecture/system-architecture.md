@@ -134,11 +134,11 @@ The governance view reads these persisted records directly and supports filters 
 
 ### Incident Context
 
-The hosted environment uses a read-only local fixture provider for checkout latency triage. The gateway returns the log group, query text, matched entries, and suspected cause, then records `incident.context.loaded` as an audit event. Customer environments can replace that provider with CloudWatch Logs or Datadog adapters.
+The default evaluation environment uses a read-only local fixture provider for checkout latency triage. Customer environments can switch to the CloudWatch Logs adapter without changing the chat flow. The gateway returns the log group, query text, matched entries, and suspected cause, then records `incident.context.loaded` as an audit event. If CloudWatch is selected but unavailable, the tool result is blocked and no fixture evidence is substituted.
 
 Production extension:
 
-- CloudWatch Logs Insights `StartQuery`/`GetQueryResults` with strict time windows
+- CloudWatch Logs Insights `StartQuery`/`GetQueryResults` with strict time windows and result limits
 - service/team allow lists by role
 - query cost and duration limits
 - immutable linkage between incident ID, log query, answer, and approval trail
