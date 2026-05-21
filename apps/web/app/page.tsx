@@ -217,6 +217,13 @@ type SetupStatus = {
     audit_retention_days: number;
     audit_export_max_events: number;
   };
+  data_boundary?: {
+    mode: string;
+    sanitized_only_audit: boolean;
+    external_models_allowed: boolean;
+    fixture_data_allowed: boolean;
+    real_integrations_required: boolean;
+  };
   integrations: {
     ticket_adapter: string;
     jira_configured: boolean;
@@ -1360,28 +1367,46 @@ function ClarificationPanel({ clarification }: { clarification: ClarificationRes
 }
 
 function SetupStatusPanel({ status }: { status: SetupStatus }) {
+  const boundary = status.data_boundary ?? {
+    mode: "evaluation",
+    sanitized_only_audit: true,
+    external_models_allowed: !status.models.cloud_model_kill_switch,
+    fixture_data_allowed: true,
+    real_integrations_required: false
+  };
+  const strictBoundary = boundary.mode === "customer_strict";
+  const ticketingConnected =
+    (status.integrations.ticket_adapter === "jira" && status.integrations.jira_configured) ||
+    (status.integrations.ticket_adapter === "servicenow" && status.integrations.servicenow_configured);
+  const cloudwatchConnected = status.integrations.incident_context_adapter === "cloudwatch" && status.integrations.cloudwatch_configured;
   const checks = [
     {
       label: "Identity",
-      value: status.auth.cognito_configured || status.auth.jwks_configured ? "Configured" : "Evaluation only",
-      ready: status.auth.cognito_configured || status.auth.jwks_configured || status.auth.persona_issuer_enabled
+      value:
+        status.auth.cognito_configured || status.auth.jwks_configured
+          ? status.auth.persona_issuer_enabled
+            ? "SSO configured, evaluation personas still enabled"
+            : "SSO/JWKS enforced"
+          : "Needs SSO/JWKS",
+      ready: (status.auth.cognito_configured || status.auth.jwks_configured) && !status.auth.persona_issuer_enabled,
+      detail: "Customer installs should disable persona issuance and rely on verified identity claims."
     },
     {
       label: "Policy",
       value: status.policy.ready ? `${status.policy.mode} ready` : "Not ready",
-      ready: status.policy.ready
+      ready: status.policy.ready,
+      detail: "OPA/Rego or the explicit Python fallback must answer policy checks before actions run."
     },
     {
       label: "Audit store",
-      value: `${status.data.store_backend}${status.data.store_ready ? " ready" : " unavailable"}`,
-      ready: status.data.store_ready
+      value: status.data.dynamodb_configured ? "DynamoDB ready" : `${status.data.store_backend}${status.data.store_ready ? " ready" : " unavailable"}`,
+      ready: status.data.store_ready && (status.mode === "evaluation" || status.data.dynamodb_configured),
+      detail: `Retention ${status.data.audit_retention_days} days; export cap ${status.data.audit_export_max_events} events.`
     },
     {
       label: "Ticketing",
       value:
-        status.integrations.ticket_adapter === "local"
-          ? "Local adapter"
-          : status.integrations.ticket_adapter === "jira"
+        status.integrations.ticket_adapter === "jira"
             ? status.integrations.jira_configured
               ? "Jira configured"
               : "Jira needs setup"
@@ -1389,24 +1414,31 @@ function SetupStatusPanel({ status }: { status: SetupStatus }) {
               ? status.integrations.servicenow_configured
                 ? "ServiceNow configured"
                 : "ServiceNow needs setup"
-            : `Unsupported: ${status.integrations.ticket_adapter}`,
-      ready:
-        status.integrations.ticket_adapter === "local" ||
-        (status.integrations.ticket_adapter === "jira" && status.integrations.jira_configured) ||
-        (status.integrations.ticket_adapter === "servicenow" && status.integrations.servicenow_configured)
+              : status.integrations.ticket_adapter === "local"
+                ? "Local adapter only"
+                : `Unsupported: ${status.integrations.ticket_adapter}`,
+      ready: ticketingConnected,
+      detail: "Connect Jira or ServiceNow for the main customer workflow."
     },
     {
-      label: "Model route",
-      value: status.models.bedrock_enabled && !status.models.cloud_model_kill_switch ? "Bedrock enabled" : "Local-safe route",
-      ready: true
+      label: "Bedrock",
+      value:
+        strictBoundary
+          ? "Disabled by boundary mode"
+          : status.models.bedrock_enabled && !status.models.cloud_model_kill_switch
+            ? status.models.bedrock_model_id
+            : "Local route / kill switch",
+      ready: strictBoundary || (status.models.bedrock_enabled && !status.models.cloud_model_kill_switch),
+      detail: strictBoundary ? "Strict mode blocks external model calls." : "Enable only after data handling is approved."
     },
     {
-      label: "Cost",
+      label: "Cost Explorer",
       value: status.integrations.cost_explorer_enabled ? "Cost Explorer enabled" : "Disabled",
-      ready: true
+      ready: status.integrations.cost_explorer_enabled,
+      detail: `Scope: ${status.integrations.cost_explorer_scope}. Cached to avoid duplicate billing calls.`
     },
     {
-      label: "Incident logs",
+      label: "CloudWatch",
       value:
         status.integrations.incident_context_adapter === "local_fixture"
           ? "Local fixture source"
@@ -1415,24 +1447,45 @@ function SetupStatusPanel({ status }: { status: SetupStatus }) {
             ? "CloudWatch configured"
             : "CloudWatch needs log group"
           : `Unsupported: ${status.integrations.incident_context_adapter}`,
-      ready:
-        status.integrations.incident_context_adapter === "local_fixture" ||
-        (status.integrations.incident_context_adapter === "cloudwatch" && status.integrations.cloudwatch_configured)
+      ready: cloudwatchConnected || (!strictBoundary && status.integrations.incident_context_adapter === "local_fixture"),
+      detail: status.integrations.cloudwatch_log_group ? `Log group: ${status.integrations.cloudwatch_log_group}` : "Use CloudWatch for a customer data path."
+    },
+    {
+      label: "Kill switch",
+      value: status.models.cloud_model_kill_switch ? "External models blocked" : "External models allowed by policy",
+      ready: true,
+      detail: "Emergency control for model spend and data boundary incidents."
+    },
+    {
+      label: "Data boundary",
+      value: strictBoundary ? "Customer strict" : "Evaluation",
+      ready: strictBoundary ? !boundary.external_models_allowed && !boundary.fixture_data_allowed : true,
+      detail: strictBoundary ? "Sanitized audit, no external model, real integrations required." : "Fixture data and local shortcuts may be enabled."
     }
   ];
+  const readyCount = checks.filter((check) => check.ready).length;
 
   return (
     <section className="panel setupPanel">
       <div className="sectionHeader">
-        <h2>Readiness</h2>
+        <h2>Admin setup checklist</h2>
         <Badge tone={status.mode === "production" ? "good" : "neutral"}>{status.mode}</Badge>
       </div>
-      <div className="setupGrid">
+      <div className="setupIntro">
+        <strong>
+          {readyCount}/{checks.length} controls ready for the selected operating mode.
+        </strong>
+        <span>
+          Customer deployments should show real identity, real operational integrations, bounded audit retention, and a clear external-model boundary.
+        </span>
+      </div>
+      <div className="setupChecklist">
         {checks.map((check) => (
-          <div key={check.label}>
+          <div className="setupItem" key={check.label}>
             <Badge tone={check.ready ? "good" : "warn"}>{check.ready ? "ready" : "needs setup"}</Badge>
             <span>{check.label}</span>
             <strong>{check.value}</strong>
+            <small>{check.detail}</small>
           </div>
         ))}
       </div>

@@ -27,10 +27,13 @@ jobs:
           test -f docs/product/roi.md
           test -f docs/product/enterprise-value.md
           test -f docs/product/frontend-spec.md
+          test -f docs/product/pilot-package.md
           test -f docs/architecture.md
           test -f docs/architecture/system-architecture.md
           test -f docs/architecture/api-contracts.md
           test -f docs/architecture/audit-event-model.md
+          test -f docs/architecture/tradeoffs.md
+          test -f docs/architecture/production-readiness-matrix.md
           test -f docs/deployment/self-hosted.md
           test -f docs/integrations/README.md
           test -f docs/integrations/codex-mcp.md
@@ -47,10 +50,24 @@ jobs:
           test -f docs/adrs/011-bounded-cloudwatch-and-audit-retention.md
           test -f docs/evidence/README.md
           test -f docs/evidence/live-operations.md
+          test -f docs/evidence/technical-review.md
+          test -f docs/evidence/integration-contract-tests.md
+          test -f docs/evidence/load-smoke.md
+          test -f docs/evidence/trace-sample.md
           test -f docs/evidence/screenshots/policy-aware-chat.png
           test -f docs/security/security-overview.md
           test -f docs/security/data-handling.md
+          test -f docs/security/customer-data-boundary.md
           test -f docs/security/threat-model.md
+          test -f docs/operations/README.md
+          test -f docs/operations/api-down.md
+          test -f docs/operations/bedrock-disabled.md
+          test -f docs/operations/opa-unavailable.md
+          test -f docs/operations/dynamodb-throttling.md
+          test -f docs/operations/cost-explorer-denied.md
+          test -f docs/operations/ticket-adapter-failure.md
+          test -f docs/support/troubleshooting.md
+          test -f docs/support/known-limitations.md
           test -f docs/sales/product-brief.md
           test -f docs/sales/walkthrough-video-script.md
           test -f docs/sales/why-not-chatgpt-or-claude.md
@@ -78,8 +95,28 @@ jobs:
       - name: Run API tests
         working-directory: services/api
         run: pytest tests
+      - name: Run API load smoke
+        run: python scripts/smoke-load-api.py
       - name: Run control evals
         run: python evals/run_evals.py
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Run high-confidence secret scan
+        run: python scripts/secret-scan.py
+      - name: Audit web dependencies
+        working-directory: apps/web
+        run: npm audit --audit-level=critical
 
   policy:
     runs-on: ubuntu-latest

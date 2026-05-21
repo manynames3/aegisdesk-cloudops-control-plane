@@ -1,13 +1,24 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
+from botocore.exceptions import ClientError
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+import httpx
+import pytest
 
 from app.adapters import CloudWatchIncidentAdapter, JiraTicketAdapter, ServiceNowTicketAdapter, UnavailableTicketAdapter
 from app.auth import create_persona_token, decode_token, jwks_document
+from app import cost_explorer as cost_explorer_module
+from app import llm as llm_module
+from app import main as main_module
+from app import tools as tools_module
+from app.cost_explorer import CostExplorerUnavailable, get_cost_summary
+from app.llm import LLMUnavailable, maybe_generate_with_bedrock
 from app.main import app, store
-from app.models import Actor, AuditEvent, PolicyDecision, Role
+from app.models import Actor, AuditEvent, ModelRoute, PolicyDecision, Role
+from app.policy_engine import PolicyEngine, PolicyUnavailable
 from app.redaction import inspect_and_redact
 from app.store import DemoStore
 
@@ -312,6 +323,44 @@ def test_setup_status_is_public_and_redacts_secret_configuration():
     assert "auth_secret" not in response.text
     assert body["data"]["audit_retention_days"] >= 1
     assert "cloudwatch_configured" in body["integrations"]
+    assert body["data_boundary"]["mode"] in {"evaluation", "customer_strict"}
+    assert "external_models_allowed" in body["data_boundary"]
+
+
+def test_customer_data_boundary_forces_local_route_before_bedrock(monkeypatch):
+    strict_settings = replace(
+        main_module.settings,
+        data_boundary_mode="customer_strict",
+        enable_bedrock=True,
+        cloud_model_kill_switch=False,
+    )
+    monkeypatch.setattr(main_module, "settings", strict_settings)
+
+    response = client.post(
+        "/chat",
+        headers=auth_headers(Role.employee, team="payments", user_id="u-boundary"),
+        json={"message": "What is the safest way to ask for help with a CloudOps issue?"},
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["model_route"]["provider"] == "local"
+    assert body["model_route"]["reason"] == "customer_data_boundary_disallows_external_models"
+    assert body["model_route"]["external_call"] is False
+    assert any(event.event_type == "data_boundary.external_model_blocked" for event in store.events)
+
+
+def test_customer_data_boundary_blocks_local_fixture_incident_adapter(monkeypatch):
+    monkeypatch.setenv("AEGISDESK_DATA_BOUNDARY_MODE", "customer_strict")
+    monkeypatch.setenv("AEGISDESK_INCIDENT_CONTEXT_ADAPTER", "local_fixture")
+
+    adapter = tools_module._configured_incident_context_adapter()
+    context = adapter.lookup_context("INC-1042", "checkout is timing out")
+    tool_call = adapter.to_tool_call(context)
+
+    assert context.source == "incident_context_unavailable"
+    assert tool_call.status == "blocked"
+    assert context.suspected_cause == "customer_data_boundary_requires_real_incident_context"
 
 
 def test_audit_export_requires_manager_or_admin_and_returns_json_and_csv():
@@ -423,6 +472,28 @@ def test_unavailable_ticket_adapter_fails_closed_without_fake_ticket():
     assert tool_call.result["error"] == "jira_adapter_missing_required_configuration"
 
 
+def test_ticket_adapter_api_failure_is_blocked_without_fake_success():
+    class FailingClient:
+        def post(self, url, json, auth):
+            raise httpx.ConnectError("connection failed")
+
+    policy = PolicyDecision(decision="allow", reason="ticket_creation_allowed", policy_name="tool_policy")
+    adapter = JiraTicketAdapter(
+        base_url="https://example.atlassian.net",
+        email="ops@example.com",
+        api_token="secret-token",
+        project_key="OPS",
+        client=FailingClient(),
+    )
+
+    tool_call = adapter.create_ticket(policy, "Checkout latency", "payments", "medium")
+
+    assert tool_call.status == "blocked"
+    assert tool_call.result["system"] == "jira"
+    assert tool_call.result["status"] == "failed"
+    assert "ticket_id" not in tool_call.result
+
+
 def test_cloudwatch_incident_adapter_queries_bounded_logs():
     class FakeLogsClient:
         def __init__(self):
@@ -485,6 +556,63 @@ def test_cloudwatch_incident_adapter_fails_closed_without_fixture_fallback():
     assert context.entries == []
     assert tool_call.status == "blocked"
     assert "fixture" not in tool_call.policy.reason
+
+
+def test_opa_unavailable_fails_closed_without_python_fallback(monkeypatch):
+    monkeypatch.setenv("AEGISDESK_POLICY_MODE", "opa")
+    monkeypatch.setenv("OPA_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("AEGISDESK_OPA_TIMEOUT_SECONDS", "0.05")
+    engine = PolicyEngine()
+
+    with pytest.raises(PolicyUnavailable):
+        engine.evaluate_chat(Actor(user_id="u-policy", role=Role.employee, team="payments"), "incident_triage")
+
+
+def test_bedrock_unavailable_fails_to_local_control_path(monkeypatch):
+    class FailingBedrockClient:
+        def converse(self, **kwargs):
+            raise ClientError(
+                {"Error": {"Code": "AccessDeniedException", "Message": "Denied"}},
+                "Converse",
+            )
+
+    def fake_client(service_name, **kwargs):
+        assert service_name == "bedrock-runtime"
+        return FailingBedrockClient()
+
+    monkeypatch.setattr(llm_module.boto3, "client", fake_client)
+    test_settings = replace(main_module.settings, enable_bedrock=True)
+    route = ModelRoute(
+        provider="bedrock",
+        model=test_settings.bedrock_model_id,
+        reason="policy_selected_bedrock",
+        estimated_cost_usd=0.0,
+        external_call=True,
+    )
+
+    with pytest.raises(LLMUnavailable):
+        maybe_generate_with_bedrock(
+            route,
+            sanitized_input="Summarize safe CloudOps help.",
+            intent="support_guidance",
+            knowledge_context=None,
+            settings=test_settings,
+        )
+
+
+def test_cost_explorer_permission_denied_fails_closed(monkeypatch):
+    class FailingCostExplorerClient:
+        def get_cost_and_usage(self, **kwargs):
+            raise ClientError(
+                {"Error": {"Code": "AccessDeniedException", "Message": "Denied"}},
+                "GetCostAndUsage",
+            )
+
+    monkeypatch.setattr(cost_explorer_module.boto3, "client", lambda *args, **kwargs: FailingCostExplorerClient())
+    test_settings = replace(main_module.settings, enable_cost_explorer=True)
+
+    with pytest.raises(CostExplorerUnavailable):
+        get_cost_summary(test_settings, store)
 
 
 def test_sqlite_store_prunes_audit_events_by_retention(tmp_path):

@@ -84,7 +84,7 @@ test("governance supports replay inspection and audit export", async ({ page }) 
   await page.getByRole("button", { name: "Seed data" }).click();
   await page.getByRole("button", { name: "Governance" }).click();
 
-  await expect(page.getByRole("heading", { name: "Readiness" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Admin setup checklist" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Audit Export" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Audit Event Explorer" })).toBeVisible();
 

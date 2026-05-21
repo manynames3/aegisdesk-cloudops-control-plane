@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import AuthError, create_persona_token, decode_token, jwks_document, require_actor, require_admin, require_manager_or_admin
@@ -65,6 +66,18 @@ configure_observability(app, settings)
 
 store = create_store()
 policy_engine = PolicyEngine()
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    error_id = f"err-{uuid4().hex[:10]}"
+    headers = dict(exc.headers or {})
+    headers["X-AegisDesk-Error-ID"] = error_id
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error_id": error_id, "detail": exc.detail, "path": request.url.path},
+        headers=headers,
+    )
 
 
 @app.post("/auth/persona-token", response_model=PersonaTokenResponse)
@@ -244,6 +257,13 @@ def setup_status():
             "store_ready": store.ready(),
             "audit_retention_days": settings.audit_retention_days,
             "audit_export_max_events": settings.audit_export_max_events,
+        },
+        "data_boundary": {
+            "mode": settings.data_boundary_mode,
+            "sanitized_only_audit": settings.data_boundary_mode == "customer_strict",
+            "external_models_allowed": settings.data_boundary_mode != "customer_strict" and not settings.cloud_model_kill_switch,
+            "fixture_data_allowed": settings.data_boundary_mode != "customer_strict",
+            "real_integrations_required": settings.data_boundary_mode == "customer_strict",
         },
         "integrations": {
             "ticket_adapter": settings.ticket_adapter,
@@ -624,6 +644,32 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     event_type="model.kill_switch_applied",
                     summary="Cloud model kill switch forced local routing before any external model call.",
                     metadata={"original_provider": "bedrock", "fallback_model": route.model},
+                    trace_id=trace_id,
+                )
+            )
+
+        if route.external_call and settings.data_boundary_mode == "customer_strict":
+            route = route.model_copy(
+                update={
+                    "provider": "local",
+                    "model": "customer-data-boundary-local-control",
+                    "reason": "customer_data_boundary_disallows_external_models",
+                    "estimated_cost_usd": 0.0,
+                    "external_call": False,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            )
+            store.add_event(
+                AuditEvent(
+                    request_id=request_id,
+                    actor=actor,
+                    event_type="data_boundary.external_model_blocked",
+                    summary="Customer data boundary mode forced local routing before any external model call.",
+                    metadata={
+                        "mode": settings.data_boundary_mode,
+                        "control": "no_external_model",
+                    },
                     trace_id=trace_id,
                 )
             )

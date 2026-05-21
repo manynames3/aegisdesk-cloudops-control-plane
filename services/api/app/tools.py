@@ -62,6 +62,11 @@ def _configured_ticket_adapter() -> TicketAdapter:
 def _configured_incident_context_adapter() -> IncidentContextAdapter:
     settings = get_settings()
     if settings.incident_context_adapter == "local_fixture":
+        if settings.data_boundary_mode == "customer_strict":
+            return UnavailableIncidentAdapter(
+                reason="customer_data_boundary_requires_real_incident_context",
+                system="local_fixture",
+            )
         return LocalFixtureIncidentAdapter()
     if settings.incident_context_adapter == "cloudwatch":
         if settings.cloudwatch_log_group:

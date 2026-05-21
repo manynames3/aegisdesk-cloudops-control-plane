@@ -76,6 +76,7 @@ class Settings:
     cloudwatch_query_poll_interval_seconds: float
     audit_retention_days: int
     audit_export_max_events: int
+    data_boundary_mode: str
     cors_origins: list[str]
 
 
@@ -147,6 +148,7 @@ def get_settings() -> Settings:
         cloudwatch_query_poll_interval_seconds=float(os.getenv("AEGISDESK_CLOUDWATCH_QUERY_POLL_INTERVAL_SECONDS", "0.5")),
         audit_retention_days=int(os.getenv("AEGISDESK_AUDIT_RETENTION_DAYS", "30")),
         audit_export_max_events=int(os.getenv("AEGISDESK_AUDIT_EXPORT_MAX_EVENTS", "500")),
+        data_boundary_mode=os.getenv("AEGISDESK_DATA_BOUNDARY_MODE", "evaluation").lower(),
         cors_origins=[
             origin.strip()
             for origin in os.getenv(

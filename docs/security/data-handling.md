@@ -5,7 +5,7 @@
 | Data class | Examples | Default handling |
 | --- | --- | --- |
 | Identity claims | user ID, role, team | Verified by API and stored in audit events |
-| Prompt text | employee request | Redacted before model routing; retained for request replay by default |
+| Prompt text | employee request | Redacted before model routing; raw prompt is not intentionally persisted in replay |
 | Sanitized prompt | prompt after redaction | Used for policy, routing, and model calls |
 | Redaction metadata | finding type, label, replacement | Stored for governance review |
 | Policy data | input and decision output | Stored in audit events and request replay |
@@ -42,7 +42,18 @@ Recommended retention modes:
 | Sanitized audit | Store sanitized prompts only |
 | Minimal audit | Store metadata, policy, route, and tool evidence without prompt body |
 
-The current implementation uses full audit because request replay is a core governance feature. Customers with stricter requirements should switch to sanitized or minimal audit before production rollout.
+The current implementation uses sanitized audit for request replay: the prompt preview and replay prompt are generated from redacted text. Customers with stricter requirements can enable customer data boundary mode and reduce audit export windows before production rollout.
+
+## Customer Data Boundary Mode
+
+Set `AEGISDESK_DATA_BOUNDARY_MODE=customer_strict` to enforce the strictest customer posture:
+
+- external model routes are forced to local control before Bedrock is called
+- local fixture incident context is blocked; a real integration such as CloudWatch is required
+- setup status reports whether fixture data and external models are allowed
+- boundary decisions are written to audit events
+
+See [Customer Data Boundary Mode](customer-data-boundary.md).
 
 ## Redaction
 

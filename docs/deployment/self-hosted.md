@@ -75,6 +75,50 @@ The deployment principal needs permission to manage:
 - Bedrock invoke permissions for the approved model ID
 - Cost Explorer read-only access
 
+For a customer pilot, start with the Terraform-managed role and narrow resources after the first plan. The runtime role should be able to read/write only the AegisDesk table, write its own logs, call the approved Bedrock model, read bounded CloudWatch Logs Insights results, and read Cost Explorer.
+
+Minimum runtime permission shape:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:DeleteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:REGION:ACCOUNT_ID:table/AEGISDESK_TABLE"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:Converse"],
+      "Resource": "arn:aws:bedrock:REGION::foundation-model/amazon.nova-lite-v1:0"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["ce:GetCostAndUsage"],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery"],
+      "Resource": "arn:aws:logs:REGION:ACCOUNT_ID:log-group:CUSTOMER_LOG_GROUP:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:REGION:ACCOUNT_ID:log-group:/aws/lambda/AEGISDESK_FUNCTION:*"
+    }
+  ]
+}
+```
+
 ## Expected Cost
 
 For light usage, the AWS shape is designed to stay low cost because it uses serverless services and no always-on compute. Main cost drivers are:
@@ -133,6 +177,7 @@ AEGISDESK_ENABLE_BEDROCK=true
 AEGISDESK_BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
 AEGISDESK_ENABLE_COST_EXPLORER=true
 AEGISDESK_COST_CACHE_TTL_SECONDS=21600
+AEGISDESK_DATA_BOUNDARY_MODE=evaluation
 ```
 
 Ticketing and audit controls:
@@ -164,6 +209,18 @@ Disable external models:
 AEGISDESK_ENABLE_BEDROCK=false
 AEGISDESK_CLOUD_MODEL_KILL_SWITCH=true
 ```
+
+Customer strict data boundary:
+
+```bash
+AEGISDESK_DATA_BOUNDARY_MODE=customer_strict
+AEGISDESK_ENABLE_BEDROCK=false
+AEGISDESK_CLOUD_MODEL_KILL_SWITCH=true
+AEGISDESK_INCIDENT_CONTEXT_ADAPTER=cloudwatch
+AEGISDESK_TICKET_ADAPTER=jira # or servicenow
+```
+
+Strict mode blocks external model routing before any Bedrock call, disallows local fixture incident data, and reports the boundary state in the Admin setup checklist.
 
 ## Connect Auth
 
@@ -246,3 +303,66 @@ Implement the `AccessRequestAdapter` interface:
 - `IAMIdentityCenterAdapter`
 
 The adapter should route requests to the system of record for temporary access, then return approval ID, resource, permission, expiry, and status.
+
+## Backup And Restore
+
+Short-term state lives in DynamoDB for hosted deployments. Recommended customer backup options:
+
+1. Enable point-in-time recovery on the AegisDesk table.
+2. Export audit records to S3 on a customer-approved schedule.
+3. Forward CloudWatch logs to the customer's SIEM.
+4. Keep Terraform state in a customer-owned backend with versioning enabled.
+
+Restore path:
+
+```bash
+aws dynamodb restore-table-to-point-in-time \
+  --source-table-name "$AEGISDESK_DYNAMODB_TABLE" \
+  --target-table-name "$AEGISDESK_DYNAMODB_TABLE-restore" \
+  --use-latest-restorable-time
+```
+
+After restore, update the Lambda environment variable or Terraform variable to point at the restored table, then run `/health/ready`.
+
+## Secret Rotation
+
+Rotate secrets on this cadence during a pilot:
+
+| Secret | Rotation action |
+| --- | --- |
+| Cognito persona seed | Redeploy with a new `AEGISDESK_PERSONA_PASSWORD_SEED`; disable personas for production |
+| HMAC auth secret | Rotate `AEGISDESK_AUTH_SECRET`; invalidate old local tokens |
+| Jira API token | Rotate in Atlassian, update runtime secret, retry adapter contract test |
+| ServiceNow password/token | Rotate in ServiceNow, update runtime secret, retry adapter contract test |
+| JWKS keys | Publish new key, overlap old/new verification, then retire old key |
+
+Never commit runtime secrets. Use GitHub environment secrets or a customer secret manager.
+
+## Teardown
+
+For the AWS path:
+
+```bash
+terraform -chdir=infra/terraform destroy
+```
+
+Before destroy:
+
+- Export required audit evidence
+- Confirm the S3 frontend bucket can be emptied
+- Confirm DynamoDB backup/PITR requirements
+- Remove Cognito test users if personas were enabled
+- Confirm Budget and CloudWatch log group deletion is acceptable
+
+## Verification Checklist
+
+After install, the Governance tab should show:
+
+- Identity configured
+- Policy ready
+- Audit store ready
+- Bedrock enabled or intentionally blocked by customer strict mode
+- Ticketing connected if ticket workflow is in scope
+- Cost Explorer enabled if cost workflow is in scope
+- CloudWatch configured if incident workflow is in scope
+- Kill switch state visible

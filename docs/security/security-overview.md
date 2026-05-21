@@ -16,6 +16,7 @@ AegisDesk is designed around a backend control plane. The frontend never decides
 | Auditability | DynamoDB or SQLite audit events with request replay |
 | Cost controls | Role quotas, request size limits, API Gateway throttling, Cost Explorer cache |
 | Observability | Structured logs and OpenTelemetry trace IDs |
+| Customer data boundary | Strict mode blocks external model calls and local fixture incident data |
 
 ## Common Security Questions
 
@@ -34,6 +35,8 @@ Prompts are retained in the audit store so governance reviewers can inspect requ
 ### Can external models be disabled?
 
 Yes. Set `AEGISDESK_CLOUD_MODEL_KILL_SWITCH=true` or leave `AEGISDESK_ENABLE_BEDROCK=false`. The API will use the local control route and will not call Bedrock.
+
+For customer pilots that require a harder boundary, set `AEGISDESK_DATA_BOUNDARY_MODE=customer_strict`. This also blocks local fixture incident context so the main workflow must use configured customer integrations.
 
 ### How are audit logs exported?
 

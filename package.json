@@ -11,6 +11,8 @@
     "test:policy": "opa test policies",
     "smoke:mcp": "scripts/smoke-mcp-tools.sh",
     "validate:infra": "terraform -chdir=infra/terraform fmt -check && terraform -chdir=infra/terraform validate",
+    "smoke:load": "services/api/.venv/bin/python scripts/smoke-load-api.py",
+    "security:scan": "scripts/security-scan.sh",
     "evals": "services/api/.venv/bin/python evals/run_evals.py",
     "check": "npm run build:web && npm run test:api && npm run evals"
   }

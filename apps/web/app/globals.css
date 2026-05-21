@@ -922,14 +922,33 @@ button:disabled {
   overflow: hidden;
 }
 
-.setupGrid {
+.setupIntro {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+}
+
+.setupIntro strong {
+  font-size: 15px;
+}
+
+.setupIntro span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.setupGrid,
+.setupChecklist {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 16px 18px;
 }
 
-.setupGrid > div {
+.setupGrid > div,
+.setupItem {
   background: var(--panel-subtle);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -940,15 +959,23 @@ button:disabled {
 }
 
 .setupGrid span,
+.setupItem span,
 .auditExportPanel p,
 .auditExportPanel small {
   color: var(--muted);
   font-size: 13px;
 }
 
-.setupGrid strong {
+.setupGrid strong,
+.setupItem strong {
   font-size: 15px;
   line-height: 1.25;
+}
+
+.setupItem small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .auditExportPanel {
@@ -1407,6 +1434,7 @@ button:disabled {
   .eventFilters,
   .abuseGrid,
   .setupGrid,
+  .setupChecklist,
   .eventExplorerLayout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1451,6 +1479,7 @@ button:disabled {
   .eventFilters,
   .abuseGrid,
   .setupGrid,
+  .setupChecklist,
   .logEntry,
   .walkthroughSteps {
     grid-template-columns: 1fr;

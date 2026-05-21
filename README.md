@@ -13,6 +13,7 @@ AegisDesk is a working self-hosted CloudOps AI control plane. It gives employees
 | [Live API health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health) | Verify the deployed FastAPI gateway |
 | [Documentation map](docs/README.md) | Find architecture, deployment, security, product, and sales docs |
 | [Live operations evidence](docs/evidence/live-operations.md) | AWS deploy, logs, budget, and throttling evidence |
+| [Technical review evidence](docs/evidence/technical-review.md) | CI, deploy, trace, load, security, and code-path review packet |
 | [Self-hosted install](docs/deployment/self-hosted.md) | Run locally or deploy into AWS |
 
 ## What It Proves
@@ -24,6 +25,7 @@ This repo is built to demonstrate production-style CloudOps AI architecture, not
 - **Enterprise integration shape:** CloudWatch incident context, Jira and ServiceNow ticket adapters, MCP server, and adapter boundaries for Datadog, Okta, Entra, and IAM Identity Center.
 - **Cost awareness:** local fallback, Bedrock kill switch, Cost Explorer cache, request limits, API throttling, and a low-idle-cost serverless deployment.
 - **Delivery maturity:** GitHub Actions CI, Playwright smoke tests, API tests, OPA tests, MCP smoke test, Terraform validation, and manual-gated AWS deploy.
+- **Customer boundary mode:** strict mode can block external model calls, require real integrations, and keep customer workflows off fixture data.
 
 ## About
 
@@ -170,6 +172,10 @@ Architecture and product docs:
 - [CloudOps Use Cases](docs/product/use-cases-for-cloudops.md)
 - [ROI Model](docs/product/roi.md)
 - [Live Operations Evidence](docs/evidence/live-operations.md)
+- [Technical Review Evidence](docs/evidence/technical-review.md)
+- [Operational Runbooks](docs/operations/README.md)
+- [Customer Data Boundary Mode](docs/security/customer-data-boundary.md)
+- [Production Readiness Matrix](docs/architecture/production-readiness-matrix.md)
 - [ADRs](docs/adrs/README.md)
 
 ## Current Capabilities
@@ -187,7 +193,10 @@ Architecture and product docs:
 - Access adapter interfaces for local approvals, Okta group requests, and IAM Identity Center
 - MCP server for governed CloudOps tools
 - Public setup-status endpoint with non-secret readiness checks
+- Admin setup checklist showing identity, Bedrock, ticketing, audit, CloudWatch, kill switch, and customer data boundary state
+- Customer strict data boundary mode that blocks external model calls and fixture incident context
 - Manager/admin audit export in JSON or CSV
+- Structured API error IDs for support and troubleshooting
 - OpenTelemetry instrumentation and local Jaeger path
 - Docker Compose runtime with API, web, OPA, Jaeger, and persistent local API data
 - AWS Terraform for Cognito, CloudFront, S3, API Gateway, Lambda, DynamoDB, Bedrock IAM, Cost Explorer IAM, CloudWatch, and Budget
