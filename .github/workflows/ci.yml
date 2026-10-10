@@ -60,6 +60,8 @@ jobs:
           test -f docs/security/customer-data-boundary.md
           test -f docs/security/threat-model.md
           test -f docs/operations/README.md
+          test -f docs/operations/incident-workflow.md
+          test -f docs/adrs/012-persistent-incident-actions.md
           test -f docs/operations/api-down.md
           test -f docs/operations/bedrock-disabled.md
           test -f docs/operations/opa-unavailable.md

@@ -17,6 +17,7 @@ from .cognito_auth import CognitoSessionError, create_persona_session, ensure_pe
 from .cost_explorer import CostExplorerUnavailable, get_cost_summary
 from .knowledge_base import format_knowledge_context, retrieve_knowledge, summarize_knowledge_guidance
 from .llm import LLMUnavailable, maybe_generate_with_bedrock
+from .incidents import incident_router
 from .model_router import select_model_route
 from .models import (
     Actor,
@@ -38,6 +39,7 @@ from .models import (
     RequestReplay,
     Role,
     TrustedSourceScore,
+    ToolCall,
 )
 from .observability import configure_observability, current_trace_id, tracer
 from .policy import QUOTA_LIMITS_BY_ROLE, classify_intent
@@ -66,6 +68,7 @@ configure_observability(app, settings)
 
 store = create_store()
 policy_engine = PolicyEngine()
+app.include_router(incident_router(store, policy_engine))
 
 
 @app.exception_handler(HTTPException)
@@ -103,6 +106,8 @@ def hosted_ui_config() -> HostedAuthConfig:
 
 @app.post("/auth/hosted-ui-login", response_model=HostedLoginResponse)
 def hosted_ui_login(request: PersonaTokenRequest) -> HostedLoginResponse:
+    if not settings.persona_issuer_enabled:
+        raise HTTPException(status_code=404, detail="evaluation_personas_disabled")
     if settings.auth_mode != "cognito":
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="hosted_ui_requires_cognito")
     try:
@@ -196,18 +201,20 @@ def chat(request: ChatRequest, actor: Annotated[Actor, Depends(require_actor)]) 
 
 
 @app.get("/events", response_model=EventList)
-def events(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> EventList:
+def events(actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> EventList:
     store.prune_audit_events(settings.audit_retention_days)
-    return EventList(events=list(reversed(store.events))[:100])
+    visible = [event for event in reversed(store.events) if actor.role == Role.admin or event.actor.team == actor.team]
+    return EventList(events=[AuditEvent.model_validate(_sanitize_export(event.model_dump(mode="json"))) for event in visible[:100]])
 
 
 @app.get("/requests/{request_id}/replay", response_model=RequestReplay)
-def request_replay(request_id: str, _actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> RequestReplay:
+def request_replay(request_id: str, actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> RequestReplay:
     store.prune_audit_events(settings.audit_retention_days)
-    request_events = [event for event in store.events if event.request_id == request_id]
+    request_events = [event for event in store.events if event.request_id == request_id and (actor.role == Role.admin or event.actor.team == actor.team)]
     if not request_events:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="request_not_found")
-    return build_request_replay(request_id, request_events)
+    replay = build_request_replay(request_id, request_events)
+    return RequestReplay.model_validate(_sanitize_export(replay.model_dump(mode="json")))
 
 
 @app.get("/metrics/summary")
@@ -273,6 +280,7 @@ def setup_status():
             "cost_explorer_scope": settings.cost_explorer_scope,
             "incident_context_adapter": settings.incident_context_adapter,
             "cloudwatch_configured": bool(settings.cloudwatch_log_group),
+            "cloudwatch_logs_enabled": settings.incident_context_adapter == "cloudwatch" and bool(settings.cloudwatch_log_group),
             "cloudwatch_log_group": settings.cloudwatch_log_group,
             "cloudwatch_query_limit": settings.cloudwatch_query_limit,
             "cloudwatch_query_lookback_minutes": settings.cloudwatch_query_lookback_minutes,
@@ -287,7 +295,7 @@ def audit_export(
     format: str = "json",
 ):
     pruned_count = store.prune_audit_events(settings.audit_retention_days)
-    events = list(reversed(store.events))[: settings.audit_export_max_events]
+    events = [event for event in reversed(store.events) if actor.role == Role.admin or event.actor.team == actor.team][: settings.audit_export_max_events]
     export_metadata = {
         "exported_by": actor.user_id,
         "event_count": len(events),
@@ -314,7 +322,7 @@ def audit_export(
                     "role": event.actor.role.value,
                     "team": event.actor.team,
                     "event_type": event.event_type,
-                    "summary": event.summary,
+                    "summary": inspect_and_redact(event.summary).redacted_text,
                     "trace_id": event.trace_id,
                 }
             )
@@ -326,8 +334,18 @@ def audit_export(
 
     return {
         "metadata": export_metadata,
-        "events": [event.model_dump(mode="json") for event in events],
+        "events": [_sanitize_export(event.model_dump(mode="json")) for event in events],
     }
+
+
+def _sanitize_export(value):
+    if isinstance(value, str):
+        return inspect_and_redact(value).redacted_text
+    if isinstance(value, list):
+        return [_sanitize_export(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_export(item) for key, item in value.items()}
+    return value
 
 
 @app.get("/controls/abuse", response_model=AbuseControls)
@@ -345,13 +363,15 @@ def abuse_controls(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) 
 
 
 @app.get("/approvals", response_model=ApprovalList)
-def approvals(_actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> ApprovalList:
-    return ApprovalList(approvals=list(reversed(store.approvals)))
+def approvals(actor: Annotated[Actor, Depends(require_manager_or_admin)]) -> ApprovalList:
+    return ApprovalList(approvals=[approval for approval in reversed(store.approvals) if actor.role == Role.admin or approval.requester.team == actor.team])
 
 
 @app.post("/approvals/{approval_id}/approve")
 def approve(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or_admin)]):
     try:
+        if actor.role != Role.admin and store.get_approval(approval_id).requester.team != actor.team:
+            raise PermissionError("approval_outside_team")
         approval = store.decide_approval(approval_id, actor.user_id, actor.role, approved=True)
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -382,6 +402,8 @@ def approve(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or
 @app.post("/approvals/{approval_id}/deny")
 def deny(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or_admin)]):
     try:
+        if actor.role != Role.admin and store.get_approval(approval_id).requester.team != actor.team:
+            raise PermissionError("approval_outside_team")
         approval = store.decide_approval(approval_id, actor.user_id, actor.role, approved=False)
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
@@ -411,12 +433,16 @@ def deny(approval_id: str, actor: Annotated[Actor, Depends(require_manager_or_ad
 
 @app.post("/admin/reset")
 def reset_state(_actor: Annotated[Actor, Depends(require_admin)]):
+    if not settings.persona_issuer_enabled:
+        raise HTTPException(404, "evaluation_reset_disabled")
     store.reset()
     return {"status": "reset"}
 
 
 @app.post("/admin/seed")
 def seed_state(_actor: Annotated[Actor, Depends(require_admin)]):
+    if not settings.persona_issuer_enabled:
+        raise HTTPException(404, "evaluation_seed_disabled")
     store.reset()
     seed_requests = [
         (
@@ -800,6 +826,7 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     answer = bedrock_answer
                     bedrock_answer_used = True
             except LLMUnavailable:
+                answer = "Bedrock analysis is unavailable. The following is static control/runbook guidance, not a verified incident finding. " + answer
                 route = route.model_copy(
                     update={
                         "provider": "local",
@@ -845,7 +872,10 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
         try:
             if intent == "create_ticket" and not clarification.blocks_tool_call:
                 tool_policy = policy_engine.evaluate_tool(actor.role, "ticket", "create_ticket")
-                tool_call = create_ticket(tool_policy, "CloudOps support request", actor.team, "medium")
+                if settings.ticket_adapter == "jira":
+                    tool_call = ToolCall(name="ticket.create", status="blocked", policy=tool_policy, result={"status": "approval_required", "error": "use_incident_case_exact_action_approval"})
+                else:
+                    tool_call = create_ticket(tool_policy, "CloudOps support request", actor.team, "medium")
                 tool_calls.append(tool_call)
                 event_type = "tool.called" if tool_call.status == "allowed" else "tool.blocked"
                 store.add_event(
@@ -868,8 +898,9 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                 )
                 if tool_call.status == "allowed":
                     bedrock_answer_used = False
+                    ticket_label = "Evaluation fixture ticket" if tool_call.result.get("source") == "evaluation_fixture" else "Ticket"
                     answer = (
-                        f"Ticket {tool_call.result['ticket_id']} was created for {actor.team} with medium severity."
+                        f"{ticket_label} {tool_call.result['ticket_id']} was created for {actor.team} with medium severity."
                         f"{summarize_knowledge_guidance(intent, knowledge_citations)}"
                     )
                 else:
@@ -983,14 +1014,15 @@ def process_chat(request: ChatRequest, actor: Actor) -> ChatResponse:
                     total = tool_call.result.get("total_usd", 0)
                     driver = tool_call.result.get("largest_driver", "unknown service")
                     recommendation = str(tool_call.result.get("recommendation", "review cost drivers")).rstrip(".")
+                    cost_label = "Evaluation fixture cost summary" if source == "evaluation_fixture" else "AWS cost summary"
                     answer = (
-                        f"AWS cost summary from {source}: ${float(total):.2f} over the selected window. "
+                        f"{cost_label} from {source}: ${float(total):.2f} over the selected window. "
                         f"The largest driver is {driver}. Recommended control: {recommendation}."
                     )
                     answer = f"{answer}{summarize_knowledge_guidance(intent, knowledge_citations)}"
                 else:
                     bedrock_answer_used = False
-                    answer = f"Cost investigation requires manager or admin access.{summarize_knowledge_guidance(intent, knowledge_citations)}"
+                    answer = "Cost evidence unavailable; no verified cost total was returned." if tool_call.result.get("status") == "unavailable" else f"Cost investigation requires manager or admin access.{summarize_knowledge_guidance(intent, knowledge_citations)}"
         except PolicyUnavailable as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import sqlite3
 import threading
 from decimal import Decimal
@@ -43,6 +44,7 @@ class DemoStore:
 
     def _migrate(self) -> None:
         with self._conn:
+            self._conn.execute("CREATE TABLE IF NOT EXISTS incident_cases (team TEXT NOT NULL, incident_id TEXT NOT NULL, version INTEGER NOT NULL, payload TEXT NOT NULL, PRIMARY KEY (team, incident_id))")
             self._conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS audit_events (
@@ -199,6 +201,7 @@ class DemoStore:
 
     def reset(self) -> None:
         with self._lock, self._conn:
+            self._conn.execute("DELETE FROM incident_cases")
             self._conn.execute("DELETE FROM audit_events")
             self._conn.execute("DELETE FROM approvals")
             self._conn.execute("DELETE FROM model_routes")
@@ -211,6 +214,24 @@ class DemoStore:
         except sqlite3.Error:
             return False
         return True
+
+    def list_cases(self, team: str) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute("SELECT payload FROM incident_cases WHERE team = ?", (team,)).fetchall()
+        return [json.loads(row["payload"]) for row in rows]
+
+    def save_case(self, case: dict, expected_version: int) -> None:
+        payload = json.dumps(case)
+        with self._lock, self._conn:
+            if expected_version == 0:
+                try:
+                    self._conn.execute("INSERT INTO incident_cases VALUES (?, ?, ?, ?)", (case["team"], case["incident_id"], case["version"], payload))
+                except sqlite3.IntegrityError as exc:
+                    raise ValueError("incident_version_conflict") from exc
+            else:
+                cursor = self._conn.execute("UPDATE incident_cases SET version = ?, payload = ? WHERE team = ? AND incident_id = ? AND version = ?", (case["version"], payload, case["team"], case["incident_id"], expected_version))
+                if cursor.rowcount != 1:
+                    raise ValueError("incident_version_conflict")
 
     def quota_count(self, actor: Actor) -> int:
         row = self._conn.execute("SELECT count FROM quota_counters WHERE quota_key = ?", (_quota_key(actor),)).fetchone()
@@ -264,6 +285,29 @@ class DynamoStore:
     def _query_payloads(self, pk: str) -> list[str]:
         response = self._table.query(KeyConditionExpression=Key("pk").eq(pk), ScanIndexForward=True)
         return [item["payload"] for item in response.get("Items", [])]
+
+    def list_cases(self, team: str) -> list[dict]:
+        cases = []
+        args = {"KeyConditionExpression": Key("pk").eq(f"INCIDENT#{team}"), "ConsistentRead": True}
+        while True:
+            response = self._table.query(**args)
+            cases.extend(json.loads(item["payload"]) for item in response.get("Items", []))
+            if not response.get("LastEvaluatedKey"):
+                return cases
+            args["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+
+    def save_case(self, case: dict, expected_version: int) -> None:
+        from botocore.exceptions import ClientError
+
+        args = {"Item": {"pk": f"INCIDENT#{case['team']}", "sk": case["incident_id"], "version": case["version"], "payload": json.dumps(case)}, "ConditionExpression": "attribute_not_exists(pk)" if expected_version == 0 else "#v = :v"}
+        if expected_version:
+            args.update(ExpressionAttributeNames={"#v": "version"}, ExpressionAttributeValues={":v": expected_version})
+        try:
+            self._table.put_item(**args)
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                raise ValueError("incident_version_conflict") from exc
+            raise
 
     @property
     def events(self) -> list[AuditEvent]:

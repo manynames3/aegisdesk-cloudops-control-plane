@@ -39,6 +39,7 @@ class LocalTicketAdapter:
                 "severity": severity,
                 "status": "open",
                 "adapter": self.name,
+                "source": "evaluation_fixture",
             }
         return ToolCall(name="ticket.create", status=status, policy=policy, result=result)
 
@@ -115,7 +116,10 @@ class JiraTicketAdapter:
             response = client.post(url, json=payload, auth=(self.email, self.api_token))
             response.raise_for_status()
             body = response.json()
-        except httpx.HTTPError as exc:
+            if not isinstance(body, dict) or not isinstance(body.get("key"), str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*-[0-9]+", body["key"]) or not body["key"].startswith(f"{self.project_key}-"):
+                raise ValueError("jira_response_missing_verified_key")
+        except (httpx.HTTPError, ValueError) as exc:
+            ambiguous = not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code >= 500 or exc.response.status_code in {408, 409}
             return ToolCall(
                 name="ticket.create",
                 status="blocked",
@@ -123,7 +127,7 @@ class JiraTicketAdapter:
                 result={
                     "adapter": self.name,
                     "system": "jira",
-                    "status": "failed",
+                    "status": "outcome_uncertain" if ambiguous else "failed",
                     "error": exc.__class__.__name__,
                 },
             )
@@ -131,7 +135,7 @@ class JiraTicketAdapter:
             if should_close:
                 client.close()
 
-        ticket_id = str(body.get("key") or body.get("id") or "JIRA-UNKNOWN")
+        ticket_id = body["key"]
         return ToolCall(
             name="ticket.create",
             status="allowed",
@@ -189,7 +193,10 @@ class ServiceNowTicketAdapter:
             response = client.post(url, json=payload, auth=(self.username, self.password))
             response.raise_for_status()
             body = response.json().get("result", {})
-        except httpx.HTTPError as exc:
+            if not isinstance(body, dict) or not body.get("number") or not body.get("sys_id"):
+                raise ValueError("servicenow_response_missing_verified_identifier")
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            ambiguous = not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code >= 500 or exc.response.status_code in {408, 409}
             return ToolCall(
                 name="ticket.create",
                 status="blocked",
@@ -197,7 +204,7 @@ class ServiceNowTicketAdapter:
                 result={
                     "adapter": self.name,
                     "system": "servicenow",
-                    "status": "failed",
+                    "status": "outcome_uncertain" if ambiguous else "failed",
                     "error": exc.__class__.__name__,
                 },
             )
@@ -205,7 +212,7 @@ class ServiceNowTicketAdapter:
             if should_close:
                 client.close()
 
-        ticket_id = str(body.get("number") or body.get("sys_id") or "SN-UNKNOWN")
+        ticket_id = str(body["number"])
         sys_id = str(body.get("sys_id") or "")
         return ToolCall(
             name="ticket.create",
@@ -280,11 +287,11 @@ class CloudWatchIncidentAdapter:
 
     def lookup_context(self, incident_id: str | None, query: str) -> IncidentContext:
         query_string = self._query_string(incident_id)
-        logs_client = self.client or boto3.client("logs", region_name=self.region)
         end_time = int(datetime.now(UTC).timestamp())
         start_time = int((datetime.now(UTC) - timedelta(minutes=self.lookback_minutes)).timestamp())
 
         try:
+            logs_client = self.client or boto3.client("logs", region_name=self.region)
             response = logs_client.start_query(
                 logGroupName=self.log_group,
                 startTime=start_time,

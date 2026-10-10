@@ -7,6 +7,7 @@ from typing import Any
 from pathlib import Path
 
 import httpx
+from pydantic import ValidationError
 
 from .models import Actor, PolicyDecision, RedactionResult, Role
 from .policy import evaluate_chat_policy, evaluate_model_route, evaluate_quota_policy, evaluate_tool_policy
@@ -115,11 +116,11 @@ class PolicyEngine:
         try:
             response = httpx.post(url, json={"input": input_payload}, timeout=self.settings.opa_timeout_seconds)
             response.raise_for_status()
-        except httpx.HTTPError as exc:
+            result = response.json().get("result")
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
             logger.warning("opa_query_failed", extra={"path": path, "error": exc.__class__.__name__})
             raise PolicyUnavailable("policy_engine_unavailable") from exc
 
-        result = response.json().get("result")
         if not isinstance(result, dict):
             raise PolicyUnavailable("invalid_policy_response")
         return result
@@ -165,9 +166,12 @@ class PolicyEngine:
     @staticmethod
     def _policy_decision(result: dict[str, Any], policy_name: str) -> PolicyDecision:
         metadata = {key: value for key, value in result.items() if key not in {"decision", "reason"}}
-        return PolicyDecision(
-            decision=result.get("decision", "deny"),
-            reason=result.get("reason", "missing_policy_reason"),
-            policy_name=policy_name,
-            metadata=metadata,
-        )
+        try:
+            return PolicyDecision(
+                decision=result.get("decision", "deny"),
+                reason=result.get("reason", "missing_policy_reason"),
+                policy_name=policy_name,
+                metadata=metadata,
+            )
+        except ValidationError as exc:
+            raise PolicyUnavailable("invalid_policy_response") from exc

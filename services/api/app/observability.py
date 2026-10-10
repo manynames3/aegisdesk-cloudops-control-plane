@@ -4,6 +4,8 @@ import json
 import logging
 import time
 from collections.abc import Callable
+from contextvars import ContextVar
+from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 from opentelemetry import trace
@@ -18,6 +20,7 @@ from .settings import Settings
 
 logger = logging.getLogger("aegisdesk.api")
 tracer = trace.get_tracer("aegisdesk.api")
+correlation_id = ContextVar("aegisdesk_correlation_id", default="request-unavailable")
 
 
 class JsonFormatter(logging.Formatter):
@@ -28,7 +31,7 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
         }
-        for key in ("method", "path", "status_code", "duration_ms", "trace_id"):
+        for key in ("method", "path", "status_code", "duration_ms", "trace_id", "correlation_id"):
             value = getattr(record, key, None)
             if value is not None:
                 payload[key] = value
@@ -38,7 +41,13 @@ class JsonFormatter(logging.Formatter):
 class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         started = time.perf_counter()
-        response = await call_next(request)
+        token = correlation_id.set(f"req-{uuid4().hex}")
+        try:
+            response = await call_next(request)
+        except Exception:
+            correlation_id.reset(token)
+            raise
+        response.headers["X-AegisDesk-Correlation-ID"] = current_correlation_id()
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
         logger.info(
             "http_request",
@@ -48,8 +57,10 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
                 "status_code": response.status_code,
                 "duration_ms": duration_ms,
                 "trace_id": current_trace_id(),
+                "correlation_id": current_correlation_id(),
             },
         )
+        correlation_id.reset(token)
         return response
 
 
@@ -72,3 +83,7 @@ def current_trace_id() -> str:
     if not span_context.is_valid:
         return "trace-unavailable"
     return f"{span_context.trace_id:032x}"
+
+
+def current_correlation_id() -> str:
+    return correlation_id.get()

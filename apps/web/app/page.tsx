@@ -20,12 +20,14 @@ import {
   Play,
   RefreshCw,
   Server,
+  Search as SearchIcon,
   ShieldCheck,
   User,
   X
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { IncidentWorkspace } from "./incident-workspace";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const PRODUCT_MODE = process.env.NEXT_PUBLIC_AEGISDESK_MODE ?? "evaluation";
@@ -37,7 +39,7 @@ const PKCE_STATE_KEY = "aegisdesk.pkce.state";
 const PKCE_REDIRECT_KEY = "aegisdesk.pkce.redirectUri";
 
 type Role = "employee" | "manager" | "admin";
-type Tab = "chat" | "approvals" | "governance" | "evaluations";
+type Tab = "incidents" | "investigations" | "actions" | "runbooks" | "integrations" | "settings" | "chat" | "approvals" | "governance" | "evaluations";
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 type MetricSummary = {
@@ -232,6 +234,7 @@ type SetupStatus = {
     cost_explorer_scope: string;
     incident_context_adapter: string;
     cloudwatch_configured: boolean;
+    cloudwatch_logs_enabled: boolean;
     cloudwatch_log_group?: string | null;
     cloudwatch_query_limit?: number;
     cloudwatch_query_lookback_minutes?: number;
@@ -368,11 +371,14 @@ const initialMetrics: MetricSummary = {
 };
 
 export default function Home() {
-  const [tab, setTab] = useState<Tab>("chat");
+  const [tab, setTab] = useState<Tab>("incidents");
   const [role, setRole] = useState<Role>("employee");
   const [message, setMessage] = useState(prompts[0].text);
   const [messages, setMessages] = useState<Message[]>([]);
   const [metrics, setMetrics] = useState<MetricSummary>(initialMetrics);
+  const [metricsAvailable, setMetricsAvailable] = useState(false);
+  const [operationalError, setOperationalError] = useState("");
+  const [operationalLoading, setOperationalLoading] = useState(true);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [abuseControls, setAbuseControls] = useState<AbuseControls | null>(null);
@@ -437,6 +443,9 @@ export default function Home() {
   }
 
   async function refreshData(selectedRole = activeRole) {
+    setOperationalLoading(true);
+    setOperationalError("");
+    setMetricsAvailable(false);
     try {
       const healthRes = await fetch(`${API_BASE}/health`);
       const setupRes = await fetch(`${API_BASE}/setup/status`);
@@ -452,6 +461,10 @@ export default function Home() {
       }
 
       const headers = await authHeaders(selectedRole);
+      if (selectedRole === "employee") {
+        setOperationalError("Permission denied: governance and approval queues require a manager or admin identity.");
+        return;
+      }
       const [metricsRes, eventsRes, approvalsRes, controlsRes] = await Promise.all([
         fetch(`${API_BASE}/metrics/summary`, { headers }),
         fetch(`${API_BASE}/events`, { headers }),
@@ -459,12 +472,19 @@ export default function Home() {
         fetch(`${API_BASE}/controls/abuse`, { headers })
       ]);
 
-      setMetrics(metricsRes.ok ? await metricsRes.json() : initialMetrics);
-      setEvents(eventsRes.ok ? (await eventsRes.json()).events : []);
-      setApprovals(approvalsRes.ok ? (await approvalsRes.json()).approvals : []);
-      setAbuseControls(controlsRes.ok ? await controlsRes.json() : null);
-    } catch {
+      if (!eventsRes.ok || !approvalsRes.ok || !controlsRes.ok) {
+        setOperationalError("Operational data unavailable. Refresh to retry; no empty or successful result is inferred.");
+        return;
+      }
+      if (metricsRes.ok) { setMetrics(await metricsRes.json()); setMetricsAvailable(true); }
+      setEvents((await eventsRes.json()).events);
+      setApprovals((await approvalsRes.json()).approvals);
+      setAbuseControls(await controlsRes.json());
+    } catch (failure) {
+      setOperationalError(failure instanceof Error ? failure.message : "Operational data unavailable. Refresh to retry.");
       setApiStatus("offline");
+    } finally {
+      setOperationalLoading(false);
     }
   }
 
@@ -839,17 +859,20 @@ export default function Home() {
     <main className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <ShieldCheck size={28} />
-          <div>
-            <strong>AegisDesk</strong>
-            <span>CloudOps Control Plane</span>
-          </div>
+          <img className="brandWordmark" src="/brand/aegisdesk-wordmark.svg" alt="AegisDesk" width={1174} height={224} />
+          <span>CloudOps Control Plane</span>
         </div>
 
         <nav className="tabs" aria-label="Primary">
+          <TabButton icon={AlertTriangle} label="Incidents" active={tab === "incidents"} onClick={() => setTab("incidents")} />
+          <TabButton icon={SearchIcon} label="Investigations" active={tab === "investigations"} onClick={() => setTab("investigations")} />
+          <TabButton icon={ShieldCheck} label="Actions" active={tab === "actions"} onClick={() => setTab("actions")} />
+          <TabButton icon={ClipboardList} label="Runbooks" active={tab === "runbooks"} onClick={() => setTab("runbooks")} />
           <TabButton icon={MessageSquare} label="Chat" active={tab === "chat"} onClick={() => setTab("chat")} />
           <TabButton icon={KeyRound} label="Approvals" active={tab === "approvals"} onClick={() => setTab("approvals")} />
           <TabButton icon={Database} label="Governance" active={tab === "governance"} onClick={() => setTab("governance")} />
+          <TabButton icon={Server} label="Integrations" active={tab === "integrations"} onClick={() => setTab("integrations")} />
+          <TabButton icon={Lock} label="Settings" active={tab === "settings"} onClick={() => setTab("settings")} />
           <TabButton icon={ShieldCheck} label="Evaluations" active={tab === "evaluations"} onClick={() => setTab("evaluations")} />
         </nav>
 
@@ -964,6 +987,10 @@ export default function Home() {
           />
         )}
 
+        {(["incidents", "investigations", "actions", "runbooks"] as Tab[]).includes(tab) && <IncidentWorkspace key={`${authActor?.user_id ?? role}:${tab}`} apiBase={API_BASE} headers={authHeaders} identityKey={authActor?.user_id ?? role} mode={tab as "incidents" | "investigations" | "actions" | "runbooks"} />}
+
+        {(tab === "integrations" || tab === "settings") && <section className="incidentWorkspace"><h2>{tab === "integrations" ? "Integration configuration" : "Workspace controls"}</h2>{!setupStatus ? <p role="status">Setup status unavailable. Retry using Refresh.</p> : tab === "integrations" ? <><p>Configuration does not establish connectivity. Successful case evidence collection and confirmed ticket outcomes are recorded in each incident timeline.</p><table className="incidentTable"><thead><tr><th>Service</th><th>Configuration</th><th>Capability</th><th>Live verification</th></tr></thead><tbody><tr><td>CloudWatch</td><td>{setupStatus.integrations.cloudwatch_logs_enabled ? "Configured" : "Unavailable"}</td><td>Read-only bounded Logs Insights queries</td><td>Inspect incident evidence collection timestamp</td></tr><tr><td>Jira</td><td>{setupStatus.integrations.jira_configured ? "Configured" : "Unavailable"}</td><td>Approved incident ticket creation</td><td>Inspect verified incident ticket outcome</td></tr><tr><td>ServiceNow</td><td>{setupStatus.integrations.servicenow_configured ? "Configured" : "Unavailable"}</td><td>Existing governed chat adapter</td><td>Not verified by this screen</td></tr><tr><td>Datadog / Okta / Identity Center</td><td>Unavailable</td><td>Extension interfaces only</td><td>Not implemented</td></tr></tbody></table></> : <dl className="incidentFacts"><dt>Identity</dt><dd>{setupStatus.auth.mode}</dd><dt>Evaluation personas</dt><dd>{setupStatus.auth.persona_issuer_enabled ? "Enabled - evaluation access" : "Disabled"}</dd><dt>Policy engine</dt><dd>{setupStatus.policy.mode} / {setupStatus.policy.ready ? "ready" : "unavailable"}</dd><dt>Storage</dt><dd>{setupStatus.data.store_backend} / {setupStatus.data.store_ready ? "ready" : "unavailable"}</dd><dt>Customer data boundary</dt><dd>{setupStatus.data_boundary?.mode ?? "Unavailable"}</dd><dt>Bedrock</dt><dd>{setupStatus.models.bedrock_enabled ? "Configured" : "Disabled"} / {setupStatus.models.cloud_model_kill_switch ? "kill switch active" : "kill switch inactive"}</dd><dt>Incident AI analysis</dt><dd>Not enabled. Operator notes and unverified hypotheses are recorded independently of model availability.</dd></dl>}</section>}
+
         {tab === "chat" && (
           <>
             {messages.length === 0 && !walkthroughOpen && (
@@ -1029,7 +1056,9 @@ export default function Home() {
           </>
         )}
 
-        {tab === "approvals" && (
+        {["approvals", "governance", "evaluations"].includes(tab) && operationalError && <div role="alert" className="incidentError">{operationalError}</div>}
+        {["approvals", "governance", "evaluations"].includes(tab) && operationalLoading && <p role="status">Loading operational data...</p>}
+        {tab === "approvals" && !operationalError && !operationalLoading && (
           <section className="panel">
             <div className="sectionHeader">
               <h2>Approval Queue</h2>
@@ -1085,14 +1114,14 @@ export default function Home() {
           </section>
         )}
 
-        {tab === "governance" && (
+        {tab === "governance" && !operationalError && !operationalLoading && (
           <div className="governanceGrid">
-            <Metric icon={Activity} label="Requests" value={metrics.requests_total} />
-            <Metric icon={DollarSign} label="Spend" value={formatUsd(metrics.estimated_spend_usd)} />
-            <Metric icon={Lock} label="Redactions" value={metrics.redactions_total} />
-            <Metric icon={AlertTriangle} label="Denied" value={metrics.denied_actions} />
-            <Metric icon={KeyRound} label="Pending" value={metrics.approvals_pending} />
-            <Metric icon={ClipboardList} label="Tools" value={metrics.tool_calls_total} />
+            <Metric icon={Activity} label="Requests" value={metricsAvailable ? metrics.requests_total : "Unavailable"} />
+            <Metric icon={DollarSign} label="Spend" value={metricsAvailable ? formatUsd(metrics.estimated_spend_usd) : "Unavailable"} />
+            <Metric icon={Lock} label="Redactions" value={metricsAvailable ? metrics.redactions_total : "Unavailable"} />
+            <Metric icon={AlertTriangle} label="Denied" value={metricsAvailable ? metrics.denied_actions : "Unavailable"} />
+            <Metric icon={KeyRound} label="Pending" value={metricsAvailable ? metrics.approvals_pending : "Unavailable"} />
+            <Metric icon={ClipboardList} label="Tools" value={metricsAvailable ? metrics.tool_calls_total : "Unavailable"} />
             {setupStatus && <SetupStatusPanel status={setupStatus} />}
             {abuseControls && <AbuseControlsPanel controls={abuseControls} />}
             <AuditExportPanel
@@ -1137,7 +1166,7 @@ export default function Home() {
           </div>
         )}
 
-        {tab === "evaluations" && (
+        {tab === "evaluations" && !operationalError && !operationalLoading && (
           <section className="panel evalPanel">
             <div className="sectionHeader">
               <h2>Control Checks</h2>
@@ -2057,6 +2086,7 @@ function EvalRow({ label, status }: { label: string; status: string }) {
 }
 
 function tabTitle(tab: Tab) {
+  if (["incidents", "investigations", "actions", "runbooks", "integrations", "settings"].includes(tab)) return tab.charAt(0).toUpperCase() + tab.slice(1);
   if (tab === "approvals") return "Approvals";
   if (tab === "governance") return "Governance";
   if (tab === "evaluations") return "Evaluations";

@@ -490,7 +490,7 @@ def test_ticket_adapter_api_failure_is_blocked_without_fake_success():
 
     assert tool_call.status == "blocked"
     assert tool_call.result["system"] == "jira"
-    assert tool_call.result["status"] == "failed"
+    assert tool_call.result["status"] == "outcome_uncertain"
     assert "ticket_id" not in tool_call.result
 
 

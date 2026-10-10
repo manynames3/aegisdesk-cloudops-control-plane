@@ -19,10 +19,16 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "../../scripts/start-api-for-e2e.sh",
+      command: "python3 tests/fixtures/jira.py",
+      url: "http://127.0.0.1:8766/health",
+      timeout: 30_000,
+      reuseExistingServer: false
+    },
+    {
+      command: "AEGISDESK_TICKET_ADAPTER=jira AEGISDESK_JIRA_BASE_URL=http://127.0.0.1:8766 AEGISDESK_JIRA_EMAIL=e2e@example.test AEGISDESK_JIRA_API_TOKEN=controlled-test-credential AEGISDESK_JIRA_PROJECT_KEY=OPS ../../scripts/start-api-for-e2e.sh",
       url: `${apiURL}/health`,
       timeout: 120_000,
-      reuseExistingServer: !process.env.CI
+      reuseExistingServer: false
     },
     {
       command:

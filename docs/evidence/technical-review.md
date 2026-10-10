@@ -19,6 +19,18 @@ The deploy workflow uses GitHub OIDC, Terraform plan, manual environment-gated a
 
 ## Key Code Paths
 
+### Local Incident Increment (2026-10-10)
+
+The persistent incident workflow has not been deployed. [Incident operations and verification](../operations/incident-workflow.md) describes its configuration, failure handling, storage boundaries, and controlled test screenshots. `services/api/app/incidents.py` implements team-scoped cases and exact-action approval/dispatch/reconciliation; `services/api/tests/test_incidents.py` exercises failure and concurrency paths. The new UI is isolated in `apps/web/app/incident-workspace.tsx`.
+
+Live Jira/CloudWatch and DynamoDB case persistence remain unverified. Existing deploy links do not attest to these changes. Local screenshots show a controlled case and loopback Jira fixture; the evidence panel explicitly reports that CloudWatch is unavailable when not configured.
+
+Local verification: 61 API tests, five Playwright tests (including the governed ticket lifecycle), six control evals, and nine OPA tests passed. Production frontend build/type checking and Terraform fmt/validate passed. Focused Ruff checks, edited-document relative links, and `git diff --check` passed. The security script found no high-confidence secrets, the updated frontend lockfile audited with zero vulnerabilities, and API dependency compatibility passed. MCP dependency checking was skipped because its environment was not installed; container builds, hosted incident persistence, and live integration tests were not run in this increment.
+
+Read-only hosted setup inspection still reported evaluation personas, local ticket/incident adapters, and unconfigured Jira/CloudWatch. No production deployment or new AWS resources were created.
+
+The 26 incident API tests also passed with the real local OPA executable in subprocess mode. CloudWatch/Jira remained controlled test adapters; this verifies local policy execution, not live external integrations.
+
 | Control | Path |
 | --- | --- |
 | Chat gateway and request replay | `services/api/app/main.py` |

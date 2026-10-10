@@ -19,6 +19,8 @@ from .settings import get_settings
 def _configured_ticket_adapter() -> TicketAdapter:
     settings = get_settings()
     if settings.ticket_adapter == "local":
+        if settings.data_boundary_mode == "customer_strict":
+            return UnavailableTicketAdapter(reason="customer_data_boundary_requires_real_ticket_adapter", system="local")
         return LocalTicketAdapter()
     if settings.ticket_adapter == "jira":
         required = [
@@ -109,6 +111,11 @@ def lookup_cost_summary(policy: PolicyDecision, summary: dict | None = None) -> 
             "recommendation": "route low-value repeated prompts to local model or cache approved answers",
             "estimated_savings_usd": 37.4,
         }
+
+        if summary is None and (get_settings().enable_cost_explorer or get_settings().data_boundary_mode == "customer_strict"):
+            return ToolCall(name="cost.summary", status="blocked", policy=policy, result={"status": "unavailable", "error": "verified_cost_data_unavailable"})
+        if summary is None:
+            result["source"] = "evaluation_fixture"
 
     return ToolCall(name="cost.summary", status=status, policy=policy, result=result)
 

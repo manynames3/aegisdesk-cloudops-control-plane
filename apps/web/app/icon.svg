@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <title>AegisDesk</title>
+  <style>
+    path { fill: #126b68; }
+    @media (prefers-color-scheme: dark) { path { fill: #f8fafc; } }
+  </style>
+  <path fill-rule="evenodd" transform="translate(5.5 10.5)" d="M70 0H111L181 171H139L90.5 44L74.843 85H35.205L70 0ZM29.883 98H96.622L108.461 129H58.039L42 171H0L29.883 98Z"/>
+</svg>

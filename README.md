@@ -2,7 +2,11 @@
 
 [![CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml)
 
-AegisDesk is a working self-hosted CloudOps AI control plane. It gives employees AI help for incidents, tickets, production access requests, and cloud cost questions while the backend enforces identity, redaction, OPA/Rego policy, approval gates, model routing, quotas, and audit trails.
+AegisDesk is a self-hosted CloudOps control plane for incident investigation and governed response. Operators can preserve incident cases, collect CloudWatch log evidence, consult runbooks, request independent approval for an exact Jira action, and review its verified or unresolved outcome. Cognito/JWKS, redaction, OPA/Rego, Bedrock routing, cost controls, access approvals, and chat request replay remain supporting capabilities.
+
+> Investigate cloud incidents, coordinate approved actions, and preserve trustworthy operational evidence.
+
+**Current implementation:** the incident workflow is locally tested against controlled integrations and has not been deployed. The linked hosted app remains the earlier evaluation deployment. No live customer CloudWatch/Jira workflow is claimed. See the [incident workflow, configuration, recovery, and limitations](docs/operations/incident-workflow.md).
 
 ## Quick Links
 
@@ -49,6 +53,12 @@ The likely buyer is a platform engineering or security leader who needs a self-h
 
 ## Screenshots
 
+The following incident screenshot is from the actual local application using a **controlled test case and Jira HTTP fixture**, not live operational evidence:
+
+![Incident queue from controlled local testing](docs/evidence/screenshots/incident-queue-controlled-desktop.png)
+
+The older screenshots below show the supporting chat/governance experience.
+
 ![Guided walkthrough](docs/evidence/screenshots/guided-walkthrough.png)
 
 ![Policy-aware chat](docs/evidence/screenshots/policy-aware-chat.png)
@@ -87,7 +97,7 @@ Production mode hides evaluation-only controls, shows a company SSO entry point,
 - **Cloud cost review:** use AWS Cost Explorer summaries, DynamoDB caching, role-based access, quotas, and model-routing evidence.
 - **AI governance review:** inspect policy input/output, redaction, model route, answer sources, tool calls, approvals, audit events, and trace IDs.
 - **Audit evidence export:** export governance events for security review in JSON or CSV.
-- **Agent interoperability:** expose governed CloudOps tools through an MCP server for agent clients such as Codex.
+- **Agent interoperability:** expose local MCP tool payloads for evaluation with agent clients such as Codex. Production MCP transport for the authenticated incident lifecycle is not implemented.
 
 ## Commercial Path
 

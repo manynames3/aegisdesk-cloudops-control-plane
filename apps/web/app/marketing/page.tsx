@@ -71,8 +71,7 @@ export default function MarketingPage() {
     <main className="marketing">
       <header className="marketingNav">
         <a className="marketingBrand" href="/">
-          <ShieldCheck size={18} />
-          AegisDesk
+          <img className="brandWordmark" src="/brand/aegisdesk-wordmark.svg" alt="AegisDesk" width={1174} height={224} />
         </a>
         <nav aria-label="Product navigation">
           <a href="#use-cases">Use cases</a>
