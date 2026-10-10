@@ -1,6 +1,24 @@
 # Live Operations Evidence
 
-Captured from the hosted AWS environment on May 13, 2026.
+Latest application deployment verified on October 10, 2026. The AWS CLI baseline below was captured on May 13, 2026; its log, metric, and budget-spend samples are historical, not current measurements.
+
+## Latest Deployment (2026-10-10)
+
+Runtime revision: [`e80927c41f87de8cf95fff5799ed447df278902c`](https://github.com/manynames3/aegisdesk-cloudops-control-plane/commit/e80927c41f87de8cf95fff5799ed447df278902c). README and evidence updates made after deployment do not change the deployed application.
+
+| Evidence | Result |
+| --- | --- |
+| [Runtime CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027293724) | All nine jobs passed, including 13 browser tests, API/policy tests, MCP smoke, security checks, Terraform validation, and three container builds. |
+| [Preflight plan](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027153191) | Existing Lambda update and artifact upload; zero resource deletions. |
+| [AWS deployment](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027407776) | OIDC, plan, gated apply, frontend publish, and API smoke passed. AWS CLI confirmed CloudFront invalidation `I1GT4Q8HOMXYFYFOTSHFE195ZG` completed. Terraform reported one S3 artifact object added, one Lambda function changed, zero resources destroyed. |
+| API liveness/readiness | `/health` and `/health/ready` returned 200; DynamoDB store and OPA subprocess were ready. |
+| Incident authentication/read | Anonymous `GET /incidents` returned 401; a Cognito evaluation persona's request returned 200 from the DynamoDB-backed case listing. |
+| Branding | CloudFront wordmark and favicon bytes exactly matched the committed SVG assets. |
+| Browser rendering | Playwright verified the app at 1440px and 375px and the marketing header. [Hosted desktop screenshot](screenshots/incident-hosted-desktop.png). |
+
+This remains an evaluation deployment: reviewer personas are enabled, Jira and CloudWatch are unconfigured, and no customer integration success is claimed. Hosted case writes, real ticket execution, and trace export were not tested in this deployment smoke check. No incident was created and no operational tool was executed by the check. Local fixture tests are not hosted integration evidence.
+
+## Historical Baseline
 
 This page documents operational controls that are already active in the live deployment. It uses AWS CLI evidence instead of a provisioned CloudWatch Dashboard because managed CloudWatch dashboards introduce a fixed monthly cost. The same metrics can be promoted into a dashboard for a customer environment that wants one.
 

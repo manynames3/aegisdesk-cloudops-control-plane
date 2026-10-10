@@ -6,7 +6,7 @@ AegisDesk is a self-hosted CloudOps control plane for incident investigation and
 
 > Investigate cloud incidents, coordinate approved actions, and preserve trustworthy operational evidence.
 
-**Current implementation:** the incident workflow is locally tested against controlled integrations and has not been deployed. The linked hosted app remains the earlier evaluation deployment. No live customer CloudWatch/Jira workflow is claimed. See the [incident workflow, configuration, recovery, and limitations](docs/operations/incident-workflow.md).
+**Current implementation:** the incident workspace and custom branding are deployed to the hosted AWS evaluation environment. API readiness, authenticated DynamoDB-backed case listing, and desktop/mobile rendering were verified on October 10, 2026. Jira and CloudWatch remain unconfigured; no live customer workflow is claimed. See [deployment evidence](docs/evidence/live-operations.md) and the [incident workflow, configuration, recovery, and limitations](docs/operations/incident-workflow.md).
 
 ## Quick Links
 
@@ -52,6 +52,10 @@ The likely buyer is a platform engineering or security leader who needs a self-h
 5. Open the [product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) for the buyer-facing explanation.
 
 ## Screenshots
+
+The hosted AWS evaluation workspace, captured on October 10, 2026. The empty queue is real; this is not evidence of customer usage or a connected Jira/CloudWatch workflow:
+
+![Hosted incident workspace with the custom wordmark](docs/evidence/screenshots/incident-hosted-desktop.png)
 
 The following incident screenshot is from the actual local application using a **controlled test case and Jira HTTP fixture**, not live operational evidence:
 

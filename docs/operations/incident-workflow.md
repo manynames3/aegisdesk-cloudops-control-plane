@@ -1,6 +1,6 @@
 # Incident Investigation And Governed Response
 
-This increment adds a persistent incident workspace. It is locally tested; it has not been deployed or verified against a live customer CloudWatch log group or Jira project. Existing hosted screenshots and deploy evidence describe the earlier chat application.
+This increment adds a persistent incident workspace, deployed to the AWS evaluation environment on October 10, 2026. Hosted API readiness and authenticated DynamoDB-backed case listing were verified. Hosted case writes, live customer CloudWatch evidence, and Jira execution remain unverified; Jira and CloudWatch are unconfigured. See the [deployment and smoke evidence](../evidence/live-operations.md).
 
 ## Operator Workflow
 

@@ -12,22 +12,25 @@ Use this page as the starting point for a senior hiring manager or technical buy
 
 - CI workflow: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml>
 - AWS deploy workflow: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/deploy-aws.yml>
-- Latest passing CI observed before this readiness pass: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/26163874100>
+- Passing runtime release CI: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027293724>
+- Verified AWS deployment: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027407776>
 - Live operations evidence: [live-operations.md](live-operations.md)
 
 The deploy workflow uses GitHub OIDC, Terraform plan, manual environment-gated apply, frontend publish, CloudFront invalidation, and API smoke test.
 
 ## Key Code Paths
 
-### Local Incident Increment (2026-10-10)
+### Incident Release (2026-10-10)
 
-The persistent incident workflow has not been deployed. [Incident operations and verification](../operations/incident-workflow.md) describes its configuration, failure handling, storage boundaries, and controlled test screenshots. `services/api/app/incidents.py` implements team-scoped cases and exact-action approval/dispatch/reconciliation; `services/api/tests/test_incidents.py` exercises failure and concurrency paths. The new UI is isolated in `apps/web/app/incident-workspace.tsx`.
+The persistent incident workspace and divided-A branding are deployed at runtime revision `e80927c41f87de8cf95fff5799ed447df278902c`. [Incident operations and verification](../operations/incident-workflow.md) describes configuration, failure handling, storage boundaries, and controlled test screenshots. `services/api/app/incidents.py` implements team-scoped cases and exact-action approval/dispatch/reconciliation; `services/api/tests/test_incidents.py` exercises failure and concurrency paths. The UI is isolated in `apps/web/app/incident-workspace.tsx`.
 
-Live Jira/CloudWatch and DynamoDB case persistence remain unverified. Existing deploy links do not attest to these changes. Local screenshots show a controlled case and loopback Jira fixture; the evidence panel explicitly reports that CloudWatch is unavailable when not configured.
+Hosted `/health` and `/health/ready` returned 200 with DynamoDB and OPA subprocess readiness. Anonymous `GET /incidents` returned 401; a Cognito evaluation persona's authenticated request returned 200. The CloudFront wordmark/favicon matched the committed SVG files exactly, and desktop/mobile app rendering and `/marketing` were checked with Playwright. Hosted case writes and live Jira/CloudWatch workflows remain unverified. No incident was created and no external tool was executed during this hosted smoke check.
 
-Local verification: 61 API tests, five Playwright tests (including the governed ticket lifecycle), six control evals, and nine OPA tests passed. Production frontend build/type checking and Terraform fmt/validate passed. Focused Ruff checks, edited-document relative links, and `git diff --check` passed. The security script found no high-confidence secrets, the updated frontend lockfile audited with zero vulnerabilities, and API dependency compatibility passed. MCP dependency checking was skipped because its environment was not installed; container builds, hosted incident persistence, and live integration tests were not run in this increment.
+Verification: 61 API tests, 13 Playwright tests (five workflow tests and eight branding checks), six control evals, and nine OPA tests passed. Production frontend build/type checking, Terraform fmt/validate, secret scanning, dependency compatibility, MCP smoke, and all three container builds passed in the release CI. Local load smoke completed 20 controlled requests without failure; this is not a hosted performance benchmark. Local focused Ruff checks, edited-document relative links, and `git diff --check` passed. The frontend dependency audit reported zero vulnerabilities.
 
-Read-only hosted setup inspection still reported evaluation personas, local ticket/incident adapters, and unconfigured Jira/CloudWatch. No production deployment or new AWS resources were created.
+The first [CI run](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027124572) caught an incompatible MCP 2.x import. Constraining the existing SDK requirement to its supported 1.x API restored the MCP smoke test; the complete release CI then passed. No new production dependency was introduced.
+
+Hosted setup still reports evaluation personas, local legacy adapters, and unconfigured Jira/CloudWatch. Deployment uploaded the Lambda artifact, updated the existing Lambda function, published the frontend, and requested CloudFront invalidation; no resource was destroyed. The [hosted screenshot](screenshots/incident-hosted-desktop.png) shows the actual empty evaluation queue. Controlled Jira lifecycle screenshots remain explicitly labeled local tests, not customer operational evidence.
 
 The 26 incident API tests also passed with the real local OPA executable in subprocess mode. CloudWatch/Jira remained controlled test adapters; this verifies local policy execution, not live external integrations.
 
