@@ -8,7 +8,7 @@ AegisDesk is a self-hosted AWS CloudOps control plane for incident investigation
 
 [Live evaluation](https://d27myiy7bbj1rz.cloudfront.net) | [Reviewer guide](docs/reviewer-guide.md) | [C4 architecture](docs/architecture.md) | [ADRs](docs/adrs/README.md) | [Documentation map](docs/README.md)
 
-**Status:** deployed AWS evaluation, not a customer production service. On October 10, 2026, API readiness, authenticated DynamoDB-backed case listing, and desktop/mobile rendering were verified. Hosted case writes and live Jira/CloudWatch workflows remain unverified; those integrations are unconfigured. [Passing CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027806592), [successful deployment](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027407776), and [verification scope](docs/evidence/live-operations.md).
+**Status:** deployed AWS evaluation, not a customer production service. The latest redeploy and public API readiness were verified on October 13, 2026; authenticated DynamoDB-backed case listing and desktop/mobile rendering were verified on October 10. Hosted case writes and live Jira/CloudWatch workflows remain unverified; those integrations are unconfigured. [Passing CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352636804), [successful deployment](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352824446), and [verification scope](docs/evidence/live-operations.md).
 
 ## Problem, Solution, And Value
 

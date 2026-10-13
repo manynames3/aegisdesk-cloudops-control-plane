@@ -12,17 +12,19 @@ Use this page as the starting point for a senior hiring manager or technical buy
 
 - CI workflow: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml>
 - AWS deploy workflow: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/deploy-aws.yml>
-- Passing runtime release CI: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027293724>
-- Verified AWS deployment: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027407776>
+- Passing latest deployment CI: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352636804>
+- Verified AWS deployment: <https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352824446>
 - Live operations evidence: [live-operations.md](live-operations.md)
 
 The deploy workflow uses GitHub OIDC, Terraform plan, manual environment-gated apply, frontend publish, CloudFront invalidation, and API smoke test.
+
+The October 13, 2026 documentation revision `def6f81533b2cd2e591d12ef3fa215d0db05fe7e` passed all nine CI jobs and was redeployed after a plan-only preflight. Terraform changed only the Lambda function and its existing S3 package object in place, with zero adds or destroys. Public health/readiness, anonymous incident rejection, frontend delivery, and completed invalidation were verified. No hosted case writes, authenticated case reads, or live provider actions were tested in this redeploy smoke check; the detailed original release evidence below remains dated October 10.
 
 ## Key Code Paths
 
 ### Incident Release (2026-10-10)
 
-The persistent incident workspace and divided-A branding are deployed at runtime revision `e80927c41f87de8cf95fff5799ed447df278902c`. [Incident operations and verification](../operations/incident-workflow.md) describes configuration, failure handling, storage boundaries, and controlled test screenshots. `services/api/app/incidents.py` implements team-scoped cases and exact-action approval/dispatch/reconciliation; `services/api/tests/test_incidents.py` exercises failure and concurrency paths. The UI is isolated in `apps/web/app/incident-workspace.tsx`.
+The persistent incident workspace and divided-A branding were first deployed at runtime revision `e80927c41f87de8cf95fff5799ed447df278902c`. [Incident operations and verification](../operations/incident-workflow.md) describes configuration, failure handling, storage boundaries, and controlled test screenshots. `services/api/app/incidents.py` implements team-scoped cases and exact-action approval/dispatch/reconciliation; `services/api/tests/test_incidents.py` exercises failure and concurrency paths. The UI is isolated in `apps/web/app/incident-workspace.tsx`.
 
 Hosted `/health` and `/health/ready` returned 200 with DynamoDB and OPA subprocess readiness. Anonymous `GET /incidents` returned 401; a Cognito evaluation persona's authenticated request returned 200. The CloudFront wordmark/favicon matched the committed SVG files exactly, and desktop/mobile app rendering and `/marketing` were checked with Playwright. Hosted case writes and live Jira/CloudWatch workflows remain unverified. No incident was created and no external tool was executed during this hosted smoke check.
 

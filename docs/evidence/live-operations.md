@@ -1,8 +1,24 @@
 # Live Operations Evidence
 
-Latest application deployment verified on October 10, 2026. The AWS CLI baseline below was captured on May 13, 2026; its log, metric, and budget-spend samples are historical, not current measurements.
+Latest application deployment verified on October 13, 2026. The AWS CLI baseline below was captured on May 13, 2026; its log, metric, and budget-spend samples are historical, not current measurements.
 
-## Latest Deployment (2026-10-10)
+## Latest Deployment (2026-10-13)
+
+Deployed revision: [`def6f81533b2cd2e591d12ef3fa215d0db05fe7e`](https://github.com/manynames3/aegisdesk-cloudops-control-plane/commit/def6f81533b2cd2e591d12ef3fa215d0db05fe7e). This documentation refresh changed no application source or Terraform resource definitions; the deployment workflow rebuilt the existing Lambda package and republished the frontend. Later evidence-only commits do not change the deployed application.
+
+| Evidence | Result |
+| --- | --- |
+| [CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352636804) | All nine jobs passed before deployment, including API/browser/policy tests, MCP smoke, security, Terraform validation, frontend and container builds. |
+| [Plan-only preflight](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352665461) | Only the existing Lambda function and S3 package object changed in place: zero adds, two changes, zero destroys. |
+| [AWS deployment](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38352824446) | Plan and gated apply passed. Terraform reported zero added, two changed, zero destroyed. Frontend publication and API smoke passed. |
+| CloudFront invalidation | AWS CLI confirmed `I9ZHI11U1JGNQFURM5ZF087KWM` on distribution `EYXXWE0YJP0QZ` completed. |
+| Public API checks | `/health` and `/health/ready` returned 200; DynamoDB and OPA subprocess readiness were true. Anonymous `GET /incidents` returned 401. |
+| Frontend delivery | CloudFront `/` and `/marketing` returned HTTP 200 after publication. |
+| Setup status | Evaluation personas remain enabled; Jira, ServiceNow, and customer CloudWatch evidence remain unconfigured. Configuration flags are not live integration proof. |
+
+No hosted case write, authenticated case read, provider execution, trace export, or recovery drill was repeated in this redeploy smoke check. It created no cases and executed no operational API tools. The screenshots and authenticated read/browser evidence below remain dated October 10, not new customer activity.
+
+## Incident Release (2026-10-10)
 
 Runtime revision: [`e80927c41f87de8cf95fff5799ed447df278902c`](https://github.com/manynames3/aegisdesk-cloudops-control-plane/commit/e80927c41f87de8cf95fff5799ed447df278902c). README and evidence updates made after deployment do not change the deployed application.
 
