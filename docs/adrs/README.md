@@ -15,4 +15,4 @@ This directory records the major architecture decisions for AegisDesk.
 | [ADR-009](009-cognito-opa-cost-explorer.md) | Accepted | Pair Cognito identity, live OPA/Rego, and Cost Explorer governance |
 | [ADR-010](010-seeded-incident-context.md) | Accepted | Use seeded CloudWatch-style incident context before real log queries |
 | [ADR-011](011-bounded-cloudwatch-and-audit-retention.md) | Accepted | Add bounded CloudWatch evidence and enforce audit retention |
-| [ADR-012](012-persistent-incident-actions.md) | Accepted locally | Persist team incident cases and require exact-action approval before Jira dispatch |
+| [ADR-012](012-persistent-incident-actions.md) | Accepted; evaluation deployment | Persist team incident cases and require exact-action approval before Jira dispatch |

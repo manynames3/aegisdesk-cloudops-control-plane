@@ -2,256 +2,92 @@
 
 [![CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml)
 
-AegisDesk is a self-hosted CloudOps control plane for incident investigation and governed response. Operators can preserve incident cases, collect CloudWatch log evidence, consult runbooks, request independent approval for an exact Jira action, and review its verified or unresolved outcome. Cognito/JWKS, redaction, OPA/Rego, Bedrock routing, cost controls, access approvals, and chat request replay remain supporting capabilities.
+AegisDesk is a self-hosted AWS CloudOps control plane for incident investigation and governed response. It preserves team-scoped cases, retrieves read-only evidence and runbooks, requires independent approval of an exact Jira action, and records confirmed or uncertain outcomes. Cognito/JWKS authentication, OPA/Rego policy, redaction, Bedrock routing, DynamoDB audit records, Cost Explorer, and request replay support the workflow.
 
-> Investigate cloud incidents, coordinate approved actions, and preserve trustworthy operational evidence.
+> Operational AI with identity, policy, approval, and evidence enforced by the backend.
 
-**Current implementation:** the incident workspace and custom branding are deployed to the hosted AWS evaluation environment. API readiness, authenticated DynamoDB-backed case listing, and desktop/mobile rendering were verified on October 10, 2026. Jira and CloudWatch remain unconfigured; no live customer workflow is claimed. See [deployment evidence](docs/evidence/live-operations.md) and the [incident workflow, configuration, recovery, and limitations](docs/operations/incident-workflow.md).
+[Live evaluation](https://d27myiy7bbj1rz.cloudfront.net) | [Reviewer guide](docs/reviewer-guide.md) | [C4 architecture](docs/architecture.md) | [ADRs](docs/adrs/README.md) | [Documentation map](docs/README.md)
 
-## Quick Links
+**Status:** deployed AWS evaluation, not a customer production service. On October 10, 2026, API readiness, authenticated DynamoDB-backed case listing, and desktop/mobile rendering were verified. Hosted case writes and live Jira/CloudWatch workflows remain unverified; those integrations are unconfigured. [Passing CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027806592), [successful deployment](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027407776), and [verification scope](docs/evidence/live-operations.md).
 
-| Link | Purpose |
-| --- | --- |
-| [Live control plane](https://d27myiy7bbj1rz.cloudfront.net) | Try the working product UI |
-| [Product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) | Buyer-facing explanation and screenshots |
-| [Live API health](https://c2wcg4cdef.execute-api.us-east-1.amazonaws.com/health) | Verify the deployed FastAPI gateway |
-| [Documentation map](docs/README.md) | Find architecture, deployment, security, product, and sales docs |
-| [Live operations evidence](docs/evidence/live-operations.md) | AWS deploy, logs, budget, and throttling evidence |
-| [Technical review evidence](docs/evidence/technical-review.md) | CI, deploy, trace, load, security, and code-path review packet |
-| [Self-hosted install](docs/deployment/self-hosted.md) | Run locally or deploy into AWS |
+## Problem, Solution, And Value
 
-## What It Proves
-
-This repo is built to demonstrate production-style CloudOps AI architecture, not just a chat UI:
-
-- **Cloud architecture:** S3, CloudFront, Lambda, API Gateway, Cognito, DynamoDB, Bedrock, Cost Explorer, CloudWatch, Budget, and Terraform.
-- **Governance controls:** OPA/Rego policy, role/team claims, quotas, approval workflows, request replay, and audit export.
-- **Enterprise integration shape:** CloudWatch incident context, Jira and ServiceNow ticket adapters, MCP server, and adapter boundaries for Datadog, Okta, Entra, and IAM Identity Center.
-- **Cost awareness:** local fallback, Bedrock kill switch, Cost Explorer cache, request limits, API throttling, and a low-idle-cost serverless deployment.
-- **Delivery maturity:** GitHub Actions CI, Playwright smoke tests, API tests, OPA tests, MCP smoke test, Terraform validation, and manual-gated AWS deploy.
-- **Customer boundary mode:** strict mode can block external model calls, require real integrations, and keep customer workflows off fixture data.
-
-## About
-
-Most employee-facing AI tools answer the prompt but leave the company with weak control over data, cost, access, and evidence. AegisDesk puts a governance layer between the user, the model, operational tools, and audit storage:
-
-> Employees get faster CloudOps support. Platform, security, and FinOps teams keep control over who can ask, what data can leave, which model is used, which tools run, what needs approval, and how every decision is audited.
-
-## Who It Is For
-
-AegisDesk is designed for AWS-heavy platform, SRE, security, and FinOps teams that want employees to use AI during operational work without bypassing company controls. The strongest first workflow is governed CloudOps support: an operator asks about an incident, ticket, access request, or cost issue; AegisDesk applies identity, redaction, policy, source grounding, model routing, approval, and audit replay.
-
-The likely buyer is a platform engineering or security leader who needs a self-hosted path, not a public chatbot, for operational AI use.
-
-## Try The Core Workflow
-
-1. Open the [live control plane](https://d27myiy7bbj1rz.cloudfront.net).
-2. Use **Walkthrough** to run the four-step evaluation: redact a sensitive log, route scoped access for approval, approve as a manager, and inspect the governance trail.
-3. Open **Governance** and click an audit event to review the request replay packet: prompt, sanitized prompt, policy input/output, model route, tool calls, sources, audit events, and trace ID.
-4. Export the audit trail as JSON or CSV to show evidence that the workflow is reviewable outside the app.
-5. Open the [product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) for the buyer-facing explanation.
-
-## Screenshots
-
-The hosted AWS evaluation workspace, captured on October 10, 2026. The empty queue is real; this is not evidence of customer usage or a connected Jira/CloudWatch workflow:
-
-![Hosted incident workspace with the custom wordmark](docs/evidence/screenshots/incident-hosted-desktop.png)
-
-The following incident screenshot is from the actual local application using a **controlled test case and Jira HTTP fixture**, not live operational evidence:
-
-![Incident queue from controlled local testing](docs/evidence/screenshots/incident-queue-controlled-desktop.png)
-
-The older screenshots below show the supporting chat/governance experience.
-
-![Guided walkthrough](docs/evidence/screenshots/guided-walkthrough.png)
-
-![Policy-aware chat](docs/evidence/screenshots/policy-aware-chat.png)
-
-![Governance dashboard](docs/evidence/screenshots/governance-dashboard.png)
-
-![Manager approvals](docs/evidence/screenshots/manager-approvals.png)
-
-![Control evaluations](docs/evidence/screenshots/evaluations.png)
-
-## Evaluation Access And Production Mode
-
-The hosted control plane supports two identity paths for evaluation:
-
-1. **Cognito Hosted UI sign-in:** In the left sidebar, choose `employee`, `manager`, or `admin` under `Access`. The app prepares a non-production Cognito persona and shows the generated username and password in the `Temporary sign-in details` box. Copy those credentials, click `Open Hosted UI`, and sign in through AWS Cognito. After the callback, the sidebar should show `Cognito Hosted UI`, the signed-in user, role, and team.
-2. **Evaluation shortcut:** Expand `Evaluation shortcut` for a faster walkthrough when you do not need to show the Hosted UI redirect. The backend still issues a controlled token and protected API routes derive identity, role, and team from token claims rather than trusting frontend fields.
-
-The visible Cognito credentials are non-production evaluation personas (`aegisdesk-employee`, `aegisdesk-manager`, and `aegisdesk-admin`). They are generated from the hosted environment's persona seed, can be rotated by redeploying that seed, and are not personal credentials.
-
-For a customer-facing deployment, disable evaluation access:
-
-```bash
-NEXT_PUBLIC_AEGISDESK_MODE=production
-NEXT_PUBLIC_SHOW_EVALUATION_TOOLS=false
-AEGISDESK_PERSONA_ISSUER_ENABLED=false
-AEGISDESK_AUTH_MODE=cognito
-```
-
-Production mode hides evaluation-only controls, shows a company SSO entry point, avoids persona-token fallback in the browser, and the API rejects persona-token issuance when `AEGISDESK_PERSONA_ISSUER_ENABLED=false`.
-
-## Product Use Cases
-
-- **Incident triage:** attach read-only incident context, retrieve runbooks, redact secrets, and answer with cited operational guidance.
-- **Ticket workflows:** create governed support tickets through adapter-backed tools.
-- **Production access governance:** deny unsafe admin access, route safer scoped access requests for approval, and record before/after audit events.
-- **Cloud cost review:** use AWS Cost Explorer summaries, DynamoDB caching, role-based access, quotas, and model-routing evidence.
-- **AI governance review:** inspect policy input/output, redaction, model route, answer sources, tool calls, approvals, audit events, and trace IDs.
-- **Audit evidence export:** export governance events for security review in JSON or CSV.
-- **Agent interoperability:** expose local MCP tool payloads for evaluation with agent clients such as Codex. Production MCP transport for the authenticated incident lifecycle is not implemented.
-
-## Commercial Path
-
-AegisDesk is best evaluated as a focused self-hosted pilot before a broad rollout. The recommended first pilot is one AWS CloudOps workflow with real identity, one operational integration, OPA policy, Bedrock routing, DynamoDB audit, and request replay.
-
-Recommended pilot shape:
-
-- **Buyer:** director of platform engineering, SRE leader, security engineering leader, or FinOps owner.
-- **Initial workflow:** incident triage with ticket creation, scoped access approval, or cloud cost review.
-- **Success metric:** faster operator response with evidence that sensitive data, model use, access requests, and audit records stayed under company control.
-- **Commercial model:** paid pilot followed by a self-hosted annual license and integration support.
-
-See the [buyer packet](docs/sales/buyer-readme.md), [product brief](docs/sales/product-brief.md), and [ROI model](docs/product/roi.md).
-
-## Tech Stack
-
-| Area | Choice | Purpose |
-| --- | --- | --- |
-| Frontend | Next.js | Chat, approvals, governance explorer, request replay, marketing page |
-| API | FastAPI, Pydantic | Gateway endpoints, schemas, OpenAPI contracts |
-| Auth | Amazon Cognito Hosted UI, ID tokens, JWKS verification | SSO-compatible identity boundary and role/team claims |
-| Policy | OPA/Rego with explicit local fallback | Authorization, routing, quotas, approvals, and tool policy |
-| AI routing | Amazon Bedrock Nova Lite, local control fallback, Ollama path documented | Approved low-sensitivity cloud route with cost controls |
-| Tools | MCP Python SDK server plus API in-process adapter layer | Jira/ServiceNow/local ticketing, access, cost, incident context, and runbook tools |
-| Knowledge | Markdown runbooks and governance policies | Source-grounded answers with owner and review date |
-| Incident context | Local fixture provider, CloudWatch Logs adapter, Datadog adapter interface | Read-only operational evidence with bounded log queries |
-| Observability | OpenTelemetry instrumentation, structured logs, Jaeger path | Request-level debugging and trace review |
-| Data | DynamoDB hosted state/cache, SQLite local fallback | Audit events, approvals, route history, quota counters, Cost Explorer cache |
-| Runtime | Docker Compose, direct local run, Lambda zip handler | Self-hosted local and AWS deployment paths |
-| Cloud path | AWS Terraform | S3, CloudFront, Lambda, API Gateway, Cognito, DynamoDB, Bedrock IAM, Cost Explorer IAM, CloudWatch, Budget |
-| CI/CD | GitHub Actions | API tests, evals, web build, OPA tests, MCP smoke test, Terraform validate, container builds, manual AWS deploy |
+- **Problem:** incident context, approvals, and AI answers can become disconnected, leaving operators without a reviewable account of what was requested or executed.
+- **Solution:** a case workspace and policy-enforced API keep identity, evidence, exact action arguments, approval, dispatch, and reconciliation together.
+- **Operational value:** reviewers can inspect decisions and unresolved outcomes. Operators avoid blind retries after ambiguous ticket responses. No response-time savings or customer usage metrics are claimed.
 
 ## Engineering Highlights
 
-- **Backend-enforced identity:** protected routes derive user, role, and team from Cognito/JWKS-verified claims or controlled local persona tokens.
-- **Policy outside the model:** OPA/Rego evaluates chat, tool, routing, quota, and approval rules before actions proceed.
-- **Sensitive-data handling:** PII and secrets are redacted before model routing and before external model calls.
-- **Real model and cost paths:** approved low-risk requests can call Amazon Bedrock Nova Lite; manager/admin cost reviews can call AWS Cost Explorer and cache results in DynamoDB.
-- **Adapter-based integrations:** ticketing, incident context, and access request workflows are behind typed adapters; Jira ticket creation, ServiceNow ticket creation, and CloudWatch incident context are implemented behind env flags, while Datadog, Okta, and IAM Identity Center remain extension points.
-- **MCP interoperability:** a Python MCP server exposes governed CloudOps tools for agent clients.
-- **Request replay:** governance reviewers can inspect the prompt, sanitized prompt, policy input/output, model route, tool calls, answer sources, citations, audit events, and trace ID.
-- **Audit retention and export:** manager/admin reviewers can export JSON/CSV evidence, while SQLite pruning and DynamoDB TTL keep the short-term audit window bounded.
-- **Trusted source score:** every answer reports whether trusted sources were found, source freshness, external model use, sensitive external data status, and policy result.
-- **Abuse and cost controls:** API Gateway throttling, prompt size limits, per-role quotas, Cost Explorer cache, and cloud-model kill switch are visible in product and Terraform configuration.
-- **Low-cost cloud shape:** serverless AWS deployment uses no always-on compute and includes short log retention plus an AWS Budget guardrail.
+- **Policy outside the model:** OPA/Rego evaluates routing and tool permissions; incident actions additionally require an independent, same-team approver and a fingerprint of the exact action.
+- **Failure-aware dispatch:** conditional version writes claim execution before external I/O. Timeouts stay unresolved until a matching Jira issue is read and verified; this is not exactly-once delivery.
+- **Trustworthy grounding:** packaged runbooks carry source metadata. Case evidence distinguishes empty, unavailable, and stale results; cases never substitute fixture logs.
+- **Reviewable governance:** sanitized replay packets, JSON/CSV audit export, correlation IDs, bounded log queries, quotas, and a model kill switch make decisions inspectable.
+
+## Tech Stack
+
+| Area | Implementation |
+| --- | --- |
+| Frontend | Next.js, TypeScript, Playwright; static AWS export |
+| API | Python, FastAPI, Pydantic, Mangum on Lambda |
+| Identity and policy | Cognito Hosted UI, PKCE, JWKS; OPA/Rego |
+| State | DynamoDB hosted; SQLite local; versioned incident snapshots |
+| AI and cost | Bedrock Nova Lite, deterministic fallback, AWS Cost Explorer cache |
+| Integrations | In-process CloudWatch/Jira/ServiceNow adapters; separate local-fixture MCP server |
+| Infrastructure and delivery | Terraform, S3/CloudFront, API Gateway, GitHub Actions/OIDC, Docker Compose |
+| Observability | Structured CloudWatch logs, OpenTelemetry instrumentation, local Jaeger |
+
+## Evidence Matrix
+
+| Area | Evidence |
+| --- | --- |
+| IaC | [Terraform](infra/terraform/main.tf), fmt/validate in CI, [verified plan/apply](docs/evidence/live-operations.md) |
+| CI/CD | [Nine-job CI](.github/workflows/ci.yml), [manual-gated AWS deployment](.github/workflows/deploy-aws.yml) |
+| Security | [Runtime IAM](infra/terraform/main.tf), [Cognito/JWKS](services/api/app/auth.py), [Rego policies](policies), [data boundary](docs/security/customer-data-boundary.md), secret scan |
+| Reliability | [Versioned dispatch and reconciliation](services/api/app/incidents.py), [failure/recovery procedures](docs/operations/incident-workflow.md) |
+| Observability | [Instrumentation](services/api/app/observability.py), [real historical Lambda logs](docs/evidence/live-operations.md); hosted trace export/alerts remain gaps |
+| Cost | Serverless idle profile, quotas/cache/kill switch, [cost drivers](docs/deployment/self-hosted.md#expected-cost); Budget is not a spending cap |
+| Operations | [Runbooks](docs/operations/README.md), [troubleshooting](docs/support/troubleshooting.md), [cleanup](docs/deployment/self-hosted.md#teardown) |
+| Testing | [API tests](services/api/tests), [browser tests](apps/web/tests), [policy tests](policies), [controlled load smoke](docs/evidence/load-smoke.md), MCP/container/infra checks |
+| Documentation | [C4](docs/architecture.md), [ADRs](docs/adrs/README.md), [tradeoffs](docs/architecture/tradeoffs.md), [technical evidence](docs/evidence/technical-review.md) |
+
+The October 10 release passed 61 API tests, 13 browser tests, six control evaluations, nine OPA tests, and three container builds. These are dated verification results, not a hosted load benchmark or proof of customer integration readiness.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    User["Employee / Manager / Admin"] --> Web["Next.js UI"]
-    Web --> API["FastAPI Gateway"]
-    API --> Cognito["Cognito / JWKS Identity"]
-    API --> Redaction["PII + Secret Redaction"]
-    API --> OPA["OPA / Rego Policy"]
-    API --> Knowledge["Runbooks + Governance Docs"]
-    API --> Router["Model Router"]
-    Router --> Bedrock["Amazon Bedrock Nova Lite"]
-    Router --> Local["Local Control Fallback"]
-    API --> Adapters["Tool Adapter Layer"]
-    Adapters --> Tickets["Jira / ServiceNow / Local Ticket"]
-    Adapters --> Incidents["CloudWatch / Datadog / Local Fixture"]
-    Adapters --> Access["Okta / IAM Identity Center / Local Approval"]
-    API --> Cost["AWS Cost Explorer"]
-    API --> Audit["DynamoDB Audit + Cache"]
-    API --> Trace["OpenTelemetry"]
-    Audit --> Governance["Governance + Request Replay"]
-```
+The browser loads a static Next.js export from CloudFront/private S3 and calls FastAPI through API Gateway/Lambda. The API verifies identity, evaluates packaged OPA policy, redacts data, and uses in-process adapters and DynamoDB state. Bedrock and Cost Explorer are optional routes; CloudWatch/Jira require operator configuration. The standalone MCP server is local fixture tooling, not a production approval boundary.
 
-Architecture and product docs:
+See the [C4 context/container diagrams, runtime and auth flows, AWS boundaries, and CI/CD shape](docs/architecture.md). [ADR-012](docs/adrs/012-persistent-incident-actions.md) explains the action gate; [tradeoffs](docs/architecture/tradeoffs.md) explain Lambda, DynamoDB, Cognito, and OPA.
 
-- [Documentation Map](docs/README.md)
-- [Architecture Overview](docs/architecture.md)
-- [System Architecture](docs/architecture/system-architecture.md)
-- [Integration Architecture](docs/integrations/README.md)
-- [Self-Hosted Deployment](docs/deployment/self-hosted.md)
-- [Security Overview](docs/security/security-overview.md)
-- [Data Handling](docs/security/data-handling.md)
-- [Landing Page Explanation](docs/product/landing-page.md)
-- [Product Positioning](docs/product/positioning.md)
-- [Buyer Personas](docs/product/buyer-personas.md)
-- [CloudOps Use Cases](docs/product/use-cases-for-cloudops.md)
-- [ROI Model](docs/product/roi.md)
-- [Live Operations Evidence](docs/evidence/live-operations.md)
-- [Technical Review Evidence](docs/evidence/technical-review.md)
-- [Operational Runbooks](docs/operations/README.md)
-- [Customer Data Boundary Mode](docs/security/customer-data-boundary.md)
-- [Production Readiness Matrix](docs/architecture/production-readiness-matrix.md)
-- [ADRs](docs/adrs/README.md)
+## Screenshots
 
-## Current Capabilities
+**Hosted AWS evaluation, October 10, 2026:** a real empty team queue, not customer usage or a connected operational integration.
 
-- Next.js frontend with Chat, Approvals, Governance, Evaluations, request replay, and `/marketing`
-- FastAPI gateway with `/chat`, `/events`, `/requests/{request_id}/replay`, `/audit/export`, `/setup/status`, `/approvals`, `/metrics/summary`, `/health`, `/health/live`, and `/health/ready`
-- Cognito Hosted UI sign-in, OAuth code exchange, and JWKS-verified ID token handling
-- OPA/Rego policy enforcement for chat decisions, model routing, tool authorization, quotas, and approvals
-- Bedrock Nova Lite route for approved low-sensitivity prompts with local control fallback
-- AWS Cost Explorer summaries for manager/admin users with DynamoDB caching
-- DynamoDB-backed hosted state with SQLite local fallback
-- Local fixture incident context plus CloudWatch Logs Insights adapter, with Datadog as an extension point
-- Local, Jira, and ServiceNow ticket adapters
-- Playwright smoke tests for chat, approvals, governance replay, and audit export
-- Access adapter interfaces for local approvals, Okta group requests, and IAM Identity Center
-- MCP server for governed CloudOps tools
-- Public setup-status endpoint with non-secret readiness checks
-- Admin setup checklist showing identity, Bedrock, ticketing, audit, CloudWatch, kill switch, and customer data boundary state
-- Customer strict data boundary mode that blocks external model calls and fixture incident context
-- Manager/admin audit export in JSON or CSV
-- Structured API error IDs for support and troubleshooting
-- OpenTelemetry instrumentation and local Jaeger path
-- Docker Compose runtime with API, web, OPA, Jaeger, and persistent local API data
-- AWS Terraform for Cognito, CloudFront, S3, API Gateway, Lambda, DynamoDB, Bedrock IAM, Cost Explorer IAM, CloudWatch, and Budget
-- GitHub Actions validation and manual AWS deploy workflow
+![Hosted incident workspace](docs/evidence/screenshots/incident-hosted-desktop.png)
 
-## Repository Structure
+**Controlled local action workflow:** the actual application below used a loopback Jira HTTP fixture and a controlled case, with earlier branding. The action records its target, requester, policy, approver, and outcome. This verifies the local workflow, not live Jira success.
 
-```text
-apps/web/                 Frontend app and marketing route
-services/api/             FastAPI gateway, policy, adapters, auth, store, LLM routing
-services/mcp-tools/       MCP tool server workspace
-policies/                 OPA/Rego policy workspace
-evals/                    Safety and policy evaluation workspace
-infra/terraform/          AWS Terraform deployment path
-infra/docker/             Local Docker runtime assets
-infra/helm/               Optional Kubernetes packaging path
-docs/product/             Product positioning, buyers, use cases, ROI
-docs/security/            Security overview, data handling, governance, threat model
-docs/deployment/          Self-hosted install and deployment path
-docs/integrations/        Integration architecture and MCP notes
-docs/sales/               Product brief, ROI calculator, buyer README, video script
-docs/evidence/            Screenshots and walkthrough evidence
-docs/knowledge/           Trusted runbooks and policies used for answer citations
-docs/architecture/        System docs, API contracts, audit model
-docs/adrs/                Architecture decision records
-```
+![Approved action from controlled local testing](docs/evidence/screenshots/incident-actions-controlled-desktop.png)
+
+See the [case queue and timeline captures](docs/operations/incident-workflow.md#verification-and-remaining-scope) and [supporting chat/governance gallery](docs/evidence/README.md).
+
+## Try It
+
+Open the [live evaluation](https://d27myiy7bbj1rz.cloudfront.net). Use the sidebar's evaluation access to inspect employee, manager, and admin views. **Walkthrough** exercises redaction, scoped access approval, and governance replay. In **Governance**, select an event to inspect its decision packet or export JSON/CSV. Access approval records do not provision AWS access.
+
+The [product page](https://d27myiy7bbj1rz.cloudfront.net/marketing) and [self-hosted pilot package](docs/product/pilot-package.md) explain the intended deployment audience.
 
 ## Local Run
 
-The fastest self-hosted path is Docker Compose:
+From the repository root, with Docker Compose installed:
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000`; API docs are at `http://localhost:8000/docs` and Jaeger at `http://localhost:16686`. Compose explicitly supplies evaluation defaults; changing `.env` alone does not override its service environment.
 
-The default `.env.example` is configured for local evaluation. For a production-style deployment, set `NEXT_PUBLIC_AEGISDESK_MODE=production`, hide evaluation tools, disable persona issuance, and configure Cognito/JWKS identity before exposing the app to users.
-
-Direct API and web run:
+Direct process alternative, in separate terminals:
 
 ```bash
 cd services/api
@@ -261,25 +97,94 @@ python3 -m venv .venv
 ```
 
 ```bash
-cd apps/web
-npm install
-npm run dev
+npm --prefix apps/web ci
+npm run dev:web
 ```
 
-See [Self-Hosted Deployment](docs/deployment/self-hosted.md) for required environment variables, AWS permissions, expected cost, auth setup, ticketing setup, and how to disable Bedrock.
+The direct API's default `auto` policy mode selects OPA when available/configured, otherwise Python policy fallback; Compose uses HTTP OPA. See [self-hosted setup](docs/deployment/self-hosted.md) for identity, policy, model, integration, and persistence settings.
 
 ## Validation
 
+From the repository root after installing local dependencies; OPA and Terraform must be available for their checks:
+
 ```bash
-npm run build:web
 npm run test:api
+npm run build:web
 npm run test:e2e
 npm run evals
+npm run smoke:load
 npm run smoke:mcp
+npm run security:scan
 opa test policies
-terraform -chdir=infra/terraform fmt -check
-terraform -chdir=infra/terraform validate
+terraform -chdir=infra/terraform init -backend=false
+npm run validate:infra
 git diff --check
 ```
 
-CI runs the main checks plus container builds and Terraform validation.
+CI also builds the API, web, and MCP images. Browser tests use an isolated local Jira fixture; adapter/DynamoDB contract tests do not replace live provider validation. [Test evidence and boundaries](docs/evidence/technical-review.md).
+
+## Deployment And Identity
+
+[Terraform](infra/terraform) provisions the AWS path. [GitHub Actions](.github/workflows/deploy-aws.yml) uses OIDC rather than stored AWS keys: build Lambda package, validate/plan, then apply/publish/invalidate/smoke only with `confirm=deploy` and the configured GitHub environment. Review the plan and cost impact before apply. [Deployment and recovery instructions](docs/deployment/self-hosted.md).
+
+Evaluation supports Cognito Hosted UI sign-in and a labeled shortcut. Temporary persona credentials are generated for reviewers, not personal accounts. A customer deployment must configure its own identity and integrations and disable evaluation access:
+
+```text
+NEXT_PUBLIC_AEGISDESK_MODE=production
+NEXT_PUBLIC_SHOW_EVALUATION_TOOLS=false
+AEGISDESK_PERSONA_ISSUER_ENABLED=false
+AEGISDESK_AUTH_MODE=cognito
+AEGISDESK_DATA_BOUNDARY_MODE=customer_strict
+```
+
+Apply these settings to the actual frontend build and API deployment: current Terraform/Compose evaluation defaults are not a turnkey production configuration. Integration secrets stay server-side; automated Secrets Manager delivery is not implemented.
+
+## Security, Privacy, And Boundaries
+
+The API derives role/team from verified claims, not browser fields. S3 blocks public access and serves through CloudFront origin access control. API ingress is public HTTPS with backend authentication, not a private VPC boundary. Runtime IAM scopes state, logs, and identity resources; Cost Explorer and configurable log-query permissions need explicit review.
+
+Redaction runs before external model routing. `customer_strict` blocks external model calls and fixture workflows, but is not physical network isolation. Replay/storage can contain sensitive operational input; pattern-based redaction is not complete DLP. Incident timelines are mutable, not immutable compliance archives. [Security model](docs/security/security-overview.md), [data handling](docs/security/data-handling.md), and [threat model](docs/security/threat-model.md).
+
+## Observability And Cost
+
+Structured logs capture route, status, duration, trace ID when available, and a separate request correlation ID. Readiness checks cover store and policy. OpenTelemetry can export to local Jaeger; no hosted trace export, managed dashboard, alarm response drill, or SLO attainment is claimed. [Observability evidence](docs/evidence/live-operations.md) and [trace/export limitations](docs/evidence/trace-sample.md).
+
+No always-on AWS compute is required. Prompt limits, role quotas, Bedrock token limits/kill switch, Cost Explorer caching, bounded log queries, API throttling, and short log retention limit exposure. The AWS Budget records a threshold; it does not stop spend. Costs depend on traffic, tokens, storage, and queries, not a guaranteed monthly price. [Cost model](docs/deployment/self-hosted.md#expected-cost).
+
+## Cleanup And Recovery
+
+`docker compose down` stops local services while preserving the data volume. Export required audit/case evidence and review backups before deleting data. For AWS, review the [teardown procedure](docs/deployment/self-hosted.md#teardown), retained state/bucket versions, and external Jira records before an intentional destroy.
+
+Policy failures block mutations. Ambiguous ticket outcomes require reconciliation rather than blind redispatch. Rollback/recovery instructions are documented, but no hosted recovery drill is claimed. [Operational runbooks](docs/operations/README.md) and [incident recovery](docs/operations/incident-workflow.md#failure-and-recovery).
+
+## Known Limitations And Next Work
+
+- Public reviewer personas remain enabled; enterprise identity federation and a customer rollout are not verified.
+- Hosted case writes and live CloudWatch/Jira/ServiceNow workflows need verification. Integration configuration is not a connection test.
+- Case retention/backups, immutable archives, scalable queue pagination, and unified incident/chat export remain incomplete.
+- Case AI analysis, ticket updates, cloud mitigation, and authenticated production MCP transport are not implemented. Deterministic guidance and operator hypotheses are not verified root causes.
+
+Next: verify one real sandbox workflow end-to-end, exercise hosted write/recovery and retention, then export a real trace and define actionable alerts. [Full limitations](docs/support/known-limitations.md) and [readiness matrix](docs/architecture/production-readiness-matrix.md).
+
+## Repository Structure
+
+```text
+apps/web/                 Incident workspace, chat/governance, marketing, browser tests
+services/api/             API, auth, policy, adapters, persistence, model routing, tests
+services/mcp-tools/       Separate local-fixture MCP tools
+policies/                 Rego policies and tests
+evals/                    Safety and control evaluations
+infra/terraform/          AWS infrastructure and deployment state configuration
+infra/docker/             Local runtime assets
+infra/helm/               Optional Kubernetes packaging; not the hosted deployment
+docs/architecture/        System, API, audit, tradeoff, and readiness docs
+docs/adrs/                Architecture decision records
+docs/deployment/          Self-hosted setup, rotation, recovery, and teardown
+docs/operations/          Failure runbooks and incident lifecycle
+docs/security/            Privacy, governance, boundary, and threat model
+docs/integrations/        Adapter contracts and MCP notes
+docs/knowledge/           Packaged runbooks and source metadata
+docs/evidence/            Dated validation, live evidence, and real screenshots
+docs/product/             Use cases, positioning, pilot scope, and ROI assumptions
+docs/sales/               Buyer brief and evaluation materials
+```

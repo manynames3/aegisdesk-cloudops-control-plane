@@ -1,150 +1,135 @@
 # Architecture Overview
 
-AegisDesk is a self-hosted CloudOps AI control plane. The system sends employee, manager, and admin workflows through a FastAPI gateway that exchanges Cognito Hosted UI authorization codes, verifies Cognito ID tokens through JWKS, performs redaction, retrieves trusted runbook or governance policy excerpts, calls OPA/Rego policy, selects a model route, invokes Amazon Bedrock for approved low-sensitivity prompts, authorizes governed tools, handles approvals, loads read-only incident context, queries AWS Cost Explorer for manager/admin cost investigations, emits OpenTelemetry spans, and writes audit/cache state to DynamoDB in the hosted environment.
+AegisDesk is a self-hosted CloudOps control plane with a static browser UI and a policy-enforced Python API. Its primary workspace preserves team incident cases, read-only evidence, operator findings, exact-action approvals, and ticket outcomes. Supporting chat provides redaction, source grounding, Bedrock routing, cost review, and governance replay.
 
-## Container Diagram
+The public AWS deployment is an **evaluation environment**. The October 10, 2026 deployment verified readiness, authenticated case listing, and rendering, not hosted case writes or live Jira/CloudWatch workflows. [Deployment evidence](evidence/live-operations.md) and [incident boundaries](operations/incident-workflow.md).
+
+## C4 Context (Level 1)
 
 ```mermaid
 flowchart LR
-    subgraph People["People"]
-        Employee["Employee<br/>Cloud support and access requests"]
-        Manager["Manager<br/>Approves scoped actions"]
-        Admin["Admin<br/>Reviews governance"]
-    end
+    Operator["Operator / manager / admin<br/>Person"]
+    Control["AegisDesk<br/>Software system<br/>Incident investigation and governed response"]
+    Identity["Amazon Cognito<br/>External identity system"]
+    AWS["AWS service APIs<br/>Bedrock, Cost Explorer, CloudWatch"]
+    Ticketing["Jira / ServiceNow<br/>External ticket systems<br/>Not connected in public evaluation"]
 
-    subgraph AegisDesk["AegisDesk System Boundary"]
-        CDN["CloudFront<br/>HTTPS static delivery"]
-        Static["Private S3 Bucket<br/>Next.js static export"]
-        Web["Web App<br/>Next.js browser UI<br/>Chat, approvals, dashboard"]
-        APIGW["HTTP API Gateway<br/>Public API ingress"]
-        Lambda["AWS Lambda<br/>Mangum adapter"]
-        Auth["Amazon Cognito<br/>Hosted UI + ID tokens + JWKS<br/>Hosted identity boundary"]
-        API["Gateway API<br/>FastAPI / Pydantic<br/>Validation, orchestration, audit"]
-        Policy["Policy Engine<br/>OPA / Rego in Lambda or HTTP<br/>Routing, authorization, approval rules"]
-        Knowledge["Trusted Knowledge Base<br/>Markdown runbooks and policies<br/>Packaged with Lambda"]
-        Router["Model Router<br/>Python module<br/>Local/Bedrock route selection"]
-        Bedrock["Amazon Bedrock<br/>Nova Lite"]
-        Tools["MCP Tool Server<br/>Python MCP SDK<br/>Ticket, access, cost, knowledge tools"]
-        Cost["AWS Cost Explorer<br/>Cached cloud cost summaries"]
-        Logs["Incident Context Adapter<br/>CloudWatch / Datadog / Local Fixture"]
-        Audit[("Audit + Cache Store<br/>DynamoDB hosted / SQLite local")]
-        Quota["Quota Policy<br/>Role/team counters"]
-        Trace["Trace Backend<br/>CloudWatch logs now / Jaeger local path"]
-        Budget["AWS Budget<br/>Spend guardrail"]
-    end
-
-    subgraph External["External Systems"]
-        LocalModel["Local Control Route<br/>Fallback / Ollama path"]
-    end
-
-    Employee --> CDN
-    Manager --> CDN
-    Admin --> CDN
-    CDN --> Static
-    CDN --> Web
-    Web --> APIGW
-    APIGW --> Lambda
-    Lambda --> API
-    API --> Auth
-    API --> Knowledge
-    API --> Policy
-    API --> Quota
-    API --> Router
-    Router --> LocalModel
-    Router --> Bedrock
-    API --> Tools
-    Tools --> Cost
-    Tools --> Logs
-    API --> Audit
-    API --> Trace
-    Budget -.->|monitors AWS spend| CDN
-    Budget -.->|monitors AWS spend| APIGW
-    Budget -.->|monitors AWS spend| Lambda
+    Operator -->|"Investigates, approves, reviews"| Control
+    Operator -->|"Signs in"| Identity
+    Control -->|"Verifies identity"| Identity
+    Control -->|"Policy-gated model/cost calls;<br/>configured read-only evidence"| AWS
+    Control -.->|"Configured ticket adapter;<br/>no automatic cloud mitigation"| Ticketing
 ```
 
-## Runtime Flow
+## C4 Containers (Level 2)
 
-1. A user submits a CloudOps request through the web app.
-2. The user signs in through Cognito Hosted UI or uses a labeled identity shortcut for local review.
-3. The FastAPI gateway validates the bearer token and derives user, role, and team from Cognito/JWKS claims.
-4. The gateway inspects input for PII, secrets, and privileged-action intent.
-5. The gateway evaluates whether the request has the minimum required context for the requested action. Vague incident requests can receive safe first-step guidance, while ticket, access, and cost tool calls pause until required fields are present.
-6. The gateway retrieves trusted knowledge excerpts from packaged runbooks and governance policies based on request intent.
-7. OPA/Rego evaluates whether the request can use a model, call a tool, or needs approval.
-8. The model router chooses a local control route or Amazon Bedrock based on sensitivity, budget, policy, and clarification status.
-9. For incident triage, the gateway loads read-only incident evidence through the incident context adapter only when the request supplies a usable incident reference.
-10. If a tool action is requested, the gateway validates the structured action and checks policy before execution.
-11. The gateway calculates an answer trust score from trusted source presence, source freshness, external model use, sensitive-data routing, and policy result.
-12. The gateway writes audit events and a sanitized replay snapshot for redaction, clarification, policy input/output, model route, incident context, tool calls, approvals, answer sources, estimated cost, and trace IDs.
-13. The frontend shows the answer, trusted citations, decision metadata, clarification status, trust score, and request replay to the user, manager, or admin in plain English, with technical policy IDs underneath.
+These are logical containers and dependencies, not separate microservices. The web application runs in the browser; CloudFront/private S3 deliver its static assets. FastAPI, packaged runbooks, in-process adapters, and the OPA subprocess share the Lambda deployment.
+
+```mermaid
+flowchart TB
+    User["Operator / reviewer<br/>Person"]
+    subgraph System["AegisDesk software system"]
+        Web["Web application<br/>Container: Next.js / TypeScript<br/>CloudFront + private S3 static delivery"]
+        API["Gateway API<br/>Container: FastAPI / Python<br/>API Gateway + Lambda / Mangum<br/>Auth, redaction, routing, adapters, cases"]
+        OPA["Policy evaluator<br/>Container: packaged OPA executable / Rego<br/>Subprocess in the same Lambda package"]
+        State[("State and cache<br/>Container: DynamoDB<br/>Cases, audit, approvals, quotas, cost cache")]
+    end
+    Cognito["Cognito Hosted UI / JWKS<br/>External AWS identity service"]
+    Bedrock["Bedrock Nova Lite<br/>External AWS model service"]
+    Cost["Cost Explorer<br/>External AWS cost service"]
+    Logs["CloudWatch runtime logs<br/>External AWS logging service"]
+    Evidence["Customer CloudWatch Logs<br/>External evidence service<br/>Unconfigured in public evaluation"]
+    Tickets["Jira / ServiceNow APIs<br/>External ticket services<br/>Unconfigured in public evaluation"]
+
+    User -->|"HTTPS"| Web
+    Web -->|"Hosted UI redirect / PKCE"| Cognito
+    Web -->|"HTTPS bearer requests"| API
+    API -->|"Code exchange / JWKS verification"| Cognito
+    API -->|"JSON policy input / decision"| OPA
+    API -->|"Team query / conditional version writes"| State
+    API -->|"Approved sanitized prompt and context"| Bedrock
+    API -->|"Authorized query / cached summary"| Cost
+    API -->|"Structured request logs"| Logs
+    API -.->|"Bounded read-only query when configured"| Evidence
+    API -.->|"In-process adapter when configured"| Tickets
+```
+
+Solid service edges show implemented hosted paths, not customer usage or a successful call on every request. Dashed edges require integration configuration. Jira incident actions have the exact-action lifecycle; preserved ServiceNow chat calls do not share that lifecycle.
+
+**Separate local tooling:** `services/mcp-tools/server.py` is a Python SDK stdio server returning fixture payloads to agent clients. FastAPI does not call it for hosted operations. It has no production incident identity/approval transport. Datadog, Okta, and IAM Identity Center remain adapter extension points, not deployed integrations.
+
+## Runtime And Data Flow
+
+### Incident Workflow
+
+1. The API verifies bearer identity and derives the actor's role/team from claims. All case reads and writes, including admin access, stay within that team.
+2. A case snapshot stores title, description, service/resource, severity, environment, notes, version, and activity timeline in the existing state store.
+3. Evidence refresh invokes the configured CloudWatch adapter and redacts messages. Empty, unavailable, and stale results remain distinct. No fixture evidence replaces failed collection.
+4. The API generates immutable Jira action arguments and a fingerprint of operation, target, arguments, requester, version, and policy. A different same-team manager/admin must approve; approval expires.
+5. Dispatch rechecks policy, approval, fingerprint, configuration, and version, then conditionally saves an execution claim before external I/O.
+6. A valid provider response records the ticket. Timeout, malformed success, or interrupted persistence leaves an unresolved outcome; reconciliation reads and matches a Jira issue. Cloud recovery is verified by the operator outside AegisDesk.
+
+Snapshots/timelines are saved together, bounded to 280,000 bytes. They are mutable operational state, not immutable audit archives or a distributed transaction with Jira. Hosted reads are verified; hosted writes and real provider execution are not. [Implementation](../services/api/app/incidents.py), [tests](../services/api/tests/test_incidents.py), [ADR-012](adrs/012-persistent-incident-actions.md).
+
+### Supporting Chat And Governance
+
+The gateway validates input, redacts detected secrets/PII, retrieves packaged runbook/policy excerpts, evaluates OPA, applies quota/routing controls, and optionally calls Bedrock or authorized in-process tools. Sensitive, denied, strict-boundary, or model-disabled paths retain deterministic guidance. Cost Explorer is restricted to manager/admin cost workflows and cached.
+
+Backend decisions produce audit records and sanitized replay packets: policy input/output, route, sources, tool outcomes, and trace ID when available. Manager audit reads are team-scoped; the legacy admin audit view is global. Case timelines remain separate from legacy chat replay/export. Pattern redaction cannot guarantee all sensitive content is removed.
+
+## Authentication Flow
+
+Cognito Hosted UI uses authorization code flow with PKCE. The browser receives a callback code and sends it to the API exchange endpoint; the API exchanges it with Cognito. Protected endpoints verify Cognito ID-token signature, issuer, audience, and expiry through JWKS, then derive role/team from claims.
+
+Hosted evaluation also exposes controlled persona access. Production-style setup must disable persona issuance and frontend evaluation tools, configure real customer identity, and verify the actual deployment settings. This environment does not prove enterprise federation, MFA enforcement, or revocation drills. [Identity implementation](../services/api/app/auth.py), [deployment settings](deployment/self-hosted.md).
 
 ## Deployment Shape
 
-### Current Repository State
+| Concern | Hosted AWS | Local |
+| --- | --- | --- |
+| Web | Next.js static export, private S3, CloudFront origin access control | Next.js development process or Compose |
+| API | API Gateway HTTP API, Python 3.12 Lambda zip, Mangum | Uvicorn process or Compose |
+| Policy | OPA binary and Rego bundled with Lambda | HTTP OPA in Compose; explicit Python fallback for evaluation |
+| Persistence | Existing encrypted DynamoDB table, conditional case versions | SQLite, persistent Compose data volume |
+| Identity | Cognito/JWKS plus evaluation personas | Controlled local persona tokens; configurable Cognito |
+| Telemetry | Structured CloudWatch logs; seven-day retention | OpenTelemetry OTLP HTTP to Jaeger in Compose |
+| AI | Optional Bedrock route and deterministic fallback | Deterministic fallback; optional configured model paths |
+| Infrastructure | Terraform and S3-backed state | Compose; optional Helm packaging is not the hosted deployment |
 
-The repository contains a runnable local frontend and API, Cognito/JWKS auth in AWS, Rego policy files and tests, CI checks, API tests, MCP server, documentation, screenshots, Docker Compose, applied AWS Terraform for the hosted deployment, and a manual GitHub Actions deploy workflow.
+DynamoDB TTL bounds short-term legacy audit/cache records; incident snapshots have no TTL or backup policy added by this increment. No hosted trace collector, managed dashboard, or alert-response evidence is supplied.
 
-### Local Deployment
+## AWS And Trust Boundaries
 
-The verified local development path is direct process execution:
+- Frontend S3 public access is blocked; CloudFront origin access control permits static delivery. API Gateway is public HTTPS. Backend identity/policy checks enforce access; CORS is not authorization.
+- The deployment does not provision private VPC subnets or a WAF. Customer-strict mode is an application routing/data policy, not an egress firewall or physical account isolation.
+- Runtime IAM scopes the state table, Lambda log group, Cognito user pool, and permitted Bedrock model/profile. Cost Explorer uses a wildcard resource; CloudWatch query scope is configurable and must be reviewed. The deploy role has a broader infrastructure blast radius than the runtime role.
+- GitHub uses OIDC to assume the deployment role. The persona seed is generated by Terraform and delivered in Lambda environment configuration; state must be treated as sensitive. Integration secrets remain server-side. Automated Secrets Manager integration is not implemented.
+- Customer log groups and external ticket systems are operator-owned dependencies. A case's resource ARN does not automatically narrow log results or select per-team AWS credentials. Hosted Jira/CloudWatch are not configured.
 
-- `services/api`: FastAPI gateway on port 8000
-- `apps/web`: Next.js frontend on port 3000
+[Terraform](../infra/terraform/main.tf), [security overview](security/security-overview.md), [customer boundary](security/customer-data-boundary.md).
 
-The Docker Compose path is available when Docker is installed:
+## CI/CD Flow
 
-- `apps/web`: Next.js frontend
-- `services/api`: FastAPI gateway
-- `opa`: OPA server loaded from the Rego policy bundle
-- local control route, with Ollama path documented
-- SQLite audit events
-- Jaeger for trace viewing through OTLP HTTP export
+Pushes to `main` and pull requests run nine CI jobs: documentation presence, API/evals/load smoke, security, OPA, MCP, Terraform, frontend build, Playwright, and three container builds.
 
-### Hosted AWS Deployment
+AWS deployment is a separate manual workflow: OIDC credentials, Lambda packaging, Terraform init/validate/plan; then `confirm=deploy` and the configured GitHub environment allow apply. The apply job builds its own plan, applies it, publishes the static export, requests CloudFront invalidation, and smoke-tests API health. It does **not** apply the saved preflight plan or automatically gate on the separate CI workflow; the operator must verify CI and review changes before dispatch.
 
-The current hosted deployment uses a low-idle-cost AWS shape:
+Recovery instructions exist; a hosted rollback drill and saved-plan promotion are not claimed. [CI](../.github/workflows/ci.yml), [deployment workflow](../.github/workflows/deploy-aws.yml), [live evidence](evidence/live-operations.md).
 
-- private S3 bucket and CloudFront distribution for the static frontend
-- FastAPI Lambda zip package behind HTTP API Gateway with default route throttling
-- Amazon Cognito user pool, Hosted UI domain, app client, role groups, OAuth code flow with PKCE, and JWKS verification
-- DynamoDB table for durable audit events, approvals, model routes, metrics, quotas, and Cost Explorer cache entries
-- Amazon Bedrock Nova Lite for approved low-sensitivity prompts
-- Runtime guardrails for per-role quotas, prompt size limits, and cloud-model kill switch routing
-- risk-based clarification before governed tool execution
-- AWS Cost Explorer for manager/admin cost investigations
-- packaged Markdown knowledge base for checkout triage, production access control, and AI/cloud cost governance
-- local fixture incident context for first-run evaluation, plus a bounded CloudWatch Logs adapter for customer incident evidence
-- IAM execution role scoped to CloudWatch log writes, DynamoDB state, Cognito persona issuance, Bedrock invocation, and Cost Explorer reads
-- CloudWatch log group with seven-day retention
-- AWS Budget guardrail set to the configured threshold
-- S3 server-side encryption, public access block, and noncurrent version cleanup
-- S3-backed Terraform state for manual GitHub Actions deployment
+## Key Constraints And Tradeoffs
 
-### Production Hardening Path
-
-The hosted deployment intentionally stays below production complexity. A production version would add:
-
-- future managed Postgres
-- enterprise identity federation with Entra ID, Okta, or an existing corporate IdP
-- immutable or append-only audit sink
-- scoped IAM roles for any real cloud tools
-
-## Key Constraints
-
-- The current system must distinguish external provider calls from local control fallback behavior.
-- Destructive cloud actions should stay behind approval and customer change-management controls.
-- Policy must be enforced outside the model.
-- Vague requests must be handled safely without silently inventing operational scope.
-- Sensitive data controls happen before model routing.
-- Cloud model use must be optional so the app can run at low cost.
-- Audit events must be based on backend decisions, not invented dashboard values.
-- Operational context in the hosted environment must be read-only and low-cost.
+- Policy and human approval remain outside model output. The model cannot execute arbitrary or destructive cloud operations.
+- Local fixtures, deterministic guidance, and operator hypotheses must never be labeled verified operational evidence.
+- Uncertain external outcomes require reconciliation, not automatic retries or exactly-once claims.
+- Low idle cost trades off cold starts, request-duration limits, and limited long-lived connection support.
+- Case size/retention, queue scaling, live integrations, identity hardening, backup recovery, and actionable hosted telemetry remain customer-readiness work.
+- Budget thresholds do not cap spending. Correlation IDs do not prove trace export.
 
 ## Related Docs
 
-- [System Architecture](architecture/system-architecture.md)
-- [API Contracts](architecture/api-contracts.md)
-- [Audit Event Model](architecture/audit-event-model.md)
-- [Governance Model](security/governance-model.md)
-- [Threat Model](security/threat-model.md)
-- [ADRs](adrs/README.md)
+- [Reviewer guide](reviewer-guide.md)
+- [ADRs](adrs/README.md) and [tradeoffs](architecture/tradeoffs.md)
+- [API contracts](architecture/api-contracts.md) and [audit model](architecture/audit-event-model.md)
+- [Incident operations](operations/incident-workflow.md) and [failure runbooks](operations/README.md)
+- [Data handling](security/data-handling.md) and [threat model](security/threat-model.md)
+- [Self-hosted deployment](deployment/self-hosted.md)

@@ -102,7 +102,7 @@ Tool capabilities:
 - Knowledge search tool
 - Incident context lookup tool
 
-The repository includes a real MCP server in `services/mcp-tools` using the Python MCP SDK. The hosted Lambda API uses an in-process adapter for the same controlled actions to avoid spawning subprocesses in Lambda.
+The hosted Lambda API uses in-process adapters, not the standalone MCP server. The Python SDK stdio server in `services/mcp-tools` returns local fixtures and does not inherit API identity, OPA, audit persistence, or exact-action approval. See the [C4 overview](../architecture.md) for the current container boundaries and [MCP operating limits](../integrations/codex-mcp.md#operating-boundary).
 
 Tool safety pattern:
 
@@ -173,7 +173,7 @@ sequenceDiagram
     participant MR as Model Router
     participant M as Bedrock or Local Route
     participant Logs as Incident Context
-    participant Tool as MCP Tool
+    participant Tool as In-process Adapter
     participant Audit as Audit Store
 
     U->>UI: Submit CloudOps request

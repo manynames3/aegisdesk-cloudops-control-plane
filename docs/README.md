@@ -7,6 +7,7 @@ This directory is the documentation packet for AegisDesk as a self-hosted CloudO
 | Need | Read |
 | --- | --- |
 | Understand the product quickly | [Product Positioning](product/positioning.md) |
+| Review engineering evidence quickly | [Technical Reviewer Guide](reviewer-guide.md) |
 | Evaluate buyer fit | [Buyer README](sales/buyer-readme.md) |
 | See the architecture | [Architecture Overview](architecture.md) |
 | Review implemented integrations | [Integrations](integrations/README.md) |

@@ -82,7 +82,7 @@ REPORT RequestId: 9c42fa20-b614-4262-8764-915fb5c618da Duration: 136.35 ms Bille
 
 ## Budget Guardrail
 
-The hosted environment has an AWS Budget resource capped at `$1/month`.
+The historical AWS sample shows a Budget threshold of `$1/month`. This records a budget target, not a hard spending cap or proof of configured alert delivery.
 
 ```json
 {

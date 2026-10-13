@@ -1,13 +1,15 @@
 # Trace Sample
 
-Every chat response includes a `trace_id`, and request replay preserves that trace ID alongside prompt redaction, policy input/output, model route, tool calls, answer sources, trusted source score, and audit events.
+Every chat response includes a `trace_id` field, and request replay preserves it alongside redaction, policy, routing, sources, and audit events. Without a configured trace exporter it can be `trace-unavailable`. The separate server-generated request correlation ID does not prove trace export.
 
-## Example Trace Packet
+## Illustrative Replay Shape
+
+This schematic example is not a captured OpenTelemetry trace or hosted span export. It shows a local decision without an available trace; the request ID is a placeholder.
 
 ```json
 {
-  "request_id": "req-77410b14ece2",
-  "trace_id": "trace-77410b14ece2",
+  "request_id": "<chat-request-id>",
+  "trace_id": "trace-unavailable",
   "actor": {
     "user_id": "u-1001",
     "role": "employee",

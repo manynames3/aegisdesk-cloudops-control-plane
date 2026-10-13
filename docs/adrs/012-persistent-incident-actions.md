@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the local incident workflow increment; not production verified.
+Accepted and deployed to the AWS evaluation environment on October 10, 2026. Local lifecycle tests and hosted authenticated case reads passed; hosted case writes and live Jira/CloudWatch workflows remain unverified. See [deployment evidence](../evidence/live-operations.md). This is not a production-readiness claim.
 
 ## Context
 

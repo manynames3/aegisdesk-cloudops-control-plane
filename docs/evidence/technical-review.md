@@ -28,7 +28,9 @@ Hosted `/health` and `/health/ready` returned 200 with DynamoDB and OPA subproce
 
 Verification: 61 API tests, 13 Playwright tests (five workflow tests and eight branding checks), six control evals, and nine OPA tests passed. Production frontend build/type checking, Terraform fmt/validate, secret scanning, dependency compatibility, MCP smoke, and all three container builds passed in the release CI. Local load smoke completed 20 controlled requests without failure; this is not a hosted performance benchmark. Local focused Ruff checks, edited-document relative links, and `git diff --check` passed. The frontend dependency audit reported zero vulnerabilities.
 
-The first [CI run](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38027124572) caught an incompatible MCP 2.x import. Constraining the existing SDK requirement to its supported 1.x API restored the MCP smoke test; the complete release CI then passed. No new production dependency was introduced.
+The first release CI attempt caught an incompatible MCP 2.x import. Constraining the existing SDK requirement to its supported 1.x API restored the MCP smoke test; the complete release CI then passed. No new production dependency was introduced.
+
+On October 13, 2026, superseded failed runs `38027124572` (MCP import) and `25775246070` (AWS credential setup) were deleted at the repository owner's request after successful replacement runs were verified. Passing CI/deployment evidence was retained. This history cleanup does not mean those earlier failures never occurred.
 
 Hosted setup still reports evaluation personas, local legacy adapters, and unconfigured Jira/CloudWatch. Deployment uploaded the Lambda artifact, updated the existing Lambda function, published the frontend, and requested CloudFront invalidation; no resource was destroyed. The [hosted screenshot](screenshots/incident-hosted-desktop.png) shows the actual empty evaluation queue. Controlled Jira lifecycle screenshots remain explicitly labeled local tests, not customer operational evidence.
 

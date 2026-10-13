@@ -1,17 +1,17 @@
 # Codex MCP Integration
 
-AegisDesk exposes its governed CloudOps tools through a local Model Context Protocol server so Codex and other MCP-aware agent clients can call the same operational actions through a standard interface.
+AegisDesk includes a local Model Context Protocol server for Codex and other MCP-aware clients to inspect CloudOps-shaped fixture payloads over stdio. It is interoperability tooling, not an authenticated production interface to the hosted incident workflow.
 
 ## What This Enables
 
-Codex can call AegisDesk tools directly for agent workflows such as:
+Agent clients can inspect these simulated workflows:
 
-- create a CloudOps ticket
-- request temporary read-only access
-- look up a cost summary
-- search the runbook corpus
+- return a locally generated ticket payload
+- return an access approval request payload without granting access
+- return a fixed example cost summary, not AWS billing data
+- search a small runbook fixture
 
-The hosted API still uses in-process tool adapters for Lambda reliability. The MCP server is the external agent interface.
+The hosted API uses separate in-process adapters for Lambda reliability. It does not invoke this MCP server, and MCP calls do not inherit the API's identity, policy, audit, or approval controls.
 
 ## Register With Codex
 
@@ -50,16 +50,16 @@ The launcher creates `services/mcp-tools/.venv` on first run and writes setup lo
 
 | Tool | Purpose |
 | --- | --- |
-| `create_ticket` | Create a controlled support ticket payload for governed CloudOps workflows |
-| `request_temporary_read_only_access` | Create a temporary read-only access approval request payload |
-| `lookup_cost_summary` | Return a cost summary payload for cost-governance workflows |
+| `create_ticket` | Return a local ticket payload; no Jira/ServiceNow call |
+| `request_temporary_read_only_access` | Return an approval-shaped payload; no durable approval or access grant |
+| `lookup_cost_summary` | Return fixed fixture values; no Cost Explorer query |
 | `search_runbook` | Search the local runbook fixture used for incident triage |
 
 ## Operating Boundary
 
-This MCP server is safe by default:
+This MCP server has a deliberately limited local boundary:
 
 - It does not grant real production access.
 - It does not mutate AWS infrastructure.
-- It returns structured payloads that match the AegisDesk governed tool model.
-- Real enterprise deployments should replace these local adapters with ServiceNow/Jira, IAM Identity Center, CloudWatch Logs, and Cost Explorer adapters behind the same policy boundary.
+- It returns structured fixtures, not confirmed external outcomes.
+- A production MCP transport would need verified identity, team scoping, OPA checks, exact-action approval, durable dispatch, and audit integration. Replacing fixtures with live adapters alone would not provide these controls.

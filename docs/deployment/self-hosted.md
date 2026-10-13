@@ -130,7 +130,7 @@ For light usage, the AWS shape is designed to stay low cost because it uses serv
 - Cost Explorer API usage
 - CloudWatch logs
 
-Use the Terraform budget variable to cap spend visibility:
+Use the Terraform budget variable to set a tracking threshold, not a spending cap:
 
 ```bash
 terraform -chdir=infra/terraform apply -var='monthly_budget_usd=5'

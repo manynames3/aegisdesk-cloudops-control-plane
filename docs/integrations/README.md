@@ -94,7 +94,7 @@ Use for temporary production access workflows. The control plane should never gr
 
 ## MCP Server
 
-The MCP server lives in `services/mcp-tools` and exposes governed CloudOps tools to agent clients. See [Codex MCP Integration](codex-mcp.md).
+The MCP server lives in `services/mcp-tools` and exposes local fixture payloads over stdio to agent clients. It does not share the hosted API's authentication, OPA, persistence, or incident approval lifecycle. See [Codex MCP Integration](codex-mcp.md) for setup and the production boundary.
 
 ## Integration Rules
 
