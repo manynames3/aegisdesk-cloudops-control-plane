@@ -26,6 +26,19 @@ To review: select the commit and verify the steps that check Kind deployment, re
 | --- | --- | --- | --- | --- |
 | Not yet recorded | Pending review | Pending | Unverified at authoring | No manual claim made |
 
+
+## Real failure discovered during first Kind rollout
+
+[Initial GitHub Actions run (October 13, 2026)](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38370732478) built the image, passed Helm lint/negative-replica checks, started Kind, and loaded the image, but **failed** on Helm install readiness.
+
+**Observed evidence:** API liveness returned HTTP 200 repeatedly, while readiness returned HTTP 503. OPA emitted rego_type_error messages for duplicate default rules in model_routing, quota, tool_authorization and approval_rules.
+
+**Root cause:** the OPA container was passed the entire mounted /policies directory. Kubernetes ConfigMap volumes use ..data symlink generations; OPA's recursive loader walked both visible files and symlink targets, producing duplicate policy definitions.
+
+**Fix:** pass the five explicit Rego policy filenames to OPA, rather than recursively walking the projected ConfigMap root. This does not relax AegisDesk readiness or bypass policy enforcement.
+
+**Verification:** this change requires a new completed Kind run proving both API and OPA are ready. Do not mark it resolved from a source diff alone. The first failed run stays linked as negative evidence for the troubleshooting record.
+
 ## What remains outside verified scope
 
 - There is **no managed Kubernetes deployment** (EKS/GKE/AKS), real production traffic, or cloud ingress in this exercise.
