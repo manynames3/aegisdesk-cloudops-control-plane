@@ -2,7 +2,7 @@
 
 **Date:** October 13, 2026
 
-**Status:** Kubernetes chart and disposable cluster CI implemented on a feature branch. The linked workflow run must be inspected before upgrading verification status. No hosted production cluster is claimed.
+**Status:** Verified in a disposable Kind cluster on October 13, 2026. Both [Kubernetes evaluation CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38371577843) and [existing application CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38371577807) passed on source revision 6af2ddad989bd24ed802897e291fa45dc51f7359. No managed/hosted Kubernetes or customer production service is claimed.
 
 ## Reproducible sources
 
@@ -24,7 +24,8 @@ To review: select the commit and verify the steps that check Kind deployment, re
 
 | Date | Commit SHA | Run URL | Result | Notes |
 | --- | --- | --- | --- | --- |
-| Not yet recorded | Pending review | Pending | Unverified at authoring | No manual claim made |
+| October 13, 2026 | 6af2ddad989bd24ed802897e291fa45dc51f7359 | [Successful local Kind run](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38371577843) | **Passed** | Helm lint and template, singleton failure gate, API Docker image, Kind install, OPA-backed readiness, Bound PVC, Helm upgrade |
+| October 13, 2026 | 15568fe091df9d368dc13e4115c0342942a42843 | [Initial failed run](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38370732478) | **Failed** | OPA ConfigMap symlink duplicate rules blocked readiness; see incident below |
 
 
 ## Real failure discovered during first Kind rollout
@@ -37,7 +38,7 @@ To review: select the commit and verify the steps that check Kind deployment, re
 
 **Fix:** pass the five explicit Rego policy filenames to OPA, rather than recursively walking the projected ConfigMap root. This does not relax AegisDesk readiness or bypass policy enforcement.
 
-**Verification:** this change requires a new completed Kind run proving both API and OPA are ready. Do not mark it resolved from a source diff alone. The first failed run stays linked as negative evidence for the troubleshooting record.
+**Verification:** [Run 38371577843](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/runs/38371577843) passed Helm installation, both rollout checks, the OPA-backed API readiness call, liveness, PVC Bound assertion and release reconciliation. The first failed run remains linked as negative evidence.
 
 ## What remains outside verified scope
 
