@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml/badge.svg)](https://github.com/manynames3/aegisdesk-cloudops-control-plane/actions/workflows/ci.yml)
 
+**Kubernetes engineering work sample:** [Local Helm + Kind runbook](infra/helm/README.md) · [CI evidence ledger](docs/evidence/kubernetes-local.md). Runs only the containerized API + OPA in a disposable evaluation cluster, not the hosted AWS workload.
+
 AegisDesk is a self-hosted AWS CloudOps control plane for incident investigation and governed response. It preserves team-scoped cases, retrieves read-only evidence and runbooks, requires independent approval of an exact Jira action, and records confirmed or uncertain outcomes. Cognito/JWKS authentication, OPA/Rego policy, redaction, Bedrock routing, DynamoDB audit records, Cost Explorer, and request replay support the workflow.
 
 > Operational AI with identity, policy, approval, and evidence enforced by the backend.
