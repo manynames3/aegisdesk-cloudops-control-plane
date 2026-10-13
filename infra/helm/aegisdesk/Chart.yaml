@@ -1,0 +1,6 @@
+apiVersion: v2
+name: aegisdesk
+description: Evaluation-only Kubernetes chart for AegisDesk API and OPA; not production HA
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

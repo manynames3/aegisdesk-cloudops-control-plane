@@ -1,0 +1,36 @@
+nameOverride: ""
+fullnameOverride: ""
+
+api:
+  replicaCount: 1 # Enforced: local SQLite does not support concurrent replica writes.
+  image:
+    repository: aegisdesk-api
+    tag: local
+    pullPolicy: IfNotPresent
+  authSecretName: aegisdesk-auth
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+
+opa:
+  replicaCount: 1
+  image:
+    repository: openpolicyagent/opa
+    tag: "1.16.1"
+    pullPolicy: IfNotPresent
+  policyConfigMapName: aegisdesk-policies
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

@@ -1,0 +1,102 @@
+name: Kubernetes Local Evidence
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  helm-kind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Lint and render manifests
+        run: |
+          helm lint infra/helm/aegisdesk
+          helm template aegisdesk infra/helm/aegisdesk \
+            --set api.image.tag=kind > /tmp/aegisdesk-rendered.yaml
+          test -s /tmp/aegisdesk-rendered.yaml
+          if helm template aegisdesk infra/helm/aegisdesk \
+            --set api.replicaCount=2 > /tmp/aegisdesk-unsafe.yaml 2>&1; then
+            echo "ERROR: chart must reject SQLite deployment with two API replicas"
+            exit 1
+          fi
+
+      - name: Build local API image
+        run: docker build -t aegisdesk-api:kind services/api
+
+      - name: Start disposable Kubernetes-in-Docker cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: aegisdesk-ci
+
+      - name: Load local image
+        run: kind load docker-image aegisdesk-api:kind --name aegisdesk-ci
+
+      - name: Create evaluation-only dependencies
+        run: |
+          kubectl create secret generic aegisdesk-auth \
+            --from-literal=AEGISDESK_AUTH_SECRET=ci-local-eval-not-secret
+          kubectl create configmap aegisdesk-policies --from-file=policies/
+
+      - name: Install and wait for application
+        run: |
+          helm upgrade --install aegisdesk infra/helm/aegisdesk \
+            --set api.image.repository=aegisdesk-api \
+            --set api.image.tag=kind \
+            --set api.image.pullPolicy=Never \
+            --wait --timeout 5m
+          kubectl rollout status deployment/aegisdesk-api --timeout=180s
+          kubectl rollout status deployment/aegisdesk-opa --timeout=180s
+
+      - name: Verify liveness, policy readiness and persistence claim
+        run: |
+          set -euo pipefail
+          kubectl port-forward service/aegisdesk-api 18000:8000 > /tmp/aegisdesk-pf.log 2>&1 &
+          FORWARD_PID=$!
+          trap 'kill "$FORWARD_PID" 2>/dev/null || true' EXIT
+          READY=false
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18000/health/ready > /tmp/aegisdesk-ready.json; then
+              READY=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$READY" != "true" ]; then
+            cat /tmp/aegisdesk-pf.log
+            echo "API did not pass the real OPA-backed readiness probe"
+            exit 1
+          fi
+          curl --fail --silent --show-error http://127.0.0.1:18000/health/live | python -m json.tool
+          cat /tmp/aegisdesk-ready.json | python -m json.tool
+          kubectl get pvc aegisdesk-api-data -o jsonpath='{.status.phase}' | grep -qx Bound
+
+      - name: Reconcile Helm release without downtime assumption
+        run: |
+          helm upgrade aegisdesk infra/helm/aegisdesk \
+            --set api.image.repository=aegisdesk-api \
+            --set api.image.tag=kind \
+            --set api.image.pullPolicy=Never \
+            --wait --timeout 5m
+          helm history aegisdesk
+          kubectl get pods,svc,pvc -o wide
+
+      - name: Capture diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get all,pvc || true
+          kubectl describe pods || true
+          kubectl logs deployment/aegisdesk-api --all-containers=true --tail=120 || true
+          kubectl logs deployment/aegisdesk-opa --all-containers=true --tail=120 || true
+          cat /tmp/aegisdesk-pf.log 2>/dev/null || true

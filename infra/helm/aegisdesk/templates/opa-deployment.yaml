@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aegisdesk.fullname" . }}-opa
+  labels:
+    {{- include "aegisdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opa
+spec:
+  replicas: {{ .Values.opa.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: opa
+  template:
+    metadata:
+      labels:
+        {{- include "aegisdesk.labels" . | nindent 8 }}
+        app.kubernetes.io/component: opa
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: opa
+          image: "{{ .Values.opa.image.repository }}:{{ .Values.opa.image.tag }}"
+          imagePullPolicy: {{ .Values.opa.image.pullPolicy }}
+          args:
+            - run
+            - --server
+            - --addr=0.0.0.0:8181
+            # Kubernetes ConfigMap projections include symlink generations (..data),
+            # so OPA must not recursively load the whole directory twice.
+            - /policies/approval_rules.rego
+            - /policies/chat_policy.rego
+            - /policies/model_routing.rego
+            - /policies/quota.rego
+            - /policies/tool_authorization.rego
+          ports:
+            - name: http
+              containerPort: 8181
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.opa.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: policies
+              mountPath: /policies
+              readOnly: true
+            - name: temp
+              mountPath: /tmp
+      volumes:
+        - name: policies
+          configMap:
+            name: {{ required "opa.policyConfigMapName is mandatory" .Values.opa.policyConfigMapName | quote }}
+        - name: temp
+          emptyDir: {}
